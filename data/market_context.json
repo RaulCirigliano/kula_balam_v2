@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-11-09T16:50:35.064749+00:00",
+  "ticker": "AAPL",
+  "timeframe": "1d",
+  "regime": "Tendencia",
+  "macro_bias": "LONG",
+  "veto_active": false,
+  "key_levels": {
+    "support": 220.0,
+    "resistance": 240.0,
+    "fibo_50": 230.0,
+    "fibo_75": 225.0
+  },
+  "max_risk_per_trade_usd": 0.5
+}

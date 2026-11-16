@@ -1,0 +1,58 @@
+{
+  "cava_ruiz_fractal.py": {
+    "id": "cava_ruiz_fractal",
+    "titulo": "🐅📦 Kula Balam: Cava & Ruiz",
+    "subtitulo": "Tríada Fractal 1D-1H-5M · Zona Dorada Fibo",
+    "descripcion": "Tríada 1D-1H-5M, Zona Dorada Fibo 0.50-0.75, EMA 50 y Secado RVOL < 1.10",
+    "dataset_sugerido": "binance_BTC_USDT_4h.parquet",
+    "timeframe": "4h"
+  },
+  "tres_velas_wyckoff.py": {
+    "id": "tres_velas_wyckoff",
+    "titulo": "🕯️📦 Tres Velas & Wyckoff VPA",
+    "subtitulo": "Patrones Bulkowski Multitemporal",
+    "descripcion": "Patrones Bulkowski (Three White Soldiers / Engulfing) + RVOL institucional",
+    "dataset_sugerido": "binance_ETH_USDT_4h.parquet",
+    "timeframe": "4h"
+  },
+  "trailing_trend_runner.py": {
+    "id": "trailing_trend_runner",
+    "titulo": "🏃📦 Trailing Dinámico: Tendencia sin Techo",
+    "subtitulo": "Microtendencia sin TP Fijo",
+    "descripcion": "Microtendencia EMA 200 / SMA 20 con RSI 40-72 y Trailing",
+    "dataset_sugerido": "binance_SOL_USDT_4h.parquet",
+    "timeframe": "4h"
+  },
+  "triple_confluencia_4h.py": {
+    "id": "triple_confluencia_4h",
+    "titulo": "🔱📦 Triple Confluencia Swing 4H",
+    "subtitulo": "EMA 21/89 + RSI + Expansión ATR",
+    "descripcion": "Cruce EMA 21 / EMA 89 con expansión de volatilidad ATR(14) > SMA20(ATR)",
+    "dataset_sugerido": "binance_ETH_USDT_4h.parquet",
+    "timeframe": "4h"
+  },
+  "alex_ruiz_triada.py": {
+    "id": "alex_ruiz_triada",
+    "titulo": "📐📦 Alex Ruiz: Tríada Fractal",
+    "subtitulo": "Fractal 1D-1H-5M · Fibo 0.50-0.786",
+    "descripcion": "Fractal 1D-1H-5M, Zona Dorada Fibo 0.50-0.75 y quiebre de vela precedente",
+    "dataset_sugerido": "binance_BTC_USDT_4h.parquet",
+    "timeframe": "4h"
+  },
+  "nasdaq_araujo_vwap.py": {
+    "id": "nasdaq_araujo_vwap",
+    "titulo": "🏛️📦 Nasdaq Araujo: VWAP Wall Street",
+    "subtitulo": "Francotirador VWAP 09:30-16:00 NY",
+    "descripcion": "Rechazo en VWAP con mechas de absorción >= 25% y RVOL >= 1.15",
+    "dataset_sugerido": "yf_QQQ_1d.parquet",
+    "timeframe": "1d"
+  },
+  "hyenuk_chu_multibagger.py": {
+    "id": "hyenuk_chu_multibagger",
+    "titulo": "🐘📦 Hyenuk Chu: Swing Multibagger",
+    "subtitulo": "Vela Elefante Institucional",
+    "descripcion": "Vela Elefante con cuerpo >= 65% del rango sobre EMA 200 y SMA 20",
+    "dataset_sugerido": "yf_QQQ_1d.parquet",
+    "timeframe": "1d"
+  }
+}

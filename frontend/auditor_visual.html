@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auditor Visual de Bóveda & Ledger SQLite · Kula Balam</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Design System & Tokens Compartidos Kula Balam -->
+  <link rel="stylesheet" href="ecosystem-theme.css?v=20261031_1">
+  <style>
+    .glass {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="bg-[#06090e] text-slate-100 min-h-screen p-4 md:p-8 font-sans antialiased custom-scrollbar">
+  <div class="max-w-6xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+      <div>
+        <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          Conectado al Ledger SQLite en Tiempo Real
+        </div>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-2.5">
+          <span>🏛️</span> Auditor Visual de Bóveda & Rendimiento
+        </h1>
+        <p class="text-xs text-slate-400 mt-1">
+          Monitoreo forense de base de datos local (<code class="text-cyan-300 font-mono">trading_ledger.sqlite3</code>), contabilidad por partida doble y curva de capital.
+        </p>
+      </div>
+      <div class="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+        <div id="sync-status" class="text-[10px] text-slate-400 font-mono text-right mr-1">
+          Sincronizando...
+        </div>
+        <div class="flex items-center gap-2">
+          <!-- Menú Desplegable Universal del Ecosistema -->
+          <div id="navEcosystemContainer"></div>
+          <button id="btn-refresh" onclick="manualRefresh()" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow active:scale-95 cursor-pointer">
+            <span id="btn-refresh-icon">🔄</span> <span id="btn-refresh-text">Actualizar</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 4 Tarjetas Métricas Principales -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Tarjeta 1: Bóveda Central USDT -->
+      <div class="glass rounded-2xl p-5 border border-slate-800 space-y-2 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">💎 Bóveda USDT</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">SWEEP-BACK</span>
+        </div>
+        <div id="stat-vault-usdt" class="text-2xl md:text-3xl font-extrabold text-emerald-400 font-mono">--</div>
+        <p class="text-[11px] text-slate-400">Saldo real consolidado en tesorería</p>
+      </div>
+
+      <!-- Tarjeta 2: Rendimiento Neto Realizado -->
+      <div class="glass rounded-2xl p-5 border border-slate-800 space-y-2 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">📈 Ganancia Neta</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">REALIZADA</span>
+        </div>
+        <div id="stat-realized-pnl" class="text-2xl md:text-3xl font-extrabold text-emerald-400 font-mono">--</div>
+        <p class="text-[11px] text-slate-400">Ganancia cerrada en bolsillo tras fees</p>
+      </div>
+
+      <!-- Tarjeta 3: Comisiones del Broker -->
+      <div class="glass rounded-2xl p-5 border border-slate-800 space-y-2 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">📉 Comisiones Broker</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-yellow-950 text-yellow-300 border border-yellow-800 font-bold">FEES</span>
+        </div>
+        <div id="stat-fees" class="text-2xl md:text-3xl font-extrabold text-yellow-400 font-mono">--</div>
+        <p class="text-[11px] text-slate-400">Comisión CCXT / Binance deducida</p>
+      </div>
+
+      <!-- Tarjeta 4: Integridad Partida Doble -->
+      <div class="glass rounded-2xl p-5 border border-slate-800 space-y-2 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">⚖️ Integridad SQLite</span>
+          <span id="badge-integrity" class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold">100% OK</span>
+        </div>
+        <div id="stat-integrity-text" class="text-xl md:text-2xl font-extrabold text-cyan-400 font-mono">Cuadrada 1:1</div>
+        <p class="text-[11px] text-slate-400">Debe y Haber auditados en cada tick</p>
+      </div>
+    </div>
+
+    <!-- Curva Gráfica Visual de Capital & Distribución -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      
+      <!-- Gráfico de Crecimiento de Bóveda -->
+      <div class="lg:col-span-2 glass rounded-2xl p-5 border border-slate-800 space-y-4 shadow-xl">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <span>📈</span> Curva de Rendimiento de la Bóveda (USDT)
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Evolución del capital protegido con el tiempo</p>
+          </div>
+          <span id="curve-badge" class="text-xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/30">
+            Cargando bóveda...
+          </span>
+        </div>
+
+        <!-- Canvas SVG de la curva (dinámico, generado desde el ledger) -->
+        <div id="curve-wrap" class="w-full h-56 bg-slate-950/80 rounded-xl border border-slate-800/80 p-3 flex items-center justify-center">
+          <svg id="curve-svg" viewBox="0 0 600 200" class="w-full h-full"></svg>
+        </div>
+      </div>
+
+      <!-- Bóvedas Multidivisa -->
+      <div class="glass rounded-2xl p-5 border border-slate-800 space-y-3 shadow-xl">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-white border-b border-slate-800 pb-2 flex items-center gap-2">
+          <span>🏛️</span> Bóvedas por Divisa
+        </h2>
+        <div class="space-y-2.5 text-xs">
+          <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span class="font-bold text-slate-200">USDT (Cripto)</span>
+            </div>
+            <span id="multival-usdt" class="font-mono font-bold text-emerald-400">--</span>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>
+              <span class="font-bold text-slate-200">USD (Cedears / Wall St.)</span>
+            </div>
+            <span id="multival-usd" class="font-mono font-bold text-blue-400">--</span>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+              <span class="font-bold text-slate-200">ARS (Pesos BYMA)</span>
+            </div>
+            <span id="multival-ars" class="font-mono font-bold text-cyan-400">--</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Sección de Posiciones Abiertas y Operaciones Cerradas -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- Posiciones Abiertas en el Guardián -->
+      <div class="glass rounded-2xl p-5 border border-slate-800 space-y-3 shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <h3 class="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+            <span>🛡️</span> Posición Abierta en Supervisión
+          </h3>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">GUARDIÁN ACTIVO</span>
+        </div>
+        
+        <div id="open-positions-container" class="space-y-2">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Historial de Operaciones Cerradas -->
+      <div class="glass rounded-2xl p-5 border border-slate-800 space-y-3 shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <h3 class="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+            <span>🎯</span> Historial de Operaciones Cerradas
+          </h3>
+          <span class="text-xs text-slate-500 font-mono">Últimos Trades</span>
+        </div>
+
+        <div id="closed-trades-container" class="space-y-2">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Sección de Análisis Contrafáctico y Llave de Trailing Stop -->
+    <div class="glass rounded-2xl p-5 border border-slate-800 space-y-4 shadow-xl">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
+        <div>
+          <h3 class="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+            <span>🧠</span> Dictamen de la Llave de Trailing Stop & Análisis Contrafáctico (What-If)
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Auditoría en vivo de la decisión activa de la IA vs. el camino alternativo descartado.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="badge-key-mode" class="text-xs font-mono font-bold px-3 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+            LLAVE: AUTO IA
+          </span>
+        </div>
+      </div>
+
+      <div id="counterfactual-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Renderizado dinámico de tarjetas contrafácticas por JS -->
+      </div>
+    </div>
+
+    <!-- Sección de Reporte en Texto Plano para Gemini / Antigravity -->
+    <div class="glass rounded-2xl p-5 border border-slate-800 space-y-3 shadow-xl">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
+        <div>
+          <h3 class="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+            <span>📋</span> Reporte Forense en Texto Plano
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Listo para ver y copiar directamente a Gemini, Antigravity o compartir.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-copy-report" onclick="copiarReporteTexto()" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow active:scale-95 cursor-pointer">
+            <span id="copy-icon">📋</span> <span id="copy-btn-text">Copiar Reporte</span>
+          </button>
+          <button id="btn-download-report" onclick="descargarReporteTexto()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 shadow active:scale-95 cursor-pointer">
+            <span>💾</span> <span>Descargar .txt</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="relative">
+        <textarea id="plain-text-report" readonly rows="12" class="w-full bg-slate-950/90 text-emerald-300 font-mono text-xs p-4 rounded-xl border border-slate-800 focus:outline-none focus:border-emerald-500/50 resize-y leading-relaxed select-all shadow-inner" placeholder="Cargando informe forense..."></textarea>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API_BASE = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
+      ? `${window.location.protocol}//${window.location.hostname || '127.0.0.1'}:18767`
+      : 'http://127.0.0.1:18767';
+
+    async function loadPlainTextReport() {
+      try {
+        const res = await fetch('ultimo_reporte_boveda.txt?t=' + Date.now());
+        if (res.ok) {
+          const text = await res.text();
+          const ta = document.getElementById('plain-text-report');
+          if (ta && text.trim()) ta.value = text;
+        }
+      } catch (err) {
+        console.warn("No se pudo cargar ultimo_reporte_boveda.txt:", err);
+      }
+    }
+
+    function copiarReporteTexto() {
+      const ta = document.getElementById('plain-text-report');
+      if (!ta || !ta.value) return;
+      navigator.clipboard.writeText(ta.value).then(() => {
+        const btnText = document.getElementById('copy-btn-text');
+        const icon = document.getElementById('copy-icon');
+        const orig = btnText.innerText;
+        btnText.innerText = '¡Copiado al Portapapeles!';
+        icon.innerText = '✅';
+        setTimeout(() => {
+          btnText.innerText = orig;
+          icon.innerText = '📋';
+        }, 2500);
+      }).catch(err => {
+        ta.select();
+        document.execCommand('copy');
+        alert('Reporte copiado al portapapeles.');
+      });
+    }
+
+    function descargarReporteTexto() {
+      const ta = document.getElementById('plain-text-report');
+      if (!ta || !ta.value) return;
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const filename = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}_auditoria_kula_balam.txt`;
+      const blob = new Blob([ta.value], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function manualRefresh() {
+      const btn = document.getElementById('btn-refresh');
+      const icon = document.getElementById('btn-refresh-icon');
+      const text = document.getElementById('btn-refresh-text');
+
+      if (icon) icon.className = 'inline-block animate-spin';
+      if (text) text.innerText = 'Actualizando...';
+      if (btn) btn.disabled = true;
+
+      try {
+        // 1. Invocar auditoría en tiempo real en el backend SQLite
+        let auditData = null;
+        try {
+          const auditRes = await fetch(`${API_BASE}/api/ledger/audit`, { cache: 'no-store' });
+          if (auditRes.ok) {
+            auditData = await auditRes.json();
+            if (auditData.report_text) {
+              const ta = document.getElementById('plain-text-report');
+              if (ta) ta.value = auditData.report_text;
+            }
+          }
+        } catch (e) {
+          console.warn("Endpoint /api/ledger/audit no disponible o fallo de red:", e);
+        }
+
+        // 2. Actualizar tarjetas visuales y reporte en texto
+        await Promise.all([
+          fetchLedgerData(),
+          loadPlainTextReport()
+        ]);
+
+        if (icon) {
+          icon.className = 'inline-block';
+          icon.innerText = '✅';
+        }
+        if (text) text.innerText = '¡Actualizado!';
+        if (btn) {
+          btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+          btn.classList.add('bg-emerald-500', 'ring-2', 'ring-emerald-400');
+        }
+
+        setTimeout(() => {
+          if (icon) icon.innerText = '🔄';
+          if (text) text.innerText = 'Actualizar';
+          if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('bg-emerald-500', 'ring-2', 'ring-emerald-400');
+            btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+          }
+        }, 1500);
+
+      } catch (err) {
+        console.error("Error al actualizar manualmente:", err);
+        if (icon) {
+          icon.className = 'inline-block';
+          icon.innerText = '⚠️';
+        }
+        if (text) text.innerText = 'Reintentar';
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function renderEquityCurve(closedTrades, stateData) {
+      const svg = document.getElementById('curve-svg');
+      if (!svg) return;
+      const bal = stateData.balances || {};
+      const equity = (bal.vault?.USDT || 0) + (bal.operational?.USDT || 0);
+      const pnlNet = bal.realized_pnl_net?.USDT || 0;
+      const base = equity - pnlNet;
+      const usdt = closedTrades
+        .filter(t => (t.symbol || '').toUpperCase().includes('USDT'))
+        .sort((x, y) => String(x.closed_at || '').localeCompare(String(y.closed_at || '')));
+      const pts = [base];
+      let acc = base;
+      usdt.forEach(t => { acc += (t.realized_pnl || 0); pts.push(acc); });
+      const W = 600, H = 200, L = 60, R = 20, T = 20, B = 30;
+      const min = Math.min(...pts), max = Math.max(...pts);
+      const span = (max - min) || Math.max(Math.abs(base) * 0.001, 0.01);
+      const lo = min - span * 0.1, hi = max + span * 0.1;
+      const x = i => pts.length === 1 ? (L + (W - L - R) / 2) : L + (i * (W - L - R)) / (pts.length - 1);
+      const y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+      let out = '';
+      [0, 0.5, 1].forEach(f => {
+        const v = lo + (hi - lo) * f;
+        out += `<line x1="${L}" y1="${y(v)}" x2="${W - R}" y2="${y(v)}" stroke="#1e293b" stroke-dasharray="3,3"/>` +
+               `<text x="4" y="${y(v) + 3}" fill="#64748b" font-size="10" font-family="monospace">$${v.toFixed(2)}</text>`;
+      });
+      const up = acc >= base;
+      const color = up ? '#10b981' : '#f43f5e';
+      if (pts.length > 1) {
+        const line = pts.map((v, i) => `${i ? 'L' : 'M'} ${x(i)},${y(v)}`).join(' ');
+        out += `<path d="${line} L ${x(pts.length - 1)},${H - B} L ${x(0)},${H - B} Z" fill="${color}" fill-opacity="0.12"/>`;
+        out += `<path d="${line}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+      } else {
+        out += `<line x1="${L}" y1="${y(base)}" x2="${W - R}" y2="${y(base)}" stroke="#38bdf8" stroke-width="2"/>`;
+      }
+      out += `<circle cx="${x(0)}" cy="${y(pts[0])}" r="5" fill="#38bdf8"/>`;
+      out += `<text x="${L}" y="${H - 10}" fill="#94a3b8" font-size="9" font-family="monospace">Inicio $${base.toFixed(2)}</text>`;
+      if (pts.length > 1) {
+        out += `<circle cx="${x(pts.length - 1)}" cy="${y(acc)}" r="6" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+        out += `<text x="${W - R}" y="${H - 10}" text-anchor="end" fill="${color}" font-size="10" font-weight="bold" font-family="monospace">${usdt.length} trades · ${acc >= base ? '+' : ''}$${(acc - base).toFixed(2)}</text>`;
+      } else {
+        out += `<text x="${W - R}" y="${H - 10}" text-anchor="end" fill="#64748b" font-size="10" font-family="monospace">Sin operaciones cerradas</text>`;
+      }
+      svg.innerHTML = out;
+    }
+
+    async function fetchLedgerData() {
+      try {
+        const [resState, resTrades] = await Promise.all([
+          fetch(`${API_BASE}/api/ledger/state`, { cache: 'no-store' }),
+          fetch(`${API_BASE}/api/broker/trades`, { cache: 'no-store' })
+        ]);
+
+        if (!resState.ok) throw new Error(`Estado Ledger HTTP ${resState.status}`);
+        const stateData = await resState.json();
+        const tradesData = resTrades.ok ? await resTrades.json() : { trades: [] };
+
+        // 1. Balances
+        if (stateData.balances && stateData.balances.vault) {
+          const v = stateData.balances.vault;
+          const vaultUsdt = v.USDT || 0;
+          document.getElementById('stat-vault-usdt').innerText = `$${vaultUsdt.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} USDT`;
+          document.getElementById('multival-usdt').innerText = `$${vaultUsdt.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} USDT`;
+          document.getElementById('multival-usd').innerText = `$${(v.USD || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} USD`;
+          document.getElementById('multival-ars').innerText = `$${(v.ARS || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ARS`;
+
+          // Curva badge
+          const curveBadge = document.getElementById('curve-badge');
+          if (curveBadge) {
+            const opUsdt = stateData.balances.operational?.USDT || 0;
+            const totalEquity = vaultUsdt + opUsdt;
+            const pnlNet = stateData.balances.realized_pnl_net?.USDT || 0;
+            const sign = pnlNet >= 0 ? '+' : '';
+            curveBadge.innerText = `Bóveda $${vaultUsdt.toFixed(2)} USDT | Total $${totalEquity.toFixed(2)} (${sign}$${pnlNet.toFixed(2)} PnL)`;
+          }
+        }
+
+        // 2. Fees & PnL
+        const fees = stateData.balances?.fees_paid?.USDT || 0;
+        document.getElementById('stat-fees').innerText = `$${fees.toFixed(2)}`;
+
+        const pnlNet = stateData.balances?.realized_pnl_net?.USDT || 0;
+        document.getElementById('stat-realized-pnl').innerText = `${pnlNet >= 0 ? '+' : ''}$${pnlNet.toFixed(2)}`;
+        document.getElementById('stat-realized-pnl').className = `text-2xl md:text-3xl font-extrabold font-mono ${pnlNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+        // 3. Integridad contable de partida doble
+        if (stateData.double_entry_integrity) {
+          const integ = stateData.double_entry_integrity;
+          const badge = document.getElementById('badge-integrity');
+          const text = document.getElementById('stat-integrity-text');
+          if (integ.valid) {
+            if (badge) {
+              badge.innerText = '100% OK';
+              badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold';
+            }
+            if (text) text.innerText = `Cuadrada (${integ.total_transactions} txs)`;
+          } else {
+            if (badge) {
+              badge.innerText = 'DESCUADRE';
+              badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold';
+            }
+            if (text) text.innerText = 'Alerta Contable';
+          }
+        }
+
+        // 4. Posiciones abiertas
+        const openContainer = document.getElementById('open-positions-container');
+        openContainer.innerHTML = '';
+        const openPos = stateData.open_positions || [];
+
+        if (openPos.length === 0) {
+          openContainer.innerHTML = '<div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-center text-xs text-slate-500 italic">No hay posiciones abiertas en este momento.</div>';
+        } else {
+          openPos.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5';
+            
+            const openedAtStr = p.opened_at || '';
+            let hoursOpen = p.time_decay_hours || 0;
+            if (!hoursOpen && openedAtStr) {
+              const d = new Date(openedAtStr.replace(' ', 'T') + 'Z');
+              if (!isNaN(d.getTime())) {
+                hoursOpen = Math.max(0, (Date.now() - d.getTime()) / 3600000);
+              }
+            }
+            const decayStatus = p.time_decay_status || (hoursOpen >= 16 ? 'TIGHTENING_16H' : (hoursOpen >= 8 ? 'TIGHTENING_8H' : 'NORMAL'));
+            const decaySugg = p.time_decay_suggestion || (hoursOpen >= 16 ? `⚠️ [Sugerencia IA]: Posición con ${hoursOpen.toFixed(1)}h sin definición. Considerar conmutar a Opción A (Time-Stop Tajante a mercado) o C (Desalojo por Prioridad).` : '');
+            
+            const decayBadge = hoursOpen >= 8 
+              ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">⏳ ${hoursOpen.toFixed(1)}h [Decay B]</span>`
+              : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">⏳ ${hoursOpen.toFixed(1)}h</span>`;
+
+            card.innerHTML = `
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-white text-sm flex items-center gap-1.5">
+                  <span class="text-amber-400">⚡</span> ${p.symbol}
+                </span>
+                <div class="flex items-center gap-1.5">
+                  ${decayBadge}
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    ${p.side} ABIERTA
+                  </span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+                <div class="text-slate-400">Entrada: <strong class="text-slate-200">$${(p.entry_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</strong></div>
+                <div class="text-slate-400">Cantidad: <strong class="text-slate-200">${p.qty}</strong></div>
+                <div class="text-slate-400">Stop Móvil / SL: <strong class="text-rose-400">${(Number(p.current_stop_net_pct !== undefined ? p.current_stop_net_pct : -p.initial_sl_pct) || 0).toFixed(2)}% neto</strong></div>
+                <div class="text-slate-400">Take Profit: <strong class="text-emerald-400">${(p.initial_tp_pct === null || p.initial_tp_pct === undefined || Number(p.initial_tp_pct) <= 0) ? 'Sin techo (MID_EXIT)' : '+' + p.initial_tp_pct + '%'}</strong></div>
+              </div>
+              ${decaySugg ? `<div class="p-2 rounded bg-amber-950/60 border border-amber-800/80 text-[11px] text-amber-200 leading-snug">${escapeHtml(decaySugg)}</div>` : ''}
+              <div class="text-[10px] text-slate-500 font-mono pt-1 border-t border-slate-900 flex justify-between">
+                <span>Apertura: ${p.opened_at || 'N/A'}</span>
+                <span>Mecánica: <strong class="text-purple-300">${decayStatus}</strong></span>
+              </div>
+            `;
+            openContainer.appendChild(card);
+          });
+        }
+
+        // 5. Operaciones cerradas
+        const closedContainer = document.getElementById('closed-trades-container');
+        closedContainer.innerHTML = '';
+        const allTrades = tradesData.trades || [];
+        const closedTrades = allTrades.filter(t => t.status === 'CLOSED');
+
+        if (closedTrades.length === 0) {
+          closedContainer.innerHTML = '<div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-center text-xs text-slate-500 italic">Aún no hay operaciones cerradas.</div>';
+        } else {
+          closedTrades.forEach(t => {
+            const pnl = t.realized_pnl || 0;
+            const card = document.createElement('div');
+            card.className = 'p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2';
+            card.innerHTML = `
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-white text-sm flex items-center gap-1.5">
+                  <span class="text-blue-400">💎</span> ${t.symbol}
+                </span>
+                <span class="px-2 py-0.5 rounded text-xs font-bold font-mono ${pnl >= 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}">
+                  ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)} USDT
+                </span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+                <div class="text-slate-400">Entrada: <strong class="text-slate-300">$${(t.entry_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</strong></div>
+                <div class="text-slate-400">Salida: <strong class="text-slate-300">$${(t.exit_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</strong></div>
+                <div class="text-slate-400">Motivo: <strong class="text-amber-400">${t.exit_reason || 'Cierre'}</strong></div>
+                <div class="text-slate-400">Comisión: <strong class="text-yellow-400">$${(t.total_fees || 0).toFixed(4)}</strong></div>
+              </div>
+              <div class="text-[10px] text-slate-500 font-mono pt-1 border-t border-slate-900">
+                Cerrado: ${t.closed_at || t.opened_at || 'N/A'}
+              </div>
+            `;
+            closedContainer.appendChild(card);
+          });
+        }
+
+        // 6. Análisis Contrafáctico (What-If) de la Llave IA
+        const cfContainer = document.getElementById('counterfactual-container');
+        const badgeKeyMode = document.getElementById('badge-key-mode');
+        if (badgeKeyMode && stateData.trailing_key_mode) {
+          badgeKeyMode.innerText = `LLAVE: ${stateData.trailing_key_mode.toUpperCase()} IA`;
+        }
+        if (cfContainer) {
+          cfContainer.innerHTML = '';
+          const telemetry = stateData.trailing_telemetry || {};
+          const keys = Object.keys(telemetry);
+
+          if (keys.length > 0) {
+            keys.forEach(sym => {
+              const item = telemetry[sym];
+              const card = document.createElement('div');
+              card.className = 'p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3';
+              const isComp = item.active_mode === 'COMPRIMIDO';
+              card.innerHTML = `
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span class="font-bold text-white text-sm flex items-center gap-1.5">
+                    <span class="text-indigo-400">⚡</span> ${sym}
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isComp ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+                    MODO ${item.active_mode} (${item.active_dist_pct}%)
+                  </span>
+                </div>
+                <div class="space-y-1.5 text-xs">
+                  <div class="text-slate-300 font-mono flex justify-between">
+                    <span>Pico Máximo:</span>
+                    <strong class="text-emerald-400">$${(item.peak_price || 0).toLocaleString()} (+${(item.peak_gross_pct || 0).toFixed(2)}%)</strong>
+                  </div>
+                  <div class="text-slate-400 text-[11px] leading-relaxed bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">
+                    <strong class="text-indigo-300">Criterio IA:</strong> ${item.ai_reason || 'Monitoreo activo'}
+                  </div>
+                  <div class="pt-1.5 border-t border-slate-900 grid grid-cols-2 gap-2 text-[11px] font-mono">
+                    <div class="p-1.5 rounded bg-emerald-950/40 border border-emerald-800/50">
+                      <span class="text-slate-400 block text-[9px] uppercase">Decisión Activa:</span>
+                      <span class="text-emerald-300 font-bold">${item.active_mode}</span>
+                      <span class="text-[10px] text-slate-300 block">Stop: $${(item.active_stop_price || 0).toFixed(2)}</span>
+                    </div>
+                    <div class="p-1.5 rounded bg-purple-950/40 border border-purple-800/50">
+                      <span class="text-slate-400 block text-[9px] uppercase">Camino Alternativo:</span>
+                      <span class="text-purple-300 font-bold">${item.alt_mode} (${item.alt_dist_pct}%)</span>
+                      <span class="text-[10px] text-slate-300 block">Stop: $${(item.alt_stop_price || 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div class="text-[11px] font-mono text-center pt-1 text-cyan-300 font-bold">
+                    🏆 Diferencial: ${(item.diff_pct >= 0 ? '+' : '')}${(item.diff_pct || 0).toFixed(2)}% (${item.diff_usd >= 0 ? '+' : ''}$${(item.diff_usd || 0).toFixed(2)} USDT)
+                  </div>
+                </div>
+              `;
+              cfContainer.appendChild(card);
+            });
+          } else {
+            cfContainer.innerHTML = '<div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-center text-xs text-slate-500 italic col-span-full">Sin telemetría de trailing activa (no hay posiciones con trailing en curso).</div>';
+          }
+        }
+
+        // 6b. Curva de capital real desde operaciones cerradas
+        renderEquityCurve(closedTrades, stateData);
+
+        // 7. Actualizar timestamp en la interfaz
+        const syncStatus = document.getElementById('sync-status');
+        if (syncStatus) {
+          const now = new Date();
+          syncStatus.innerText = `Sincronizado: ${now.toLocaleTimeString()}`;
+        }
+
+      } catch (err) {
+        console.error("Error al obtener datos del ledger:", err);
+        const syncStatus = document.getElementById('sync-status');
+        if (syncStatus) {
+          syncStatus.innerHTML = '<span class="text-amber-400">⚠️ Sin conexión al backend</span>';
+        }
+      }
+    }
+
+    // Polling automático cada 4 segundos
+    fetchLedgerData();
+    loadPlainTextReport();
+    setInterval(fetchLedgerData, 4000);
+    setInterval(loadPlainTextReport, 4000);
+  </script>
+  <!-- Menú Desplegable Universal del Ecosistema -->
+  <script src="universal-nav.js?v=20261031_52"></script>
+</body>
+</html>

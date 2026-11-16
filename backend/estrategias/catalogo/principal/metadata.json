@@ -1,0 +1,156 @@
+{
+  "1_donchian_breakout_sol_4h.py": {
+    "id": "1_donchian_breakout_sol_4h",
+    "titulo": "🌊🏦 1. Donchian Breakout SOL 4H (Fondeo Slot 1)",
+    "subtitulo": "Auditada Walk-Forward · Fondeo Strict · PF 1.82 · MC DD 7.55%",
+    "descripcion": "Ruptura Donchian 30 con filtro EMA 200, compresión ATR, RVOL >= 0.85 y sizing dinámico neto 0.60%.",
+    "timeframe": "4h",
+    "lote_sugerido": 0.1,
+    "dataset_sugerido": "binance_SOL_USDT_4h.parquet",
+    "activo_default": "SOL/USDT",
+    "rendimiento_lab": "Fondeo Aprobado (Max DD 3.37% · MC DD 7.55%)"
+  },
+  "2_squeeze_dual_eth_4h.py": {
+    "id": "2_squeeze_dual_eth_4h",
+    "titulo": "⚡👑 2. Squeeze Dual ETH 4H (Slot 2)",
+    "subtitulo": "Auditada Walk-Forward · Calibrada Fondeo · PF 1.66 · MC DD 6.91%",
+    "descripcion": "Compresión de volatilidad Bollinger/Donchian en compras y Bear BOS bajo EMA 50 en ventas con RVOL >= 0.70.",
+    "timeframe": "4h",
+    "lote_sugerido": 0.01,
+    "dataset_sugerido": "binance_ETH_USDT_4h.parquet",
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Fondeo Aprobado (Max DD 2.50% · MC DD 6.91%)"
+  },
+  "squeeze_dual_eth_fondeo_strict_4h.py": {
+    "id": "squeeze_dual_eth_fondeo_strict_4h",
+    "titulo": "⚡🏦 Squeeze Dual ETH 4H (Fondeo Strict)",
+    "subtitulo": "Certificada Prop Firm · PF 2.53 · Max DD 6.50% · Daily DD 2.99%",
+    "descripcion": "Compresión estricta BB/Donchian con sizing 0.50 y compuerta anti-mechas para cuentas fondeadas.",
+    "timeframe": "4h",
+    "lote_sugerido": 0.01,
+    "dataset_sugerido": "binance_ETH_USDT_4h.parquet",
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "APTO FONDEO DD 6.50%"
+  },
+  "squeeze_dual_eth_4h_slot1.py": {
+    "id": "squeeze_dual_eth_4h_slot1",
+    "titulo": "⚡👑 Squeeze Dual ETH 4H (Slot 1)",
+    "subtitulo": "Auditada Walk-Forward · PF 1.66 · Max DD 2.50% · WFE 0.53",
+    "descripcion": "Fórmula titular certificada en Slot 1 para ETH/USDT en 4H.",
+    "timeframe": "4h",
+    "lote_sugerido": 0.01,
+    "dataset_sugerido": "binance_ETH_USDT_4h.parquet",
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Lab Validado"
+  },
+  "squeeze_dual_eth_4h.py": {
+    "id": "squeeze_dual_eth_4h",
+    "titulo": "⚡👑 Squeeze Dual BB/Donchian 4H",
+    "subtitulo": "Auditada Walk-Forward · PF 1.66 · Max DD 2.50%",
+    "descripcion": "Motor cuantitativo dual de compresión y Bear BOS en ETH/USDT 4H.",
+    "timeframe": "4h",
+    "lote_sugerido": 0.01,
+    "dataset_sugerido": "binance_ETH_USDT_4h.parquet",
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Lab Validado"
+  },
+  "cava_fallo_macd_eurusd_1h.py": {
+    "id": "cava_fallo_macd_eurusd_1h",
+    "titulo": "🐅🏦 Cava Fallo MACD EURUSD 1H",
+    "subtitulo": "Forex Spot 1H · PF 1.79 · OOS PF 9.30 · WR 55.56% · MC DD 1.29%",
+    "descripcion": "Divergencia y fallo de histograma MACD sobre EMA 50 en EUR/USD 1H (07:00-18:00 UTC) con árbitro RFC-2026-11.",
+    "timeframe": "1h",
+    "lote_sugerido": 0.1,
+    "dataset_sugerido": "yf_EURUSD_1h.parquet",
+    "activo_default": "EURUSD=X",
+    "rendimiento_lab": "Lab Validado Forex (OOS PF 9.30 · Max DD 0.93%)"
+  },
+  "donchian_breakout_1h.py": {
+    "id": "donchian_breakout_1h",
+    "titulo": "🌊👑 Donchian Breakout 1H",
+    "subtitulo": "Auditada Multi-Marco · WR 45.5% · R:R 2.12 · PF 1.77",
+    "descripcion": "Ruptura estructural de canales Donchian con filtro macro EMA 200.",
+    "timeframe": "1h",
+    "lote_sugerido": 0.1,
+    "dataset_sugerido": "binance_SOL_USDT_4h.parquet",
+    "activo_default": "SOL/USDT",
+    "rendimiento_lab": "Lab Validado"
+  },
+  "ensamble_campeon_binance_ETH_USDT_4h.py": {
+    "id": "ensamble_campeon_binance_ETH_USDT_4h",
+    "titulo": "🏆👑 Ensamble Campeón ETH 4H",
+    "subtitulo": "Fusión Multiactivo Ponderada Walk-Forward · Poda de Correlación",
+    "descripcion": "Ensamble adaptativo Donchian Breakout + Squeeze Dual con arbitraje unificado.",
+    "timeframe": "4h",
+    "lote_sugerido": 0.01,
+    "dataset_sugerido": "binance_ETH_USDT_4h.parquet",
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Ensamble Campeón Lab"
+  },
+  "cava_fallo_macd_eurusd_1h_slot1.py": {
+    "id": "cava_fallo_macd_eurusd_1h_slot1",
+    "titulo": "🐅🏦 Cava Fallo MACD EURUSD 1H (Slot 1)",
+    "subtitulo": "Forex Spot 1H · PF 1.79 · OOS PF 9.30 · WR 55.56% · MC DD 1.29%",
+    "descripcion": "Divergencia y fallo de histograma MACD sobre EMA 50 en EUR/USD 1H (07:00-18:00 UTC) con árbitro RFC-2026-11.",
+    "dataset_sugerido": "yf_EURUSD_1h.parquet",
+    "timeframe": "1h",
+    "lote_sugerido": 0.1,
+    "activo_default": "EURUSD=X",
+    "rendimiento_lab": "Lab Validado Forex (OOS PF 9.30 · Max DD 0.93%)"
+  },
+  "mejorada_cava_fallo_macd_eurusd_1h.py": {
+    "id": "mejorada_cava_fallo_macd_eurusd_1h",
+    "titulo": "🚀 mejorada cava_fallo_macd_eurusd_1h.py (EURUSD=X)",
+    "subtitulo": "Panel Principal (Cerebro Kula) · Slot 1 · Confianza 85%",
+    "descripcion": "Variante Lab Forex · TP 4.5x ATR · Árbitro RFC-2026-11",
+    "dataset_sugerido": "yf_EURUSD_1h.parquet",
+    "timeframe": "1h",
+    "lote_sugerido": 0.1,
+    "activo_default": "EURUSD=X",
+    "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
+  },
+  "1_donchian_breakout_sol_4h_slot1.py": {
+    "id": "1_donchian_breakout_sol_4h_slot1",
+    "titulo": "🚀 1_donchian_breakout_sol_4h.py (SOL/USDT)",
+    "subtitulo": "Panel Principal (Cerebro Kula) · Slot 1 · Confianza 85%",
+    "descripcion": "Estrategia auditada con asimetría R:R >= 1:2.0 y Walk-Forward OOS.",
+    "dataset_sugerido": "binance_SOL_USDT_4h.parquet",
+    "timeframe": "4h",
+    "lote_sugerido": 0.1,
+    "activo_default": "SOL/USDT",
+    "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
+  },
+  "21_donchian_breakout_sol_4h.py": {
+    "id": "21_donchian_breakout_sol_4h",
+    "titulo": "🚀 21_donchian_breakout_sol_4h.py (SOL/USDT)",
+    "subtitulo": "Panel Principal (Cerebro Kula) · Slot 1 · Confianza 85%",
+    "descripcion": "Estrategia auditada con asimetría R:R >= 1:2.0 y Walk-Forward OOS.",
+    "dataset_sugerido": "binance_SOL_USDT_4h.parquet",
+    "timeframe": "4h",
+    "lote_sugerido": 0.1,
+    "activo_default": "SOL/USDT",
+    "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
+  },
+  "ensamble_campeon_binance_ETH_USDT_4h_slot1.py": {
+    "id": "ensamble_campeon_binance_ETH_USDT_4h_slot1",
+    "titulo": "🚀 ensamble_campeon_binance_ETH_USDT_4h.py (ETH/USDT)",
+    "subtitulo": "Panel Principal (Cerebro Kula) · Slot 1 · Confianza 85%",
+    "descripcion": "Auditada Walk-Forward · Fondeo Strict · PF 1.82 · MC DD 7.55%",
+    "dataset_sugerido": "binance_ETH_USDT_4h.parquet",
+    "timeframe": "4h",
+    "lote_sugerido": 0.1,
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
+  },
+  "31_donchian_breakout_sol_4h.py": {
+    "id": "31_donchian_breakout_sol_4h",
+    "titulo": "🚀 31_donchian_breakout_sol_4h.py (SOL/USDT)",
+    "subtitulo": "Panel Principal (Cerebro Kula) · Slot 1 · Confianza 85%",
+    "descripcion": "Estrategia auditada con asimetría R:R >= 1:2.0 y Walk-Forward OOS.",
+    "dataset_sugerido": "binance_SOL_USDT_4h.parquet",
+    "timeframe": "4h",
+    "lote_sugerido": 0.1,
+    "activo_default": "SOL/USDT",
+    "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
+  }
+}

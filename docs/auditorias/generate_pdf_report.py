@@ -1,0 +1,791 @@
+#!/usr/bin/env python3
+"""
+Generador del Informe Técnico Completo en PDF:
+Configuraciones de Movimiento Objetivo, Gestión de Salidas y Mejoras del Sistema.
+"""
+
+import os
+import subprocess
+from pathlib import Path
+
+OUTPUT_DIR = Path(__file__).resolve().parent
+HTML_PATH = OUTPUT_DIR / "informe_movimiento_objetivo_mejorado.html"
+PDF_PATH = OUTPUT_DIR / "INFORME_MOVIMIENTO_OBJETIVO_Y_MEJORAS.pdf"
+DESKTOP_PDF_PATH = Path("/home/raul/Escritorio/INFORME_MOVIMIENTO_OBJETIVO_Y_MEJORAS.pdf")
+
+HTML_CONTENT = """<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe Técnico: Configuraciones de Movimiento Objetivo y Gestión de Salidas</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 14mm 16mm 16mm 16mm;
+    @bottom-center {
+      content: "Página " counter(page);
+      font-size: 8pt;
+      color: #64748b;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #1e293b;
+    line-height: 1.5;
+    font-size: 9.5pt;
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .header-box {
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+  }
+
+  .doc-category {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 8pt;
+    font-weight: 700;
+    color: #0284c7;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  h1 {
+    font-size: 19pt;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.03em;
+    margin: 0 0 6px 0;
+    line-height: 1.2;
+  }
+
+  .doc-meta {
+    font-size: 8.5pt;
+    color: #64748b;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-family: ui-monospace, monospace;
+  }
+
+  .lead-text {
+    font-size: 10pt;
+    color: #334155;
+    line-height: 1.6;
+    margin-bottom: 18px;
+  }
+
+  h2 {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #0f172a;
+    border-left: 4px solid #0284c7;
+    padding-left: 10px;
+    margin-top: 18px;
+    margin-bottom: 10px;
+    letter-spacing: -0.02em;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-size: 10.5pt;
+    font-weight: 650;
+    color: #1e293b;
+    margin-top: 14px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+  }
+
+  p, li {
+    color: #334155;
+    font-size: 9.3pt;
+  }
+
+  ul, ol {
+    margin-top: 4px;
+    margin-bottom: 10px;
+    padding-left: 20px;
+  }
+
+  li {
+    margin-bottom: 4px;
+  }
+
+  strong {
+    color: #0f172a;
+    font-weight: 650;
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 8.5pt;
+    background: #f1f5f9;
+    padding: 1px 4px;
+    border-radius: 4px;
+    color: #0369a1;
+    border: 1px solid #e2e8f0;
+  }
+
+  .alert-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #0284c7;
+    border-radius: 6px;
+    padding: 9px 13px;
+    margin: 12px 0;
+    page-break-inside: avoid;
+  }
+
+  .alert-box.success {
+    border-left-color: #10b981;
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+  }
+
+  .alert-box.warning {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+    border-color: #fde68a;
+  }
+
+  pre.ascii-diagram {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 8.2pt;
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 12px 14px;
+    border-radius: 8px;
+    line-height: 1.45;
+    margin: 12px 0;
+    page-break-inside: avoid;
+    white-space: pre;
+    font-weight: 500;
+  }
+
+  .ascii-diagram .accent { color: #38bdf8; font-weight: bold; }
+  .ascii-diagram .green { color: #4ade80; font-weight: bold; }
+  .ascii-diagram .red { color: #f87171; font-weight: bold; }
+  .ascii-diagram .dim { color: #94a3b8; }
+
+  /* Math card */
+  .math-card {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-left: 4px solid #0284c7;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 8.3pt;
+    page-break-inside: avoid;
+  }
+
+  .math-row {
+    margin: 3px 0;
+    color: #0f172a;
+  }
+
+  /* Tablas de métricas */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 8.3pt;
+    page-break-inside: avoid;
+  }
+
+  th, td {
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 7.8pt;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #f8fafc;
+  }
+
+  tbody tr.highlight-row {
+    background: #f0fdf4;
+    font-weight: 600;
+  }
+
+  tbody tr.danger-row {
+    background: #fef2f2;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 7.2pt;
+    font-weight: 600;
+    font-family: ui-monospace, monospace;
+  }
+
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-blue { background: #e0f2fe; color: #075985; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-purple { background: #f3e8ff; color: #6b21a8; }
+
+  /* Gráficos vectoriales SVG */
+  .chart-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 12px 0;
+    background: #ffffff;
+    page-break-inside: avoid;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .chart-title {
+    font-size: 9pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .chart-desc {
+    font-size: 8.2pt;
+    color: #64748b;
+    margin-top: 5px;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+
+  /* Comparativa infantil / didáctica */
+  .kid-box {
+    border: 2px dashed #0284c7;
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: #f0f9ff;
+    margin-top: 14px;
+    page-break-inside: avoid;
+  }
+
+  .kid-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+  }
+
+  .kid-card {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 11px;
+    border: 1px solid #bae6fd;
+  }
+
+  .kid-card.old {
+    border-color: #fecaca;
+    background: #fff5f5;
+  }
+
+  .kid-card.new {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+  }
+
+  .kid-card h4 {
+    margin: 0 0 6px 0;
+    font-size: 9.5pt;
+    font-weight: 750;
+  }
+
+  .kid-card.old h4 { color: #991b1b; }
+  .kid-card.new h4 { color: #166534; }
+
+  .kid-card ul {
+    margin: 0;
+    padding-left: 15px;
+    font-size: 8.2pt;
+  }
+
+  .footer-sig {
+    margin-top: 16px;
+    padding-top: 10px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 7.8pt;
+    color: #64748b;
+    font-family: ui-monospace, monospace;
+  }
+</style>
+</head>
+<body>
+
+  <!-- ==================== PÁGINA 1 ==================== -->
+  <div class="header-box">
+    <div class="doc-category">DOCUMENTO TÉCNICO · ARQUITECTURA DE TRADING CUANTITATIVO</div>
+    <h1>Informe Técnico: Configuraciones de Movimiento Objetivo y Gestión de Salidas</h1>
+    <div class="doc-meta">
+      <span><strong>Sistema:</strong> Trading Ollama & Monitor del Mercado</span>
+      <span><strong>Versión:</strong> 2.5 (Auditoría Asimétrica)</span>
+      <span><strong>Fecha:</strong> Octubre 2026</span>
+      <span><strong>Estado:</strong> En Producción</span>
+    </div>
+  </div>
+
+  <p class="lead-text">
+    Este documento detalla el funcionamiento técnico, matemático y operativo del <strong>Movimiento Objetivo</strong>, el <strong>Take Profit (TP)</strong> y el <strong>Stop Loss (SL)</strong> en el ecosistema <code>trading_ollama</code>. Incluye la auditoría de costos transaccionales de ida y vuelta (comisión y spread), las nuevas compuertas deterministas previas a la entrada (<em>Entry Gate</em>), la resolución de bloqueos fuera de rueda y el protocolo de asimetría matemática (<em>R:R</em> &ge; 1:2 o 1:3).
+  </p>
+
+  <h2>1. ¿Qué es el "Movimiento Objetivo" y Qué Función Cumple?</h2>
+  <p>
+    En la arquitectura de <code>trading_ollama</code>, el <strong>Movimiento Objetivo</strong> (o <em>Target Move</em>) es el recorrido porcentual proyectado del precio que la estrategia exige para considerar que una operación tiene sentido matemático y operativo antes de ser enviada al mercado.
+  </p>
+  <p>
+    No es una simple etiqueta informativa en el frontend: es la <strong>fuente única de verdad</strong> que gobierna cuatro capas operativas críticas:
+  </p>
+  <ul>
+    <li>
+      <strong>Filtro de Viabilidad Transaccional:</strong> Antes de consultar a la Inteligencia Artificial o enviar la orden al broker, el sistema calcula si el recorrido proyectado cubre con holgura los costos de ida y vuelta (<em>Round-Trip Costs</em>: comisiones y spread estimado). Si la ganancia neta proyectada es menor a <code>min_profit_pct</code>, la orden se descarta de inmediato.
+    </li>
+    <li>
+      <strong>Compuerta Determinista de Entrada (Entry Gate):</strong> Exige un Ratio Riesgo/Beneficio real neto <em>R:R</em><sub>neto</sub> &ge; 1.0, exige que el Stop Loss supere el ruido estadístico (<em>SL</em> &ge; 1.5 &times; ATR%), aplica un <em>blackout</em> de 15 minutos en la apertura de Wall Street y activa memoria de precio para no sobreoperar por revancha.
+    </li>
+    <li>
+      <strong>Colocación de Órdenes OCO (One-Cancels-the-Other):</strong> Al abrir una posición compradora (<em>Long</em>), se fijan simultáneamente dos límites inquebrantables:
+      <ul>
+        <li><strong>Take Profit (TP):</strong> Nivel superior donde se capturan ganancias automáticamente.</li>
+        <li><strong>Stop Loss (SL):</strong> Límite inferior donde se corta la pérdida de inmediato para proteger el capital.</li>
+      </ul>
+    </li>
+    <li>
+      <strong>Ancla de Salida para el Guardián Multi-Posición:</strong> El daemon de monitoreo permanente (<code>backend/daemon.py</code>) coteja en tiempo real tick a tick el precio contra estos niveles y liquida automáticamente sin intervención humana.
+    </li>
+  </ul>
+
+<pre class="ascii-diagram">
+<span class="dim">&#9650;  Precio</span>
+<span class="dim">|</span>
+<span class="green">+TP% &#9500;&#9472;&#9472; Take Profit (Objetivo alcanzado -> VENTA / Toma de Ganancias Asimétrica)</span>
+<span class="dim">|    |  Movimiento Objetivo Alza (+1.0% a +2.1% Bruto)</span>
+<span class="dim">|    &#9660;</span>
+<span class="accent">Entrada&#9500;&#9472;&#9472; Precio de Compra (P&#8320;) con Bóveda y Billetera JIT</span>
+<span class="dim">|    &#9650;</span>
+<span class="dim">|    |  Riesgo Máximo Permitido (-0.5% a -0.6% Bruto)</span>
+<span class="dim">|    &#9660;</span>
+<span class="red">-SL% &#9492;&#9472;&#9472; Stop Loss (Límite de pérdida -> VENTA / Corte de Protección y Sweep-Back)</span>
+<span class="dim">|</span>
+</pre>
+
+  <div class="alert-box">
+    <strong>Principio Rector de la Arquitectura:</strong> Toda posición debe nacer con su destino calculado. El sistema prohíbe operaciones abiertas a la deriva: o se alcanza el <strong>Take Profit asimétrico</strong> o el <strong>Stop Loss de contención</strong> protege el capital automáticamente.
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- ==================== PÁGINA 2 ==================== -->
+  <h2>2. Ciclo de Vida: ¿Cuándo Compra y Cuándo Vende el Sistema?</h2>
+
+  <h3>2.1 Momento de COMPRA (Gatillos de Entrada y Nueva Compuerta)</h3>
+  <p>
+    El sistema ejecuta una orden de <strong>COMPRA</strong> únicamente cuando supera un embudo determinista de 5 filtros secuenciales inalterables:
+  </p>
+  <ol>
+    <li>
+      <strong>Apertura de mercado y frescura de datos:</strong> Se comprueba que el activo esté dentro de su horario de rueda y que la última cotización no supere el umbral de latencia (150 segundos en acciones, 20 segundos en cripto).
+    </li>
+    <li>
+      <strong>Matemática Anti Micro-Trading:</strong> Se deduce la comisión del broker (<code>fee</code>) y el medio-spread de entrada y salida mediante capitalización real compuesta:
+      <div class="math-card">
+        <div style="font-weight: 700; margin-bottom: 4px; color: #0369a1;">FÓRMULAS DE CAPITALIZACIÓN REAL (ROUND-TRIP):</div>
+        <div class="math-row"><strong>Factor Entrada</strong> = (1 + comisi&oacute;n) &times; (1 + spread<sub>medio</sub>)</div>
+        <div class="math-row"><strong>Factor Salida</strong> = (1 - comisi&oacute;n) &times; (1 - spread<sub>medio</sub>)</div>
+        <div class="math-row"><strong>Retorno Neto TP</strong> = [ (1 + TP<sub>bruto</sub>) &times; (Factor Salida / Factor Entrada) - 1 ] &times; 100</div>
+        <div class="math-row"><strong>P&eacute;rdida Neta SL</strong> = [ (1 - SL<sub>bruto</sub>) &times; (Factor Salida / Factor Entrada) - 1 ] &times; 100</div>
+      </div>
+      Si el Retorno Neto es inferior a <code>min_profit_pct</code>, la orden se rechaza de raíz antes de llamar a la IA.
+    </li>
+    <li>
+      <strong>Compuerta Determinista de Entrada (Entry Gate Python):</strong>
+      Garantiza que el Stop Loss supere el umbral de ruido del mercado (<em>SL</em> &ge; 1.5 &times; ATR%), bloquea entradas durante los primeros 15 minutos tras la campana de Nueva York (<em>Opening Blackout</em>) y exige que el ratio riesgo/beneficio neto sea matemáticamente sustentable.
+    </li>
+    <li>
+      <strong>Filtro Técnico Cuantitativo:</strong> Reversión a la media por ATR (<em>Z</em> &le; -2.0), ruptura de VWAP institucional o swing de tendencia sobre EMA 200 con absorción en mecha inferior.
+    </li>
+    <li>
+      <strong>Veto de Inteligencia Artificial (Ollama / Antigravity CIO):</strong> La IA no inventa compras; únicamente tiene poder de veto cualitativo sobre los candidatos que ya superaron los filtros numéricos de Python.
+    </li>
+  </ol>
+
+  <h3>Parámetros de la Nueva Compuerta Determinista (Entry Gate):</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Parámetro Entry Gate</th>
+        <th>Configuración Estándar</th>
+        <th>Objetivo Cuantitativo / Justificación</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Opening Blackout</strong></td>
+        <td>15 minutos tras la campana</td>
+        <td>Evita trampas de liquidez y falsos quiebres de apertura en Wall Street.</td>
+      </tr>
+      <tr>
+        <td><strong>Distancia Mínima Stop Loss</strong></td>
+        <td>&ge; 1.5 &times; ATR%</td>
+        <td>Impide que el ruido browniano intradía expulse la orden antes del movimiento.</td>
+      </tr>
+      <tr>
+        <td><strong>Ratio R:R Neto Mínimo</strong></td>
+        <td><em>R:R</em><sub>neto</sub> &ge; 1.0 (Óptimo &ge; 1.5)</td>
+        <td>Asegura que el beneficio neto compense ampliamente el riesgo real de capital.</td>
+      </tr>
+      <tr>
+        <td><strong>Cooldown por Stop Loss</strong></td>
+        <td>30 minutos en el activo</td>
+        <td>Bloquea la sobreoperación por revancha psicológica tras un cierre en pérdida.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <!-- ==================== PÁGINA 3 ==================== -->
+  <h3>2.2 Momento de VENTA (Gatillos de Salida y Protecciones)</h3>
+  <p>Una vez dentro de la posición, el sistema monitorea 5 caminos de salida con prioridad absoluta:</p>
+
+  <div class="alert-box">
+    <strong>Escenario 1: Salida por Stop Loss (Corte de Pérdidas y Sweep-Back)</strong><br>
+    Condición: <code>Precio Actual &le; Precio Entrada &times; (1 - SL_bruto)</code>.<br>
+    Acción: Liquidación inmediata del 100% de la posición, barrido del capital a la Bóveda (<em>Sweep-Back</em>) y activación de un período de enfriamiento (<em>cooldown</em>) para evitar sobreoperar por revancha.
+  </div>
+
+  <div class="alert-box success">
+    <strong>Escenario 2: Salida por Take Profit Estándar (Modo Asimétrico 1:2 o 1:3)</strong><br>
+    Condición: <code>Precio Actual &ge; Precio Entrada &times; (1 + TP_bruto)</code>.<br>
+    Acción: Liquidación total de la posición, captura de la ganancia neta y acreditación directa a la tesorería central (Bóveda).
+  </div>
+
+  <div class="alert-box">
+    <strong>Escenario 3: Toma Parcial y Breakeven ("Peluqueo TP1 y Riesgo Cero")</strong><br>
+    En modos automáticos y de swing (<code>hyenuk_chu_multibagger</code>, <code>nasdaq_araujo_vwap</code>):
+    <ol style="margin-top: 5px;">
+      <li>Al llegar a TP1 (+1.0% o +2.5&times;ATR), se liquida el <strong>50% de la posición</strong> asegurando ganancias netas en el bolsillo.</li>
+      <li>El Stop Loss del 50% restante se mueve automáticamente a <strong>Breakeven Real (+0.25%)</strong> cubriendo comisiones.</li>
+      <li><strong>Resultado:</strong> La posición corre con <strong>$0 de riesgo patrimonial</strong>: si continúa subiendo captura más beneficio, y si retrocede cierra en ganancia neta garantizada.</li>
+    </ol>
+  </div>
+
+  <div class="alert-box warning">
+    <strong>Escenario 4: Cierre Manual de Emergencia Fuera de Rueda (Mejora Crítica)</strong><br>
+    <strong>Problema detectado:</strong> El sistema anterior bloqueaba el botón manual diciendo <em>"mercado cerrado"</em> cuando cerraba Wall Street.<br>
+    <strong>Solución implementada:</strong> Si el operador solicita cerrar la posición con la rueda cerrada, el sistema toma el <strong>último precio oficial de cierre registrado</strong> (<em>P</em><sub>cierre</sub>) y liquida en el broker SQLite barriendo el dinero a la Bóveda de inmediato sin trabar la orden.
+  </div>
+
+  <div class="alert-box">
+    <strong>Escenario 5: Auto-Flatten al Cierre de Rueda (Timbre de Salida Previsto)</strong><br>
+    Regla de protección institucional: Para activos que no cotizan 24/7 (acciones, ETFs como QQQ o bonos), el sistema liquida automáticamente las posiciones intradía <strong>15 minutos antes del toque de campana (16:45 ARG / 15:45 NY)</strong> para eliminar el riesgo de <em>Gap Overnight</em>.
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- ==================== PÁGINA 4 ==================== -->
+  <h2>3. Ejemplos Gráficos de Operaciones</h2>
+
+  <div class="chart-card">
+    <div class="chart-title">
+      <span>Gráfico 1: Operación Ganadora con Take Profit Asimétrico (+1.0% Bruto / +0.70% Neto)</span>
+      <span class="badge badge-green">TAKE PROFIT ALCANZADO</span>
+    </div>
+    <svg viewBox="0 0 700 130" width="100%" height="130" style="background:#090d16; border-radius:6px;">
+      <!-- Grid -->
+      <line x1="50" y1="20" x2="680" y2="20" stroke="#1e293b" stroke-dasharray="3,3" />
+      <line x1="50" y1="65" x2="680" y2="65" stroke="#334155" />
+      <line x1="50" y1="110" x2="680" y2="110" stroke="#1e293b" stroke-dasharray="3,3" />
+      
+      <!-- Levels -->
+      <text x="55" y="16" fill="#4ade80" font-size="9" font-family="monospace">TP: $101.00 (+1.0%)</text>
+      <text x="55" y="61" fill="#94a3b8" font-size="9" font-family="monospace">Entrada: $100.00</text>
+      <text x="55" y="122" fill="#f87171" font-size="9" font-family="monospace">SL: $99.50 (-0.5%)</text>
+      
+      <!-- Path -->
+      <polyline points="150,65 190,55 230,75 280,45 340,58 400,30 460,40 520,20" fill="none" stroke="#38bdf8" stroke-width="2.5" />
+      
+      <!-- Dots -->
+      <circle cx="150" cy="65" r="4" fill="#38bdf8" />
+      <circle cx="520" cy="20" r="4" fill="#4ade80" />
+      <text x="140" y="82" fill="#e2e8f0" font-size="8.5" font-family="monospace">COMPRA</text>
+      <text x="500" y="38" fill="#4ade80" font-size="8.5" font-family="monospace">VENTA (+0.70% neto)</text>
+    </svg>
+    <div class="chart-desc">El precio supera el objetivo de ganancia. Se ejecuta la venta con beneficio positivo neto tras comisiones y el capital se transfiere de inmediato a la Bóveda.</div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-title">
+      <span>Gráfico 2: Operación Perdedora con Stop Loss Protector (-0.50% Bruto / -0.80% Neto)</span>
+      <span class="badge badge-red">STOP LOSS EJECUTADO</span>
+    </div>
+    <svg viewBox="0 0 700 130" width="100%" height="130" style="background:#090d16; border-radius:6px;">
+      <!-- Grid -->
+      <line x1="50" y1="20" x2="680" y2="20" stroke="#1e293b" stroke-dasharray="3,3" />
+      <line x1="50" y1="65" x2="680" y2="65" stroke="#334155" />
+      <line x1="50" y1="110" x2="680" y2="110" stroke="#1e293b" stroke-dasharray="3,3" />
+      
+      <!-- Levels -->
+      <text x="55" y="16" fill="#4ade80" font-size="9" font-family="monospace">TP: $101.00 (+1.0%)</text>
+      <text x="55" y="61" fill="#94a3b8" font-size="9" font-family="monospace">Entrada: $100.00</text>
+      <text x="55" y="122" fill="#f87171" font-size="9" font-family="monospace">SL: $99.50 (-0.5%)</text>
+      
+      <!-- Path -->
+      <polyline points="150,65 190,58 230,80 270,70 320,110" fill="none" stroke="#f87171" stroke-width="2.5" />
+      
+      <!-- Dots -->
+      <circle cx="150" cy="65" r="4" fill="#38bdf8" />
+      <circle cx="320" cy="110" r="4" fill="#f87171" />
+      <text x="140" y="82" fill="#e2e8f0" font-size="8.5" font-family="monospace">COMPRA</text>
+      <text x="300" y="100" fill="#f87171" font-size="8.5" font-family="monospace">SL (-0.80% neto)</text>
+    </svg>
+    <div class="chart-desc">El mercado se da vuelta. El Stop Loss corta la pérdida de raíz en $99.50, evitando un desplome mayor hacia $95 o $90 que destruiría el capital.</div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- ==================== PÁGINA 5 ==================== -->
+  <div class="chart-card">
+    <div class="chart-title">
+      <span>Gráfico 3: Estrategia de Peluqueo (Toma Parcial 50% + Breakeven a Riesgo Cero)</span>
+      <span class="badge badge-purple">RIESGO CERO ACTIVADO</span>
+    </div>
+    <svg viewBox="0 0 700 135" width="100%" height="135" style="background:#090d16; border-radius:6px;">
+      <!-- Grid -->
+      <line x1="50" y1="20" x2="680" y2="20" stroke="#1e293b" stroke-dasharray="3,3" />
+      <line x1="50" y1="55" x2="680" y2="55" stroke="#4ade80" stroke-dasharray="2,2" />
+      <line x1="50" y1="70" x2="680" y2="70" stroke="#334155" />
+      <line x1="50" y1="120" x2="680" y2="120" stroke="#1e293b" stroke-dasharray="3,3" />
+      
+      <!-- Levels -->
+      <text x="55" y="16" fill="#a855f7" font-size="9" font-family="monospace">TP2 Final (+2.5%)</text>
+      <text x="55" y="50" fill="#4ade80" font-size="8.5" font-family="monospace">Breakeven Real (+0.25%)</text>
+      <text x="55" y="66" fill="#94a3b8" font-size="9" font-family="monospace">Entrada: $100.00</text>
+      <text x="55" y="130" fill="#f87171" font-size="9" font-family="monospace">SL Inicial (-0.5%)</text>
+      
+      <!-- Path -->
+      <polyline points="130,70 170,60 210,80 270,40 330,42 390,20 450,22 510,18" fill="none" stroke="#a855f7" stroke-width="2.5" />
+      
+      <!-- Dots -->
+      <circle cx="130" cy="70" r="4" fill="#38bdf8" />
+      <circle cx="270" cy="40" r="4" fill="#4ade80" />
+      <circle cx="510" cy="18" r="4" fill="#a855f7" />
+      <text x="120" y="86" fill="#e2e8f0" font-size="8.5" font-family="monospace">COMPRA</text>
+      <text x="250" y="30" fill="#4ade80" font-size="8.5" font-family="monospace">TP1 (50% al bolsillo)</text>
+      <text x="490" y="32" fill="#a855f7" font-size="8.5" font-family="monospace">TP2 (Venta Final)</text>
+    </svg>
+    <div class="chart-desc">Al alcanzar TP1 se asegura el 50% de la ganancia. El Stop Loss sube a +0.25% (Breakeven). A partir de ese momento, la operación corre con $0 de riesgo patrimonial.</div>
+  </div>
+
+  <h2>4. Matriz Comparativa de Configuraciones y Márgenes Reales</h2>
+  <p>
+    La siguiente tabla refleja los cálculos exactos del motor cuantitativo, asumiendo comisiones estándar de mercado (0.10% por orden, spread medio 0.05%, total ida y vuelta: 0.30%):
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Configuración / Preset</th>
+        <th>TP Bruto</th>
+        <th>SL Bruto</th>
+        <th>Ratio Teórico</th>
+        <th>Retorno Neto TP</th>
+        <th>Retorno Neto SL</th>
+        <th>R:R Neto Real</th>
+        <th>Win Rate Mínimo</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight-row">
+        <td><strong>1. Asimétrico Intradía 1:2 (Recomendado)</strong></td>
+        <td>+1.00%</td>
+        <td>-0.50%</td>
+        <td>2.00 : 1</td>
+        <td>+0.70%</td>
+        <td>-0.80%</td>
+        <td><strong>0.87 : 1</strong></td>
+        <td><strong>53.3%</strong></td>
+      </tr>
+      <tr class="highlight-row">
+        <td><strong>2. Asimétrico Francotirador 1:3</strong></td>
+        <td>+1.50%</td>
+        <td>-0.50%</td>
+        <td>3.00 : 1</td>
+        <td>+1.20%</td>
+        <td>-0.80%</td>
+        <td><strong>1.50 : 1</strong></td>
+        <td><strong>40.0%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>3. Swing Asimétrico 1:2.5</strong></td>
+        <td>+2.00%</td>
+        <td>-0.80%</td>
+        <td>2.50 : 1</td>
+        <td>+1.69%</td>
+        <td>-1.10%</td>
+        <td><strong>1.54 : 1</strong></td>
+        <td><strong>39.4%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>4. Swing Mayor Asimétrico 1:3</strong></td>
+        <td>+3.00%</td>
+        <td>-1.00%</td>
+        <td>3.00 : 1</td>
+        <td>+2.69%</td>
+        <td>-1.30%</td>
+        <td><strong>2.08 : 1</strong></td>
+        <td><strong>32.5%</strong></td>
+      </tr>
+      <tr>
+        <td>5. Scalping Intradía</td>
+        <td>+0.80%</td>
+        <td>-0.50%</td>
+        <td>1.60 : 1</td>
+        <td>+0.50%</td>
+        <td>-0.80%</td>
+        <td>0.62 : 1</td>
+        <td>61.5%</td>
+      </tr>
+      <tr class="danger-row">
+        <td>6. Scalping Rápido (Antipatrón Riesgoso)</td>
+        <td>+0.50%</td>
+        <td>-0.30%</td>
+        <td>1.67 : 1</td>
+        <td>+0.20%</td>
+        <td>-0.60%</td>
+        <td><strong>0.33 : 1</strong></td>
+        <td><strong>75.0%</strong></td>
+      </tr>
+      <tr>
+        <td>7. Cuantitativo Dinámico ATR</td>
+        <td>+2.5&times;ATR</td>
+        <td>-1.5&times;ATR</td>
+        <td>1.67 : 1</td>
+        <td>Dinámico</td>
+        <td>Dinámico</td>
+        <td>~ 1.30 : 1</td>
+        <td>~ 42.0%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Análisis Técnico de la Matriz:</h3>
+  <ul>
+    <li>
+      <strong>La Trampa del Scalping Rápido:</strong> En el preset antiguo (+0.50% / -0.30%), los costos transaccionales (0.30%) devoraban el <strong>60% del beneficio bruto</strong>, reduciendo el retorno neto a un mísero +0.20% mientras la pérdida neta se estiraba a -0.60%. Para no fundir la cuenta se requería un 75% de aciertos, una exigencia matemáticamente insostenible.
+    </li>
+    <li>
+      <strong>El Poder de la Asimetría 1:3:</strong> Con el <em>Asimétrico Francotirador</em> (+1.50% / -0.50%), la cuenta es rentable incluso fallando el 60% de las operaciones. Con solo 4 aciertos de cada 10, la curva de capital es positiva.
+    </li>
+  </ul>
+
+  <div class="page-break"></div>
+
+  <!-- ==================== PÁGINA 6 ==================== -->
+  <h2>5. Resumen Didáctico: ¿Cómo Operaba Antes y Qué Hace Ahora?</h2>
+  <p>
+    Explicación conceptual y accesible, sin tecnicismos complejos, para entender de un vistazo la evolución de la máquina:
+  </p>
+
+  <div class="kid-box">
+    <div style="font-weight: 800; font-size: 10.5pt; color: #0284c7; text-align: center;">
+      🍬 EL JUEGO DE LOS CARAMELOS Y EL RECREO DE LA ESCUELA
+    </div>
+
+    <div class="kid-grid">
+      <!-- ANTES -->
+      <div class="kid-card old">
+        <h4>❌ LO QUE HACÍA ANTES</h4>
+        <ul>
+          <li><strong>Cazaba hormigas arriesgando vacas:</strong> Apenas ganaba un caramelo chiquito (+0.15%), festejaba y vendía. Pero cuando perdía, esperaba hasta perder 3 alfajores enteros.</li>
+          <li><strong>El kiosquero se quedaba con todo:</strong> Por entrar y salir tan rápido a cada rato, las comisiones del intermediario se comían casi toda la ganancia.</li>
+          <li><strong>Encerrado en la escuela:</strong> Entraba a jugar a los 44 minutos del segundo tiempo (10 minutos antes del cierre de NY). Cuando apagaban las luces, el botón se trababa y te decía <em>"no podés salir porque la escuela cerró"</em>.</li>
+          <li><strong>Tablero que se colgaba:</strong> Ventanas feas de la computadora que congelaban la pantalla y menús cortados por la mitad.</li>
+        </ul>
+      </div>
+
+      <!-- AHORA Y A FUTURO -->
+      <div class="kid-card new">
+        <h4>✅ LO QUE HACE AHORA Y SE ESPERA</h4>
+        <ul>
+          <li><strong>Busca vacas arriesgando caramelos:</strong> Solo entra si el premio prometido es el doble o triple de lo que arriesga (Ratio 1:2 o 1:3). ¡Puede fallar la mitad de los tiros y seguir ganando plata!</li>
+          <li><strong>Puerta de escape siempre abierta:</strong> Si el mercado se va a dormir, apretás el botón rojo y te vas a tu casa al último precio oficial, sin trabas ni discusiones.</li>
+          <li><strong>Alcancía blindada (Bóveda):</strong> Cuando termina una operación, la plata regresa de inmediato a la caja fuerte bajo llave.</li>
+          <li><strong>Timbre de salida automático (Mejora prevista):</strong> A las 16:45 hs, 15 minutos antes de la campana, liquida todo lo de EE.UU. para dormir en paz sin riesgos de noche.</li>
+          <li><strong>Medio chocolate al bolsillo (Peluqueo):</strong> En cuanto sube, guarda la mitad y pone el freno a costo cero para jugar gratis.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert-box success" style="margin-top: 18px;">
+    <strong>Conclusión Estratégica:</strong><br>
+    El sistema pasó de ser un bot frágil de micro-scalping que dependía de un win rate imposible del 75%, a convertirse en una <strong>plataforma asimétrica institucional</strong> protegida por compuertas deterministas en Python, Bóveda blindada, interfaz moderna en DOM puro y gestión estricta de riesgo.
+  </div>
+
+  <div class="footer-sig">
+    <span>SISTEMA CUANTITATIVO TRADING OLLAMA & MONITOR DEL MERCADO</span>
+    <span>AUDITORÍA TÉCNICA · CIO ANTIGRAVITY</span>
+    <span>OCTUBRE 2026</span>
+  </div>
+
+</body>
+</html>
+"""
+
+def generate_pdf():
+    print(f"Escribiendo archivo HTML en: {HTML_PATH}")
+    HTML_PATH.write_text(HTML_CONTENT, encoding="utf-8")
+
+    print("Compilando PDF con Google Chrome Headless...")
+    cmd = [
+        "google-chrome",
+        "--headless",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--no-pdf-header-footer",
+        f"--print-to-pdf={PDF_PATH}",
+        str(HTML_PATH)
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        print(f"Error generando PDF: {res.stderr}")
+        return False
+
+    print(f"PDF generado exitosamente en: {PDF_PATH} ({PDF_PATH.stat().st_size} bytes)")
+
+    # Copiar también al Escritorio para fácil acceso
+    try:
+        import shutil
+        shutil.copy2(PDF_PATH, DESKTOP_PDF_PATH)
+        print(f"Copia guardada en el Escritorio: {DESKTOP_PDF_PATH}")
+    except Exception as e:
+        print(f"No se pudo copiar al escritorio: {e}")
+
+    return True
+
+if __name__ == "__main__":
+    generate_pdf()

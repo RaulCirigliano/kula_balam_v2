@@ -1,0 +1,1916 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kula Balam // Backtest Lab Pro (3 Estaciones)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: #131b2e;
+      --bg-input: #080c14;
+      --border: #23324d;
+      --border-focus: #3b82f6;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --green: #10b981;
+      --green-hover: #059669;
+      --blue: #2563eb;
+      --blue-hover: #1d4ed8;
+      --purple: #8b5cf6;
+      --purple-hover: #7c3aed;
+      --amber: #f59e0b;
+      --cyan: #06b6d4;
+      --red: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 10px 16px;
+      gap: 12px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .brand h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--green);
+      letter-spacing: -0.5px;
+    }
+
+    .brand span {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      background: #1e293b;
+      color: var(--green);
+      padding: 3px 8px;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+    }
+
+    /* ESTACIONES */
+    .station-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .station-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .station-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .station-title.s1 { color: #38bdf8; }
+    .station-title.s2 { color: #34d399; }
+    .station-title.s3 { color: #fbbf24; }
+
+    .field-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .field-group label {
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    select, input, textarea {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.82rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input:focus, textarea:focus { border-color: var(--border-focus); }
+    select { cursor: pointer; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: transform 0.1s, opacity 0.15s, background 0.15s;
+    }
+
+    .btn:active { transform: scale(0.97); }
+    .btn-green { background: var(--green); color: #022c22; }
+    .btn-green:hover { background: var(--green-hover); }
+    .btn-blue { background: var(--blue); color: #fff; }
+    .btn-blue:hover { background: var(--blue-hover); }
+    .btn-purple { background: var(--purple); color: #fff; }
+    .btn-purple:hover { background: var(--purple-hover); }
+    .btn-amber { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); color: #fff; border: 1px solid #f59e0b; }
+    .btn-amber:hover { background: linear-gradient(135deg, #b45309 0%, #92400e 100%); }
+    .btn-cyan { background: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%); color: #fff; border: 1px solid #38bdf8; }
+    .btn-emerald { background: linear-gradient(135deg, #059669 0%, #0d9488 100%); color: #fff; border: 1px solid #6ee7b7; }
+    .btn-danger { background: #991b1b; color: #fff; border: 1px solid #ef4444; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-dark { background: #1e293b; color: var(--text); border: 1px solid var(--border); }
+    .btn-dark:hover { background: #334155; }
+    .btn-mini { padding: 3px 8px; font-size: 0.72rem; border-radius: 4px; }
+    .btn-loading { opacity: 0.6; cursor: not-allowed !important; pointer-events: none; }
+
+    /* WORKSPACE DE LA ESTACIÓN 2 */
+    .workspace-s2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      flex: 1;
+      min-height: 520px;
+    }
+
+    @media (max-width: 1100px) {
+      .workspace-s2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel-box {
+      background: #080c14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .panel-header {
+      padding: 6px 10px;
+      background: #0f172a;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .panel-title {
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    textarea.editor {
+      flex: 1;
+      border: none;
+      padding: 10px 12px;
+      font-family: 'Fira Code', Consolas, monospace;
+      font-size: 0.81rem;
+      line-height: 1.45;
+      background: #060910;
+      color: #e2e8f0;
+      resize: none;
+      outline: none;
+    }
+
+    #output {
+      background: #040711;
+      color: #38bdf8;
+      font-family: 'Fira Code', Consolas, monospace;
+      font-size: 0.80rem;
+      line-height: 1.4;
+      flex: 1;
+      padding: 10px 12px;
+      border: none;
+      resize: none;
+      outline: none;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 4px 10px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab-btn.active {
+      color: #38bdf8;
+      border-bottom-color: #38bdf8;
+    }
+
+    /* ======================================================== */
+    /* DROPDOWNS CUSTOMIZADOS CON CONTENCIÓN DE VIEWPORT (LAB)  */
+    /* ======================================================== */
+    .lab-select-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      flex: 1 1 0%;
+      min-width: 0;
+    }
+
+    .lab-select-native-hidden {
+      position: absolute !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      width: 1px !important;
+      height: 1px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      clip: rect(0, 0, 0, 0) !important;
+      overflow: hidden !important;
+    }
+
+    .lab-select-trigger {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: var(--bg-input, #080c14);
+      border: 1px solid var(--border, #23324d);
+      color: var(--text, #f1f5f9);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.82rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      user-select: none;
+      min-height: 31px;
+    }
+
+    .lab-select-trigger:focus,
+    .lab-select-trigger.active {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+    }
+
+    .lab-select-label {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: left;
+    }
+
+    .lab-select-arrow {
+      font-size: 0.65rem;
+      color: var(--text-muted, #94a3b8);
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .lab-select-trigger.active .lab-select-arrow {
+      transform: rotate(180deg);
+    }
+
+    .lab-select-dropdown {
+      position: absolute;
+      left: 0;
+      width: max(100%, 460px);
+      max-width: min(640px, 94vw);
+      background: #09101f;
+      border: 1px solid #0284c7;
+      border-radius: 8px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(56, 189, 248, 0.35);
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      opacity: 1;
+    }
+
+    .lab-select-dropdown.upward {
+      opacity: 1;
+    }
+
+    .lab-select-search-wrap {
+      padding: 6px 8px;
+      background: #080d1a;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      flex-shrink: 0;
+    }
+
+    .lab-select-search-input {
+      width: 100%;
+      padding: 5px 8px;
+      font-size: 0.78rem;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      color: #f1f5f9;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+
+    .lab-select-search-input:focus {
+      border-color: #38bdf8;
+    }
+
+    .lab-select-options {
+      background: #09101f;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      scrollbar-width: thin;
+      scrollbar-color: #475569 #09101f;
+    }
+
+    .lab-select-options::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .lab-select-options::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+
+    .lab-select-group-header {
+      padding: 6px 8px;
+      font-size: 0.71rem;
+      font-weight: 700;
+      color: #fbbf24;
+      background: #0f172a;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      margin-top: 6px;
+      margin-bottom: 2px;
+      user-select: none;
+    }
+
+    .lab-select-group-header:first-child {
+      border-top: none;
+      margin-top: 0;
+    }
+
+    .lab-select-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 5px;
+      font-size: 0.80rem;
+      color: #e2e8f0;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .lab-select-item.is-child {
+      padding-left: 14px;
+    }
+
+    .lab-select-item:hover,
+    .lab-select-item.keyboard-focus {
+      background: #1e293b;
+      color: #ffffff;
+    }
+
+    .lab-select-item.selected {
+      background: rgba(2, 132, 199, 0.22);
+      color: #38bdf8;
+      font-weight: 600;
+    }
+
+    .lab-select-item-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .lab-select-item-check {
+      font-size: 0.75rem;
+      color: #38bdf8;
+      flex-shrink: 0;
+    }
+
+    .lab-select-empty {
+      padding: 12px 8px;
+      text-align: center;
+      font-size: 0.78rem;
+      color: #64748b;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ENCABEZADO -->
+  <header>
+    <div class="brand">
+      <h1>Kula Balam</h1>
+      <span>Laboratorio Cuantitativo // Flujo Lineal en 3 Estaciones</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div id="iaStatusPill" class="badge" style="color: var(--cyan); border-color: var(--cyan);">
+        🤖 Árbitro IA & Cerebro Kula: ACTIVO
+      </div>
+      <span class="badge">● Puerto 8000</span>
+    </div>
+  </header>
+
+  <!-- ======================================================== -->
+  <!-- ESTACIÓN 1: ENTRADA UNIFICADA (EXISTENTE O PROMPT IA)     -->
+  <!-- ======================================================== -->
+  <section class="station-card">
+    <div class="station-header">
+      <span class="station-title s1">🏛️ ESTACIÓN 1: ENTRADA UNIFICADA</span>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span id="badgeDatasetMotivo" style="font-size: 0.70rem; padding: 2px 7px; background: #0369a1; color: #fff; border-radius: 4px;">⚡ Auto por Código</span>
+        <button type="button" class="btn btn-dark btn-mini" onclick="resetearDatasetAuto()">⚡ Auto</button>
+        <button id="btnActualizarVelas" type="button" class="btn btn-dark btn-mini" onclick="actualizarVelasAlDia()">🔄 Velas</button>
+      </div>
+    </div>
+
+    <!-- MODO A: SELECTOR DIRECTO DE ESTRATEGIAS Y DATASET -->
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <div class="field-group" style="flex: 2 1 360px;">
+        <label>Estrategia:</label>
+        <select id="selEstrategiaUnificada" onchange="alCambiarEstrategiaUnificada()" style="flex: 1; font-weight: 600; color: #38bdf8; background: #0f172a; border-color: #0284c7;">
+          <option value="">Cargando catálogo...</option>
+        </select>
+        <button id="btnCargarFormulaSeleccionada" type="button" class="btn btn-dark btn-mini" onclick="alCambiarEstrategiaUnificada()" style="border: 1px solid #d97706; background: rgba(217, 119, 6, 0.2); color: #fbbf24; font-weight: 700; white-space: nowrap; padding: 4px 10px;" title="Cargar la fórmula seleccionada en los editores de código y sincronizar su dataset">
+          📂 Cargar
+        </button>
+      </div>
+
+      <div class="field-group" style="flex: 2 1 320px;">
+        <label>Dataset .parquet:</label>
+        <select id="selTicker" onchange="alCambiarDatasetManual()" style="flex: 1; font-family: 'Fira Code', monospace; color: #7dd3fc; background: #0f172a;">
+          <option value="AUTO">⚡ AUTO (Determinado por la Fórmula)</option>
+          <optgroup label="🪙 Criptomonedas 4H">
+            <option value="binance_SOL_USDT_4h.parquet">SOL/USDT 4H (Solana Ganadora Lab)</option>
+            <option value="binance_ETH_USDT_4h.parquet">ETH/USDT 4H (Ethereum)</option>
+            <option value="binance_BTC_USDT_4h.parquet">BTC/USDT 4H (Bitcoin)</option>
+          </optgroup>
+          <optgroup label="⚡ Criptomonedas Intradía">
+            <option value="binance_ETH_USDT_15m.parquet">ETH/USDT 15M (Reversión VWAP)</option>
+            <option value="binance_ETH_USDT_5m.parquet">ETH/USDT 5M (Scalping Presencial)</option>
+            <option value="binance_BTC_USDT_15m.parquet">BTC/USDT 15M</option>
+            <option value="binance_BTC_USDT_5m.parquet">BTC/USDT 5M</option>
+          </optgroup>
+          <optgroup label="📈 Acciones & ETFs US 1D">
+            <option value="yf_SPY_1d.parquet">SPY 1D (S&P 500)</option>
+            <option value="yf_QQQ_1d.parquet">QQQ 1D (Nasdaq 100)</option>
+            <option value="yf_AAPL_1d.parquet">AAPL 1D (Apple)</option>
+            <option value="yf_NVDA_1d.parquet">NVDA 1D (Nvidia)</option>
+            <option value="yf_MSFT_1d.parquet">MSFT 1D (Microsoft)</option>
+            <option value="yf_META_1d.parquet">META 1D (Meta)</option>
+          </optgroup>
+          <optgroup label="💱 Forex Internacional">
+            <option value="yf_EURUSD_1d.parquet">EUR/USD 1D</option>
+            <option value="yf_EURUSD_1h.parquet">EUR/USD 1H</option>
+            <option value="yf_GBPUSD_1d.parquet">GBP/USD 1D</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <button id="btnRun" class="btn btn-green" onclick="ejecutarCodigo()" style="padding: 7px 18px;">
+        ▶ AUDITAR
+      </button>
+      <button id="btnWfoRolling" class="btn btn-cyan" onclick="ejecutarWfoRollingUI()" style="padding: 7px 14px;" title="Auditar Robustez Walk-Forward Deslizante en 5 Ventanas (WFE >= 0.50)">
+        🔄 AUDITAR WFO RODANTE (5V)
+      </button>
+    </div>
+
+    <!-- MODO B: GENERADOR CON PROMPT IA + GANCHO DE CEREBRO -->
+    <div style="background: rgba(15, 23, 42, 0.7); border: 1px dashed rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;">
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <textarea id="txtPromptIA" rows="2" style="flex: 1; resize: vertical; font-size: 0.81rem; background: #030712;" placeholder="💡 Modo B (Generador IA): Escribe una tesis matemática y opcionalmente condiciones para custom_brain_filter (ej: Ruptura Donchian 20 en SOL 4H con SL 1.4x ATR y TP 3.36x ATR con filtro de secado de volumen)..."></textarea>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="field-group">
+            <label>Motor:</label>
+            <select id="selMotorIA" onchange="alCambiarMotorIA()" style="padding: 3px 6px; font-size: 0.78rem;">
+              <option value="auto">🤖 Antigravity Local ($0.00)</option>
+              <option value="gemini">☁️ Google Gemini Cloud</option>
+            </select>
+          </div>
+          <div id="boxGeminiKey" style="display: none; align-items: center; gap: 4px;">
+            <input type="password" id="txtApiKeyGemini" placeholder="Gemini API Key..." style="width: 140px; padding: 3px 6px; font-size: 0.75rem;">
+          </div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button id="btnGenerarIACargar" type="button" class="btn btn-blue btn-mini" onclick="sintetizarYAuditar('backtest')" title="Sintetiza fórmula y gancho de cerebro y carga en el editor">
+            ✨ GENERAR Y AUDITAR
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- ESTACIÓN 2: AUDITORÍA RIGUROSA & OPTIMIZACIÓN             -->
+  <!-- ======================================================== -->
+  <section class="station-card" style="flex: 1;">
+    <div class="station-header">
+      <span class="station-title s2">📊 ESTACIÓN 2: AUDITORÍA DUAL WALK-FORWARD (IS 70% / OOS 30%)</span>
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <button id="btnOptimize" class="btn btn-purple btn-mini" onclick="optimizarCodigo()" title="Barrido paramétrico causal en local">
+          ⚡ OPTIMIZAR
+        </button>
+        <button id="btnForzarOptimizado" class="btn btn-dark btn-mini" onclick="forzarCargaOptimizada()" style="display: none; border-color: #f59e0b; color: #fbbf24;">
+          ⚠️ Cargar Parámetros #1
+        </button>
+        <button id="btnTorneoPoda" class="btn btn-amber btn-mini" onclick="ejecutarTorneoPodaUI()" title="Torneo de Poda Retrógrada Walk-Forward (IS 70% / OOS 30%) sobre el catálogo y síntesis de Superfórmula Ensamble">
+          🏆 TORNEO DE PODA & SUPERFÓRMULA
+        </button>
+        <button id="btnAuditarEscalado" class="btn btn-cyan btn-mini" onclick="auditarEscaladoSlot()" title="Auditoría de Cumplimiento Fondeo (FTMO/Prop Firm) y Escalado por Slots">
+          🏦 VALIDAR FONDEO / ESCALADO
+        </button>
+        <div class="field-group" style="border-left: 1px solid var(--border); padding-left: 8px;">
+          <select id="selUniversoScreening" style="padding: 3px 6px; font-size: 0.75rem;">
+            <option value="todos">🌐 Cartera Núcleo (12 Activos)</option>
+            <option value="crypto_4h">⚡ Cripto 4H (SOL, ETH, BTC)</option>
+            <option value="tradfi_1d">📈 Acciones US 1D</option>
+            <option value="forex">💱 Forex</option>
+            <option value="completo">🔥 Todo el Catálogo</option>
+          </select>
+          <button id="btnScreening" class="btn btn-emerald btn-mini" onclick="ejecutarScreeningGrid()">
+            🌐 BARRIDO MULTIMERCADO
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- WORKSPACE: CONSOLA PROTAGONISTA + CÓDIGO UNIFICADO -->
+    <div class="workspace-s2">
+      <!-- CONSOLA DE RESULTADOS -->
+      <div class="panel-box">
+        <div class="panel-header">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span class="panel-title" style="color: #38bdf8;">📋 CONSOLA DE MÉTRICAS DUAL (SIN IA vs. CON CEREBRO KULA)</span>
+            <span id="lblEstrategiaEnConsola" style="font-size: 0.72rem; color: #fbbf24; font-weight: 700; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); padding: 1px 6px; border-radius: 4px; display: none;"></span>
+          </div>
+          <div style="display: flex; gap: 4px;">
+            <button type="button" class="btn btn-dark btn-mini" onclick="copiarConsola()">📋 Copiar</button>
+            <button type="button" class="btn btn-dark btn-mini" onclick="document.getElementById('output').value=''">🧹 Limpiar</button>
+          </div>
+        </div>
+        <textarea id="output" readonly placeholder="Esperando ejecución... Presiona '▶ AUDITAR' o '⚡ OPTIMIZAR'"></textarea>
+      </div>
+
+      <!-- PANEL DE CÓDIGO (.PY UNIFICADO: FÓRMULA + GANCHO CEREBRO) -->
+      <div class="panel-box">
+        <div class="panel-header">
+          <div style="display: flex; gap: 4px;">
+            <button id="tabBtnMath" class="tab-btn active" onclick="mostrarPestañaCodigo('math')">📐 Fórmula Matemática</button>
+            <button id="tabBtnIA" class="tab-btn" onclick="mostrarPestañaCodigo('ia')">🤖 Gancho Cerebro / IA</button>
+            <button id="tabBtnTestigo" class="tab-btn" onclick="mostrarPestañaCodigo('testigo')">🕯️ Vela Testigo</button>
+          </div>
+          <button type="button" class="btn btn-dark btn-mini" onclick="limpiarEditores()">🧹 Limpiar</button>
+        </div>
+
+        <div id="wrapCodeMath" style="display: flex; flex: 1; min-height: 0;">
+          <textarea id="codeEditorMath" class="editor" spellcheck="false" placeholder="# Pega aquí tu def formula_matematica(df, i): ..."></textarea>
+        </div>
+
+        <div id="wrapCodeIA" style="display: none; flex: 1; min-height: 0;">
+          <textarea id="codeEditorIA" class="editor" spellcheck="false" placeholder="# Opcional: def custom_brain_filter(df, i, lado, entry, sl, tp): ... o arbitro_ia"></textarea>
+        </div>
+
+        <div id="wrapCodeTestigo" style="display: none; flex: 1; min-height: 0;">
+          <textarea id="codeEditorTestigo" class="editor" spellcheck="false" placeholder="# Opcional: VELA_TESTIGO = {'close_offset_pct': 2.0}"></textarea>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- ESTACIÓN 3: DECISIÓN Y DESTINO FINAL (3 BOTONES)          -->
+  <!-- ======================================================== -->
+  <section class="station-card">
+    <div class="station-header">
+      <span class="station-title s3">🎯 ESTACIÓN 3: DECISIÓN Y DESTINO FINAL</span>
+      <span style="font-size: 0.72rem; color: var(--text-muted);">Gobernanza de Estrategias y Publicación Kula Balam</span>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 300px;">
+        <div class="field-group" style="flex: 1;">
+          <label>Archivo:</label>
+          <input type="text" id="txtNombreMath" placeholder="mi_estrategia.py" style="flex: 1; font-family: 'Fira Code', monospace; color: #38bdf8;">
+        </div>
+        <div class="field-group" style="flex: 1.5;">
+          <label>Nota / Tesis:</label>
+          <input type="text" id="txtComentarioMath" placeholder="Tesis cuantitativa y parámetros..." style="flex: 1;">
+        </div>
+      </div>
+
+      <!-- LOS 3 BOTONES DE DESTINO -->
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button id="btnDescartar" type="button" class="btn btn-danger" onclick="descartarOLimpiar()" title="Borrar del catálogo o descartar borrador actual">
+          🗑️ BORRAR / DESCARTAR
+        </button>
+
+        <button id="btnGuardarLab" type="button" class="btn btn-blue" onclick="guardarEnCarpetaLab()" title="Guardar en Carpeta Lab (backend/estrategias/catalogo/para_testear/ganadoras/) sin tocar el daemon">
+          📁 GUARDAR EN CARPETA LAB
+        </button>
+
+        <button id="btnPromover" type="button" class="btn btn-green" onclick="abrirModalPromocion()" title="Promover formalmente al panel de Kula Balam (puerto 8080) y registrar en buzon_radar.json">
+          🚀 PROMOVER AL PANEL DE KULA
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODAL DE PROMOCIÓN A DAEMON -->
+  <div id="modalPromocion" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: #111827; border: 1px solid #10b981; border-radius: 10px; width: 520px; max-width: 95vw; padding: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); color: #f8fafc;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #374151; padding-bottom: 10px; margin-bottom: 15px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.1rem; font-weight: 700; color: #10b981;">🚀 Promover Estrategia al Panel Kula Balam</span>
+        </div>
+        <button type="button" class="btn btn-dark btn-mini" onclick="cerrarModalPromocion()">✖</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem;">
+        <div>
+          <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Activo Asignado (Normalizado):</label>
+          <input type="text" id="promoActivo" style="width: 100%; padding: 8px 10px; background: #030712; border: 1px solid #374151; border-radius: 6px; color: #fff; font-family: 'Fira Code', monospace; font-weight: 600;" placeholder="SOL/USDT">
+        </div>
+
+        <div>
+          <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Destino en el Sistema:</label>
+          <select id="promoDestino" style="width: 100%; padding: 8px 10px; background: #030712; border: 1px solid #0284c7; border-radius: 6px; color: #38bdf8; font-weight: 700;">
+            <option value="principal" selected>🏛️ Panel Principal (Cerebro Kula Autónomo)</option>
+            <option value="operador_presente">⚡ Con Operador Presente (Scalping Intradía)</option>
+            <option value="para_testear_ganadoras">🧪 Carpeta Lab (Ganadoras / Incubadora)</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Slot Asignado:</label>
+            <select id="promoSlot" style="width: 100%; padding: 8px 10px; background: #030712; border: 1px solid #374151; border-radius: 6px; color: #fff;">
+              <option value="1">Slot 1 (Principal 25%-35%)</option>
+              <option value="2">Slot 2 (Secundario)</option>
+              <option value="3">Slot 3 (Diversificación)</option>
+              <option value="4">Slot 4 (Oportunista)</option>
+            </select>
+          </div>
+          <div>
+            <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Nivel de Confianza (%):</label>
+            <input type="number" id="promoConfianza" value="85" min="50" max="100" style="width: 100%; padding: 8px 10px; background: #030712; border: 1px solid #374151; border-radius: 6px; color: #fff;">
+          </div>
+        </div>
+
+        <div>
+          <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Nombre Identificador:</label>
+          <input type="text" id="promoNombre" style="width: 100%; padding: 8px 10px; background: #030712; border: 1px solid #374151; border-radius: 6px; color: #fff;" placeholder="estrategia_validada.py">
+        </div>
+
+        <div>
+          <label style="color: #94a3b8; display: block; margin-bottom: 4px;">Tesis Cuantitativa:</label>
+          <textarea id="promoJustificacion" rows="3" style="width: 100%; padding: 8px 10px; background: #030712; border: 1px solid #374151; border-radius: 6px; color: #fff; font-size: 0.8rem;"></textarea>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; border-top: 1px solid #374151; padding-top: 12px;">
+        <button type="button" class="btn btn-dark" onclick="cerrarModalPromocion()">Cancelar</button>
+        <button type="button" id="btnConfirmarPromocion" class="btn btn-green" onclick="confirmarPromocionDaemon()" style="padding: 8px 18px;">
+          🚀 CONFIRMAR Y PROMOVER
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let debounceTimer = null;
+    let estrategiaActualSeleccionada = null;
+
+    // --- PESTAÑAS DE CÓDIGO ---
+    function mostrarPestañaCodigo(tab) {
+      document.getElementById('tabBtnMath').classList.toggle('active', tab === 'math');
+      document.getElementById('tabBtnIA').classList.toggle('active', tab === 'ia');
+      document.getElementById('tabBtnTestigo').classList.toggle('active', tab === 'testigo');
+
+      document.getElementById('wrapCodeMath').style.display = tab === 'math' ? 'flex' : 'none';
+      document.getElementById('wrapCodeIA').style.display = tab === 'ia' ? 'flex' : 'none';
+      document.getElementById('wrapCodeTestigo').style.display = tab === 'testigo' ? 'flex' : 'none';
+    }
+
+    function alCambiarMotorIA() {
+      const mot = document.getElementById('selMotorIA').value;
+      document.getElementById('boxGeminiKey').style.display = mot === 'gemini' ? 'flex' : 'none';
+    }
+
+    // ========================================================
+    // COMPONENTE DE DROPDOWN INTELIGENTE CON VIEWPORT AWARENESS
+    // ========================================================
+    class LabCustomSelect {
+      constructor(selectEl, options = {}) {
+        if (!selectEl || selectEl._labCustomSelect) return selectEl?._labCustomSelect;
+        this.select = selectEl;
+        this.options = Object.assign({
+          searchable: true,
+          placeholder: '🔍 Filtrar...',
+          emptyText: 'Sin opciones disponibles'
+        }, options);
+
+        this.isOpen = false;
+        this.initDOM();
+        this.bindEvents();
+        this.hookNativeProperties();
+        this.render();
+        selectEl._labCustomSelect = this;
+      }
+
+      initDOM() {
+        this.wrapper = document.createElement('div');
+        this.wrapper.className = 'lab-select-wrapper';
+        if (this.select.style.flex) {
+          this.wrapper.style.flex = this.select.style.flex;
+        }
+
+        this.select.parentNode.insertBefore(this.wrapper, this.select);
+        this.wrapper.appendChild(this.select);
+        this.select.classList.add('lab-select-native-hidden');
+
+        this.trigger = document.createElement('button');
+        this.trigger.type = 'button';
+        this.trigger.className = 'lab-select-trigger';
+        this.trigger.setAttribute('aria-haspopup', 'listbox');
+        this.trigger.setAttribute('aria-expanded', 'false');
+
+        if (this.select.style.borderColor) this.trigger.style.borderColor = this.select.style.borderColor;
+        if (this.select.style.color) this.trigger.style.color = this.select.style.color;
+        if (this.select.style.fontWeight) this.trigger.style.fontWeight = this.select.style.fontWeight;
+        if (this.select.style.fontFamily) this.trigger.style.fontFamily = this.select.style.fontFamily;
+
+        this.labelSpan = document.createElement('span');
+        this.labelSpan.className = 'lab-select-label';
+
+        this.arrowSpan = document.createElement('span');
+        this.arrowSpan.className = 'lab-select-arrow';
+        this.arrowSpan.textContent = '▼';
+
+        this.trigger.appendChild(this.labelSpan);
+        this.trigger.appendChild(this.arrowSpan);
+        this.wrapper.appendChild(this.trigger);
+
+        this.dropdown = document.createElement('div');
+        this.dropdown.className = 'lab-select-dropdown';
+        this.dropdown.style.display = 'none';
+
+        if (this.options.searchable) {
+          this.searchWrap = document.createElement('div');
+          this.searchWrap.className = 'lab-select-search-wrap';
+          this.searchInput = document.createElement('input');
+          this.searchInput.type = 'text';
+          this.searchInput.className = 'lab-select-search-input';
+          this.searchInput.placeholder = this.options.placeholder;
+          this.searchWrap.appendChild(this.searchInput);
+          this.dropdown.appendChild(this.searchWrap);
+        }
+
+        this.optionsList = document.createElement('div');
+        this.optionsList.className = 'lab-select-options';
+        this.dropdown.appendChild(this.optionsList);
+
+        this.wrapper.appendChild(this.dropdown);
+      }
+
+      hookNativeProperties() {
+        const self = this;
+        const proto = HTMLSelectElement.prototype;
+        const origValDesc = Object.getOwnPropertyDescriptor(proto, 'value');
+        const origIdxDesc = Object.getOwnPropertyDescriptor(proto, 'selectedIndex');
+
+        try {
+          if (origValDesc && origValDesc.set) {
+            Object.defineProperty(this.select, 'value', {
+              get() { return origValDesc.get.call(this); },
+              set(val) {
+                origValDesc.set.call(this, val);
+                self.syncFromNative();
+              },
+              configurable: true
+            });
+          }
+        } catch (_) {}
+
+        try {
+          if (origIdxDesc && origIdxDesc.set) {
+            Object.defineProperty(this.select, 'selectedIndex', {
+              get() { return origIdxDesc.get.call(this); },
+              set(idx) {
+                origIdxDesc.set.call(this, idx);
+                self.syncFromNative();
+              },
+              configurable: true
+            });
+          }
+        } catch (_) {}
+      }
+
+      bindEvents() {
+        this.trigger.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.toggle();
+        });
+
+        if (this.searchInput) {
+          this.searchInput.addEventListener('input', () => {
+            this.filter(this.searchInput.value);
+          });
+          this.searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+              this.close();
+              this.trigger.focus();
+            } else if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              this.focusNextOption(1);
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              this.focusNextOption(-1);
+            } else if (e.key === 'Enter') {
+              e.preventDefault();
+              const focused = this.optionsList.querySelector('.lab-select-item.keyboard-focus:not([style*="display: none"])') ||
+                              this.optionsList.querySelector('.lab-select-item:not([style*="display: none"])');
+              if (focused) focused.click();
+            }
+          });
+        }
+
+        this.trigger.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.open();
+          }
+        });
+
+        document.addEventListener('click', (e) => {
+          if (!this.wrapper.contains(e.target)) {
+            this.close();
+          }
+        });
+
+        this.select.addEventListener('change', () => {
+          this.syncFromNative();
+        });
+
+        this.observer = new MutationObserver(() => {
+          this.render();
+        });
+        this.observer.observe(this.select, { childList: true, subtree: true });
+      }
+
+      render() {
+        this.optionsList.innerHTML = '';
+        const children = Array.from(this.select.children);
+
+        if (children.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'lab-select-empty';
+          empty.textContent = this.options.emptyText;
+          this.optionsList.appendChild(empty);
+          this.syncFromNative();
+          return;
+        }
+
+        children.forEach(child => {
+          if (child.tagName === 'OPTGROUP') {
+            const grp = document.createElement('div');
+            grp.className = 'lab-select-group-header';
+            grp.textContent = child.label;
+            this.optionsList.appendChild(grp);
+
+            Array.from(child.children).forEach(opt => {
+              this.createOptionItem(opt, true);
+            });
+          } else if (child.tagName === 'OPTION') {
+            this.createOptionItem(child, false);
+          }
+        });
+
+        this.syncFromNative();
+      }
+
+      createOptionItem(opt, isChild) {
+        const item = document.createElement('div');
+        item.className = 'lab-select-item' + (isChild ? ' is-child' : '');
+        item.setAttribute('data-value', opt.value);
+        item.title = opt.textContent;
+
+        const txt = document.createElement('span');
+        txt.className = 'lab-select-item-text';
+        txt.textContent = opt.textContent;
+        item.appendChild(txt);
+
+        const check = document.createElement('span');
+        check.className = 'lab-select-item-check';
+        check.textContent = '✓';
+        check.style.display = opt.selected ? 'inline' : 'none';
+        item.appendChild(check);
+
+        if (opt.selected) {
+          item.classList.add('selected');
+        }
+
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.selectValue(opt.value);
+        });
+
+        this.optionsList.appendChild(item);
+      }
+
+      selectValue(val) {
+        const changed = (this.select.value !== val);
+        this.select.value = val;
+        this.syncFromNative();
+        this.close();
+        this.trigger.focus();
+
+        if (changed) {
+          this.select.dispatchEvent(new Event('change', { bubbles: true }));
+          this.select.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+
+      syncFromNative() {
+        const selOpt = this.select.selectedOptions[0] || this.select.options[this.select.selectedIndex];
+        if (selOpt) {
+          this.labelSpan.textContent = selOpt.textContent;
+          this.trigger.title = selOpt.textContent;
+        } else {
+          this.labelSpan.textContent = 'Seleccionar...';
+          this.trigger.title = '';
+        }
+
+        const currentVal = this.select.value;
+        const items = this.optionsList.querySelectorAll('.lab-select-item');
+        items.forEach(it => {
+          const match = it.getAttribute('data-value') === currentVal;
+          it.classList.toggle('selected', match);
+          const chk = it.querySelector('.lab-select-item-check');
+          if (chk) chk.style.display = match ? 'inline' : 'none';
+        });
+      }
+
+      filter(query) {
+        const q = (query || '').toLowerCase().trim();
+        const items = this.optionsList.querySelectorAll('.lab-select-item');
+        let visibleCount = 0;
+
+        items.forEach(it => {
+          const txt = (it.textContent || '').toLowerCase();
+          const val = (it.getAttribute('data-value') || '').toLowerCase();
+          const matches = !q || txt.includes(q) || val.includes(q);
+          it.style.display = matches ? 'flex' : 'none';
+          if (matches) visibleCount++;
+        });
+
+        const groups = this.optionsList.querySelectorAll('.lab-select-group-header');
+        groups.forEach(g => {
+          let next = g.nextElementSibling;
+          let hasVisible = false;
+          while (next && next.classList.contains('lab-select-item')) {
+            if (next.style.display !== 'none') hasVisible = true;
+            next = next.nextElementSibling;
+          }
+          g.style.display = hasVisible ? 'block' : 'none';
+        });
+
+        let emptyMsg = this.optionsList.querySelector('.lab-select-empty-search');
+        if (visibleCount === 0) {
+          if (!emptyMsg) {
+            emptyMsg = document.createElement('div');
+            emptyMsg.className = 'lab-select-empty lab-select-empty-search';
+            emptyMsg.textContent = 'No se encontraron opciones coincidentes';
+            this.optionsList.appendChild(emptyMsg);
+          }
+          emptyMsg.style.display = 'block';
+        } else if (emptyMsg) {
+          emptyMsg.style.display = 'none';
+        }
+      }
+
+      focusNextOption(dir) {
+        const visible = Array.from(this.optionsList.querySelectorAll('.lab-select-item:not([style*="display: none"])'));
+        if (visible.length === 0) return;
+        const current = this.optionsList.querySelector('.lab-select-item.keyboard-focus');
+        let idx = visible.indexOf(current);
+        if (idx === -1) {
+          idx = dir > 0 ? 0 : visible.length - 1;
+        } else {
+          idx = (idx + dir + visible.length) % visible.length;
+        }
+        if (current) current.classList.remove('keyboard-focus');
+        visible[idx].classList.add('keyboard-focus');
+        visible[idx].scrollIntoView({ block: 'nearest' });
+      }
+
+      open() {
+        document.querySelectorAll('.lab-select-dropdown').forEach(d => {
+          if (d !== this.dropdown) {
+            d.style.display = 'none';
+            const pTrig = d.parentElement?.querySelector('.lab-select-trigger');
+            if (pTrig) {
+              pTrig.classList.remove('active');
+              pTrig.setAttribute('aria-expanded', 'false');
+            }
+            if (d.parentElement) d.parentElement.style.zIndex = 'auto';
+          }
+        });
+
+        if (this.optionsList.children.length === 0 && this.select.options.length > 0) {
+          this.render();
+        }
+
+        this.isOpen = true;
+        this.dropdown.style.display = 'flex';
+        this.trigger.classList.add('active');
+        this.trigger.setAttribute('aria-expanded', 'true');
+        this.wrapper.style.zIndex = '1000';
+
+        // AJUSTE DINÁMICO DE LÍMITES DE VIEWPORT (CERO DESBORDES FUERA DE VENTANA)
+        const rect = this.trigger.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const vw = window.innerWidth;
+        const spaceBelow = vh - rect.bottom - 12;
+        const spaceAbove = rect.top - 12;
+
+        const openUp = (spaceBelow < 250 && spaceAbove > spaceBelow);
+        const availSpace = openUp ? spaceAbove : spaceBelow;
+        const maxH = Math.max(80, Math.min(availSpace - 54, 360));
+        this.optionsList.style.maxHeight = maxH + 'px';
+
+        if (openUp) {
+          this.dropdown.classList.add('upward');
+          this.dropdown.style.bottom = 'calc(100% + 4px)';
+          this.dropdown.style.top = 'auto';
+        } else {
+          this.dropdown.classList.remove('upward');
+          this.dropdown.style.top = 'calc(100% + 4px)';
+          this.dropdown.style.bottom = 'auto';
+        }
+
+        this.dropdown.style.left = '0';
+        this.dropdown.style.right = 'auto';
+        const ddRect = this.dropdown.getBoundingClientRect();
+        if (ddRect.right > vw - 12 && rect.right >= ddRect.width) {
+          this.dropdown.style.left = 'auto';
+          this.dropdown.style.right = '0';
+        }
+
+        if (this.searchInput) {
+          this.searchInput.value = '';
+          this.filter('');
+          setTimeout(() => this.searchInput.focus(), 40);
+        }
+
+        const selItem = this.optionsList.querySelector('.lab-select-item.selected');
+        if (selItem) {
+          selItem.scrollIntoView({ block: 'nearest' });
+        }
+      }
+
+      close() {
+        if (!this.isOpen) return;
+        this.isOpen = false;
+        this.dropdown.style.display = 'none';
+        this.trigger.classList.remove('active');
+        this.trigger.setAttribute('aria-expanded', 'false');
+        this.wrapper.style.zIndex = 'auto';
+        const focused = this.optionsList.querySelector('.lab-select-item.keyboard-focus');
+        if (focused) focused.classList.remove('keyboard-focus');
+      }
+
+      toggle() {
+        if (this.isOpen) this.close();
+        else this.open();
+      }
+    }
+
+    function initLabCustomSelects() {
+      const selE = document.getElementById('selEstrategiaUnificada');
+      if (selE && !selE._labCustomSelect) {
+        new LabCustomSelect(selE, {
+          searchable: true,
+          placeholder: '🔍 Buscar estrategia en catálogo...'
+        });
+      }
+      const selT = document.getElementById('selTicker');
+      if (selT && !selT._labCustomSelect) {
+        new LabCustomSelect(selT, {
+          searchable: true,
+          placeholder: '🔍 Buscar dataset .parquet...'
+        });
+      }
+    }
+
+    // --- CARGA UNIFICADA DE ESTRATEGIAS (ESTACIÓN 1) ---
+    async function cargarEstrategiasUnificadas() {
+      const sel = document.getElementById('selEstrategiaUnificada');
+      try {
+        const res = await fetch('/api/lab/estrategias_unificadas');
+        const d = await res.json();
+        sel.innerHTML = '<option value="">-- Seleccionar Estrategia --</option>';
+
+        // 1. Grupo Producción
+        const grpProd = document.createElement('optgroup');
+        grpProd.label = '🏛️ En Producción (Panel Kula Balam)';
+        (d.produccion || []).forEach(it => {
+          const opt = document.createElement('option');
+          opt.value = JSON.stringify({ cat: it.categoria, archivo: it.archivo });
+          opt.textContent = `${it.titulo || it.archivo} (${(it.timeframe || '4h').toUpperCase()})`;
+          grpProd.appendChild(opt);
+        });
+        sel.appendChild(grpProd);
+
+        // 2. Grupo Laboratorio
+        const grpLab = document.createElement('optgroup');
+        grpLab.label = '🧪 En Carpeta Lab (Taller / Ganadoras)';
+        (d.laboratorio || []).forEach(it => {
+          const opt = document.createElement('option');
+          opt.value = JSON.stringify({ cat: it.categoria, archivo: it.archivo });
+          opt.textContent = `${it.titulo || it.archivo} [${it.origen}]`;
+          grpLab.appendChild(opt);
+        });
+        sel.appendChild(grpLab);
+        if (sel._labCustomSelect) {
+          sel._labCustomSelect.render();
+        }
+      } catch (err) {
+        console.error("Error cargando estrategias unificadas:", err);
+      }
+    }
+
+    function obtenerNombreEstrategiaSeleccionada() {
+      const sel = document.getElementById('selEstrategiaUnificada');
+      let nombreSel = '';
+      if (sel && sel.selectedIndex >= 0 && sel.options[sel.selectedIndex]) {
+        const txt = sel.options[sel.selectedIndex].text;
+        if (txt && !txt.startsWith('--') && !txt.startsWith('Cargando')) {
+          nombreSel = txt.trim();
+        }
+      }
+      const txtNombre = document.getElementById('txtNombreMath') ? document.getElementById('txtNombreMath').value.trim() : '';
+      if (nombreSel && txtNombre) {
+        if (!nombreSel.toLowerCase().includes(txtNombre.toLowerCase())) {
+          return `${nombreSel} [${txtNombre}]`;
+        }
+        return nombreSel;
+      }
+      if (nombreSel) return nombreSel;
+      if (txtNombre) return txtNombre;
+      if (window.estrategiaActualSeleccionada && window.estrategiaActualSeleccionada.archivo) {
+        return window.estrategiaActualSeleccionada.archivo;
+      }
+      return 'Fórmula Matemática Personalizada (Editor)';
+    }
+
+    function actualizarBadgeConsola() {
+      const lbl = document.getElementById('lblEstrategiaEnConsola');
+      if (!lbl) return;
+      const nom = obtenerNombreEstrategiaSeleccionada();
+      if (nom && nom !== 'Fórmula Matemática Personalizada (Editor)') {
+        lbl.textContent = `· [ ${nom} ]`;
+        lbl.style.display = 'inline-block';
+      } else {
+        lbl.style.display = 'none';
+      }
+    }
+
+    async function alCambiarEstrategiaUnificada() {
+      const sel = document.getElementById('selEstrategiaUnificada');
+      if (!sel.value) return;
+
+      const parsed = JSON.parse(sel.value);
+      estrategiaActualSeleccionada = parsed;
+      const { cat, archivo } = parsed;
+      actualizarBadgeConsola();
+      window._ultimoCodigoOptimizado = null;
+      const btnForzar = document.getElementById('btnForzarOptimizado');
+      if (btnForzar) btnForzar.style.display = 'none';
+      const nomEstrategia = obtenerNombreEstrategiaSeleccionada();
+      const out = document.getElementById('output');
+      out.value = `==========================================================================================\n` +
+                  `   🏛️  FÓRMULA / ESTRATEGIA SELECCIONADA : ${nomEstrategia.toUpperCase()}\n` +
+                  `==========================================================================================\n` +
+                  `>>> Cargando estrategia '${archivo}' de '${cat}'...\n`;
+
+      try {
+        let data = null;
+        if (cat === 'math') {
+          const res = await fetch('/api/estrategias_math/' + encodeURIComponent(archivo));
+          data = await res.json();
+          document.getElementById('codeEditorMath').value = data.codigo || '';
+          document.getElementById('txtNombreMath').value = data.nombre || archivo;
+          document.getElementById('txtComentarioMath').value = data.comentario || '';
+          if (data.arbitro_sugerido) {
+            try {
+              const r_ia = await fetch('/api/estrategias_ia/' + encodeURIComponent(data.arbitro_sugerido));
+              const d_ia = await r_ia.json();
+              document.getElementById('codeEditorIA').value = d_ia.codigo || '';
+            } catch (_) {}
+          }
+        } else {
+          const res = await fetch(`/api/catalogo_formulas/${encodeURIComponent(cat)}/${encodeURIComponent(archivo)}`);
+          data = await res.json();
+          document.getElementById('codeEditorMath').value = data.code_math || '';
+          document.getElementById('codeEditorIA').value = data.code_ia || '';
+          document.getElementById('txtNombreMath').value = data.archivo || archivo;
+          document.getElementById('txtComentarioMath').value = data.subtitulo || data.titulo || '';
+          if (data.dataset_sugerido) {
+            const selT = document.getElementById('selTicker');
+            for (let i = 0; i < selT.options.length; i++) {
+              if (selT.options[i].value === data.dataset_sugerido) {
+                selT.selectedIndex = i;
+                alCambiarDatasetManual();
+                break;
+              }
+            }
+          }
+        }
+        await actualizarDatasetPorCodigo();
+        actualizarBadgeConsola();
+        out.value += `✓ Estrategia cargada con éxito en los editores.\n` +
+                     `>>> Presiona '▶ AUDITAR' para contrastar la métrica dual (Sin IA vs. Con Cerebro Kula).\n`;
+      } catch (err) {
+        out.value += `❌ Error al cargar estrategia: ${err.message}\n`;
+      }
+    }
+
+    // --- DATASETS Y AUTODETECCIÓN ---
+    async function actualizarDatasetPorCodigo() {
+      const code = document.getElementById('codeEditorMath').value;
+      const sel = document.getElementById('selTicker');
+      const badge = document.getElementById('badgeDatasetMotivo');
+
+      if (sel.value && sel.value !== 'AUTO') {
+        badge.textContent = '🔒 Forzado por Operador';
+        badge.style.background = '#8b5cf6';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/resolve_dataset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code_math: code, ticker: 'AUTO' })
+        });
+        const d = await res.json();
+        if (d.dataset) {
+          if (sel.options.length > 0 && sel.options[0].value === 'AUTO') {
+            sel.options[0].textContent = `⚡ AUTO: ${d.dataset}`;
+          }
+          if (d.dataset.includes('SPY') || d.dataset.includes('QQQ') || d.dataset.includes('yf_')) {
+            badge.style.background = '#059669';
+            badge.textContent = 'TradFi (0.10%)';
+          } else {
+            badge.style.background = '#0369a1';
+            badge.textContent = 'Cripto (0.26%)';
+          }
+        }
+      } catch (err) {
+        console.error('Error resolviendo dataset:', err);
+      }
+    }
+
+    function alCambiarDatasetManual() {
+      const sel = document.getElementById('selTicker');
+      const badge = document.getElementById('badgeDatasetMotivo');
+      if (sel.value === 'AUTO') {
+        badge.textContent = '⚡ Auto por Código';
+        badge.style.background = '#0369a1';
+        actualizarDatasetPorCodigo();
+      } else {
+        badge.textContent = '🔒 Forzado por Operador';
+        badge.style.background = '#8b5cf6';
+        let code = document.getElementById('codeEditorMath').value;
+        if (code && /DATASET\s*=\s*["'][^"']+["']/.test(code)) {
+          document.getElementById('codeEditorMath').value = code.replace(/DATASET\s*=\s*["'][^"']+["']/, `DATASET = "${sel.value}"`);
+        }
+      }
+    }
+
+    function resetearDatasetAuto() {
+      document.getElementById('selTicker').value = 'AUTO';
+      alCambiarDatasetManual();
+    }
+
+    // --- EJECUCIÓN (ESTACIÓN 2) ---
+    async function ejecutarCodigo() {
+      const tick = document.getElementById('selTicker').value;
+      const codMath = document.getElementById('codeEditorMath').value;
+      const codIA = document.getElementById('codeEditorIA').value;
+      const codTestigo = document.getElementById('codeEditorTestigo').value;
+      const out = document.getElementById('output');
+      const btn = document.getElementById('btnRun');
+      const nomEstrategia = obtenerNombreEstrategiaSeleccionada();
+      actualizarBadgeConsola();
+
+      if (!tick) { alert('Selecciona un dataset primero.'); return; }
+      if (!codMath.trim()) { alert('La fórmula matemática está vacía.'); return; }
+
+      btn.classList.add('btn-loading');
+      btn.textContent = '⏳ Auditando...';
+      out.value = `==========================================================================================\n` +
+                  `   🏛️  FÓRMULA / ESTRATEGIA EVALUADA : ${nomEstrategia.toUpperCase()}\n` +
+                  `==========================================================================================\n` +
+                  `>>> Iniciando Auditoría Dual Walk-Forward en Dataset: ${tick}...\n`;
+
+      try {
+        const res = await fetch('/api/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            category: 'datos_historicos',
+            ticker: tick,
+            code_math: codMath,
+            code_ia: codIA,
+            code_testigo: codTestigo,
+            nombre_estrategia: nomEstrategia
+          })
+        });
+        const d = await res.json();
+        let resTxt = '';
+        if (d.output) {
+          resTxt += d.output;
+          const matchJson = d.output.match(/###JSON_METRICAS_INICIO###([\s\S]*?)###JSON_METRICAS_FIN###/);
+          if (matchJson) {
+            try {
+              const metaJson = JSON.parse(matchJson[1]);
+              window._ultimaMetricaEvaluada = metaJson;
+              window._ultimoMonteCarloDD = (metaJson.oos_mc_max_dd_95_pct !== undefined && metaJson.oos_mc_max_dd_95_pct !== null)
+                ? metaJson.oos_mc_max_dd_95_pct
+                : metaJson.mc_max_dd_95_pct;
+            } catch (_) {}
+          } else {
+            const m = d.output.match(/Monte Carlo DD \(95%\)\s*\|\s*([0-9.]+)%[^\n|]*\|\s*([0-9.]+)%/);
+            if (m) {
+              window._ultimoMonteCarloDD = parseFloat(m[2]);
+            } else {
+              const m1 = d.output.match(/Monte Carlo DD \(95%\)\s*\|\s*([0-9.]+)%/);
+              if (m1) window._ultimoMonteCarloDD = parseFloat(m1[1]);
+            }
+          }
+        }
+        if (d.error) resTxt += '\n--- ERRORES / ALERTAS ---\n' + d.error;
+
+        const headerTop = `==========================================================================================\n` +
+                          `   🏛️  FÓRMULA / ESTRATEGIA EVALUADA : ${nomEstrategia.toUpperCase()}\n` +
+                          `==========================================================================================\n\n`;
+        if (!resTxt.includes(`FÓRMULA / ESTRATEGIA EVALUADA : ${nomEstrategia.toUpperCase()}`)) {
+          resTxt = headerTop + resTxt;
+        }
+
+        out.value = resTxt.trim() ? resTxt : 'El script terminó sin imprimir texto.';
+      } catch (err) {
+        out.value = 'Error de comunicación: ' + err.message;
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.textContent = '▶ AUDITAR';
+      }
+    }
+
+    async function ejecutarWfoRollingUI() {
+      const tick = document.getElementById('selTicker').value || 'AUTO';
+      const codMath = document.getElementById('codeEditorMath').value;
+      const codIA = document.getElementById('codeEditorIA').value;
+      const out = document.getElementById('output');
+      const btn = document.getElementById('btnWfoRolling');
+
+      if (!codMath.trim()) { alert('La fórmula matemática está vacía.'); return; }
+
+      btn.classList.add('btn-loading');
+      btn.textContent = '⏳ WFO (5V)...';
+      out.value += '\n>>> Ejecutando Walk-Forward Deslizante (5 Ventanas IS 70% / OOS 30%)...\n';
+
+      try {
+        const res = await fetch('/api/lab/evaluar_wfo_rolling', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ticker: tick,
+            code_math: codMath,
+            code_ia: codIA,
+            n_windows: 5
+          })
+        });
+        const d = await res.json();
+        if (d.resumen_texto) {
+          out.value = d.resumen_texto + '\n\n' + out.value;
+        } else if (d.detail) {
+          out.value += `\n❌ Error WFO: ${d.detail}\n`;
+        }
+      } catch (err) {
+        out.value += `\n❌ Error de conexión en WFO Rodante: ${err.message}\n`;
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.textContent = '🔄 AUDITAR WFO RODANTE (5V)';
+      }
+    }
+
+    async function optimizarCodigo() {
+      const tick = document.getElementById('selTicker').value;
+      const codMath = document.getElementById('codeEditorMath').value;
+      const codIA = document.getElementById('codeEditorIA').value;
+      const out = document.getElementById('output');
+      const btn = document.getElementById('btnOptimize');
+      const nomEstrategia = obtenerNombreEstrategiaSeleccionada();
+      actualizarBadgeConsola();
+
+      if (!tick) { alert('Selecciona un dataset.'); return; }
+      if (!codMath.trim()) { alert('Fórmula matemática vacía.'); return; }
+
+      btn.classList.add('btn-loading');
+      btn.textContent = '⏳ Optimizando...';
+      out.value = `==========================================================================================\n` +
+                  `   🏛️  FÓRMULA / ESTRATEGIA EN OPTIMIZACIÓN : ${nomEstrategia.toUpperCase()}\n` +
+                  `==========================================================================================\n` +
+                  `>>> Iniciando Optimización Paramétrica Local en IS (70%) y validación OOS (30%)...\n`;
+
+      try {
+        const res = await fetch('/api/optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: 'datos_historicos', ticker: tick, code_math: codMath, code_ia: codIA })
+        });
+        const d = await res.json();
+        out.value = d.output || 'Optimización finalizada sin texto.';
+        window._ultimoCodigoOptimizado = d.codigo_optimizado || null;
+
+        if (d.califica_institucional && d.codigo_optimizado) {
+          document.getElementById('codeEditorMath').value = d.codigo_optimizado;
+          document.getElementById('txtNombreMath').value = d.archivo_guardado || 'estrategia_optimizada.py';
+          document.getElementById('txtComentarioMath').value = '🏆 Calibración Óptima Aprobada (OOS Positivo)';
+          const btnForzar = document.getElementById('btnForzarOptimizado');
+          if (btnForzar) btnForzar.style.display = 'none';
+        } else if (d.codigo_optimizado) {
+          const btnForzar = document.getElementById('btnForzarOptimizado');
+          if (btnForzar) btnForzar.style.display = 'inline-block';
+        }
+      } catch (err) {
+        out.value = 'Error al optimizar: ' + err.message;
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.textContent = '⚡ OPTIMIZAR';
+      }
+    }
+
+    function forzarCargaOptimizada() {
+      if (!window._ultimoCodigoOptimizado) return;
+      document.getElementById('codeEditorMath').value = window._ultimoCodigoOptimizado;
+      document.getElementById('txtNombreMath').value = 'estrategia_calibrada_experimental.py';
+      document.getElementById('btnForzarOptimizado').style.display = 'none';
+      document.getElementById('output').value += '\n[⚠️] Parámetros de la combinación #1 inyectados en el editor.\n';
+    }
+
+    async function ejecutarTorneoPodaUI() {
+      const btn = document.getElementById('btnTorneoPoda');
+      const out = document.getElementById('output');
+      const selDs = document.getElementById('selDataset');
+      const dataset = (selDs && selDs.value) ? selDs.value : 'binance_ETH_USDT_4h.parquet';
+
+      if (!confirm(`¿Iniciar Torneo de Poda Walk-Forward (IS 70% / OOS 30%) sobre el catálogo completo usando ${dataset}?\n\nEste proceso auditará todas las fórmulas sin data-snooping y sintetizará la Superfórmula Ensamble Campeona.`)) {
+        return;
+      }
+
+      btn.classList.add('btn-loading');
+      btn.textContent = '⏳ PODANDO...';
+      out.value = `🏁 INICIANDO TORNEO DE PODA ITERATIVA & SÍNTESIS DE ENSAMBLE...\nDataset: ${dataset}\nPartición Causal: IS 70% / OOS 30% (Cero Data-Snooping)\nPor favor aguarde, auditando fórmulas candidatas...\n`;
+
+      try {
+        const resp = await fetch('/api/ensemble/torneo_poda', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataset: dataset, max_batch_size: 5 })
+        });
+        const d = await resp.json();
+        if (d.status === 'ok') {
+          out.value = d.log_texto || 'Torneo completado exitosamente.';
+          if (d.code_math) {
+            document.getElementById('codeEditorMath').value = d.code_math;
+          }
+          if (d.code_ia) {
+            document.getElementById('codeEditorIA').value = d.code_ia;
+          }
+          if (d.nombre_sugerido) {
+            document.getElementById('txtNombreMath').value = d.nombre_sugerido;
+          }
+          const lblConsola = document.getElementById('lblEstrategiaEnConsola');
+          if (lblConsola) {
+            lblConsola.textContent = `🏆 Ensamble Campeón (${d.campeones ? d.campeones.length : 0} Sensores) [${d.nombre_sugerido || 'ensamble.py'}]`;
+            lblConsola.style.display = 'inline-block';
+          }
+          alert(`🏆 Torneo de Poda Finalizado con Éxito.\nEnsamble sintetizado con ${d.campeones ? d.campeones.length : 0} sensores campeones.\nCódigo inyectado en el editor.`);
+        } else {
+          out.value = `❌ Error en Torneo de Poda: ${d.mensaje || d.error || 'Fallo desconocido'}`;
+        }
+      } catch (err) {
+        out.value = '❌ Error de comunicación: ' + err.message;
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.textContent = '🏆 TORNEO DE PODA & SUPERFÓRMULA';
+      }
+    }
+
+    async function auditarEscaladoSlot() {
+      const btn = document.getElementById('btnAuditarEscalado');
+      const out = document.getElementById('output');
+      const codMath = document.getElementById('codeEditorMath').value;
+      const codIA = document.getElementById('codeEditorIA').value;
+      const selDs = document.getElementById('selDataset');
+      const ticker = (selDs && selDs.value) ? selDs.value : 'binance_ETH_USDT_4h.parquet';
+
+      if (!codMath.trim()) {
+        alert('Debe cargar una fórmula matemática en el editor para auditar fondeo y escalado.');
+        return;
+      }
+
+      btn.classList.add('btn-loading');
+      btn.textContent = '⏳ VALIDANDO...';
+      out.value = `🏦 AUDITANDO CUMPLIMIENTO DE FONDEO (PROP FIRM) Y ESCALADO EN SLOT...\nActivo: ${ticker}\nSlot Capital: 25.0% | Riesgo Base: 0.5% -> 1.0%\n`;
+
+      try {
+        const resp = await fetch('/api/auditar_escalado', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            category: 'datos_historicos',
+            ticker: ticker,
+            code_math: codMath,
+            code_ia: codIA,
+            slot_capital: 25.0,
+            riesgo_base: 0.50,
+            riesgo_escalado: 1.00,
+            umbral_escalado: 35.0,
+            umbral_desescalado: 30.0
+          })
+        });
+        const d = await resp.json();
+        if (d.output) {
+          out.value = d.output;
+        } else if (d.error) {
+          out.value = `❌ Error en auditoría de escalado: ${d.error}`;
+        } else {
+          out.value = 'Sin salida de auditoría de escalado.';
+        }
+      } catch (err) {
+        out.value = '❌ Error de conexión: ' + err.message;
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.textContent = '🏦 VALIDAR FONDEO / ESCALADO';
+      }
+    }
+
+    async function ejecutarScreeningGrid() {
+      const codMath = document.getElementById('codeEditorMath').value;
+      const codIA = document.getElementById('codeEditorIA').value;
+      const universo = document.getElementById('selUniversoScreening').value;
+      const btn = document.getElementById('btnScreening');
+      const out = document.getElementById('output');
+
+      if (!codMath.trim()) { alert('Fórmula matemática vacía.'); return; }
+      btn.classList.add('btn-loading');
+      btn.textContent = '⏳ Screening...';
+      out.value = `>>> [BARRIDO MULTIMERCADO] Evaluando en paralelo universo: ${universo.toUpperCase()}...\n`;
+
+      try {
+        const res = await fetch('/api/screening_grid', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code_math: codMath, code_ia: codIA, universo: universo, top_n: 15, max_workers: 4 })
+        });
+        const d = await res.json();
+        out.value = d.resumen_texto || 'Barrido completado sin datos.';
+      } catch (err) {
+        out.value += '\n❌ Error en Screening: ' + err.message;
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.textContent = '🌐 BARRIDO MULTIMERCADO';
+      }
+    }
+
+    async function sintetizarYAuditar(modo = 'backtest') {
+      const prompt = document.getElementById('txtPromptIA').value.trim();
+      const motor = document.getElementById('selMotorIA').value;
+      const apiKey = document.getElementById('txtApiKeyGemini').value.trim();
+      const btn = document.getElementById('btnGenerarIACargar');
+      const out = document.getElementById('output');
+      const tick = document.getElementById('selTicker').value;
+
+      if (!prompt) { alert('Escribe tu tesis técnica cuantitativa primero.'); return; }
+      btn.classList.add('btn-loading');
+      btn.textContent = '⏳ Sintetizando...';
+      out.value = `>>> [SINTETIZADOR IA] Analizando tesis y generando arquitectura dual (Fórmula + Gancho Cerebro)...\n`;
+
+      try {
+        const res = await fetch('/api/generar_estrategia_ia', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: prompt,
+            motor: motor,
+            api_key: apiKey,
+            ticker: tick,
+            code_math_existente: document.getElementById('codeEditorMath').value,
+            code_ia_existente: document.getElementById('codeEditorIA').value
+          })
+        });
+        const d = await res.json();
+        if (d.code_math) {
+          document.getElementById('codeEditorMath').value = d.code_math;
+          document.getElementById('txtNombreMath').value = d.nombre || 'estrategia_ia.py';
+          document.getElementById('txtComentarioMath').value = d.comentario || 'Generada por IA';
+          actualizarBadgeConsola();
+        }
+        if (d.code_ia) {
+          document.getElementById('codeEditorIA').value = d.code_ia;
+        }
+        if (d.dataset_recomendado) {
+          const selT = document.getElementById('selTicker');
+          selT.value = d.dataset_recomendado;
+          alCambiarDatasetManual();
+        }
+        out.value += `✓ Estrategia sintetizada exitosamente por: ${d.motor_usado || motor}\n>>> Ejecutando auditoría...\n\n`;
+        await ejecutarCodigo();
+      } catch (err) {
+        out.value += '\n❌ Error sintetizando: ' + err.message;
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.textContent = '✨ GENERAR Y AUDITAR';
+      }
+    }
+
+    // --- ACCIONES DE DESTINO (ESTACIÓN 3) ---
+    async function guardarEnCarpetaLab() {
+      const nombre = document.getElementById('txtNombreMath').value.trim() || 'estrategia_lab.py';
+      const comentario = document.getElementById('txtComentarioMath').value.trim() || 'Estrategia auditada en Lab';
+      const codeMath = document.getElementById('codeEditorMath').value.trim();
+      const codeIA = document.getElementById('codeEditorIA').value.trim();
+      const tick = document.getElementById('selTicker').value;
+      const out = document.getElementById('output');
+
+      if (!codeMath) { alert('La fórmula matemática está vacía.'); return; }
+
+      try {
+        const res = await fetch('/api/lab/guardar_en_carpeta_lab', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nombre: nombre,
+            comentario: comentario,
+            code_math: codeMath,
+            code_ia: codeIA,
+            ticker: tick
+          })
+        });
+        const d = await res.json();
+        if (res.ok) {
+          out.value += `\n✓ ${d.mensaje}\n`;
+          alert(`✅ ${d.mensaje}`);
+          await cargarEstrategiasUnificadas();
+        } else {
+          alert('Error al guardar: ' + (d.detail || 'Fallo HTTP'));
+        }
+      } catch (err) {
+        alert('Error al conectar: ' + err.message);
+      }
+    }
+
+    async function descartarOLimpiar() {
+      const nom = document.getElementById('txtNombreMath').value.trim();
+      if (estrategiaActualSeleccionada && confirm(`¿Deseas eliminar permanentemente '${estrategiaActualSeleccionada.archivo}' del catálogo?`)) {
+        try {
+          const res = await fetch(`/api/catalogo_formulas/${encodeURIComponent(estrategiaActualSeleccionada.cat)}/${encodeURIComponent(estrategiaActualSeleccionada.archivo)}`, {
+            method: 'DELETE'
+          });
+          const d = await res.json();
+          alert(d.mensaje || 'Fórmula eliminada con éxito.');
+          await cargarEstrategiasUnificadas();
+        } catch (e) {
+          alert('Error al eliminar: ' + e.message);
+        }
+      }
+      limpiarEditores();
+    }
+
+    function limpiarEditores() {
+      document.getElementById('codeEditorMath').value = '';
+      document.getElementById('codeEditorIA').value = '';
+      document.getElementById('codeEditorTestigo').value = '';
+      document.getElementById('txtNombreMath').value = '';
+      document.getElementById('txtComentarioMath').value = '';
+      estrategiaActualSeleccionada = null;
+      document.getElementById('selEstrategiaUnificada').value = '';
+      actualizarBadgeConsola();
+      window._ultimoCodigoOptimizado = null;
+      const btnForzar = document.getElementById('btnForzarOptimizado');
+      if (btnForzar) btnForzar.style.display = 'none';
+      document.getElementById('output').value = '>>> Taller despejado.';
+    }
+
+    // --- PROMOCIÓN A DAEMON ---
+    function abrirModalPromocion() {
+      const codMath = document.getElementById('codeEditorMath').value.trim();
+      if (!codMath) { alert('No hay estrategia cargada para promover.'); return; }
+
+      const selDs = document.getElementById('selTicker').value || '';
+      let sym = 'SOL/USDT';
+      if (selDs.includes('BTC')) sym = 'BTC/USDT';
+      else if (selDs.includes('ETH')) sym = 'ETH/USDT';
+      else if (selDs.includes('SOL')) sym = 'SOL/USDT';
+      else if (selDs.includes('SPY')) sym = 'SPY';
+      else if (selDs.includes('QQQ')) sym = 'QQQ';
+      else if (selDs.includes('AAPL')) sym = 'AAPL';
+      else if (selDs.includes('NVDA')) sym = 'NVDA';
+      else if (selDs.includes('EURUSD')) sym = 'EURUSD=X';
+
+      document.getElementById('promoActivo').value = sym;
+      document.getElementById('promoNombre').value = document.getElementById('txtNombreMath').value.trim() || 'estrategia_promovida.py';
+      document.getElementById('promoJustificacion').value = document.getElementById('txtComentarioMath').value.trim() || 'Estrategia auditada con asimetría R:R >= 1:2.0 y Walk-Forward OOS.';
+      document.getElementById('modalPromocion').style.display = 'flex';
+    }
+
+    function cerrarModalPromocion() {
+      document.getElementById('modalPromocion').style.display = 'none';
+    }
+
+    async function confirmarPromocionDaemon() {
+      const codMath = document.getElementById('codeEditorMath').value.trim();
+      const codIA = document.getElementById('codeEditorIA').value.trim();
+      const activo = document.getElementById('promoActivo').value.trim();
+      const slotId = parseInt(document.getElementById('promoSlot').value) || 1;
+      const confianza = parseInt(document.getElementById('promoConfianza').value) || 85;
+      const nombre = document.getElementById('promoNombre').value.trim() || 'estrategia_promovida.py';
+      const justificacion = document.getElementById('promoJustificacion').value.trim();
+      const destino = document.getElementById('promoDestino').value || 'principal';
+      const btn = document.getElementById('btnConfirmarPromocion');
+      const out = document.getElementById('output');
+
+      btn.classList.add('btn-loading');
+      btn.textContent = '⏳ Promoviendo...';
+
+      let mcMaxDd = null;
+      if (window._ultimoMonteCarloDD !== undefined && window._ultimoMonteCarloDD !== null && !isNaN(window._ultimoMonteCarloDD)) {
+        mcMaxDd = parseFloat(window._ultimoMonteCarloDD);
+      } else {
+        const outTxt = document.getElementById('output') ? document.getElementById('output').value : '';
+        const m = outTxt.match(/Monte Carlo DD \(95%\)\s*\|\s*([0-9.]+)%[^\n|]*\|\s*([0-9.]+)%/);
+        if (m) {
+          mcMaxDd = parseFloat(m[2]);
+        } else {
+          const m1 = outTxt.match(/Monte Carlo DD \(95%\)\s*\|\s*([0-9.]+)%/);
+          if (m1) mcMaxDd = parseFloat(m1[1]);
+        }
+      }
+
+      try {
+        const res = await fetch('/api/promover_a_produccion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ticker: activo,
+            code_math: codMath,
+            code_ia: codIA,
+            nombre: nombre,
+            slot_id: slotId,
+            confianza: confianza,
+            justificacion: justificacion,
+            destino: destino,
+            mc_max_dd_95_pct: mcMaxDd
+          })
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          alert('Error al promover: ' + (d.detail || d.message || 'Fallo HTTP ' + res.status));
+          return;
+        }
+        cerrarModalPromocion();
+        await cargarEstrategiasUnificadas();
+
+        out.value = `==========================================================================================\n` +
+                    `   KULA BALAM: ESTRATEGIA PROMOVIDA CON ÉXITO AL PANEL DE PRODUCCIÓN\n` +
+                    `==========================================================================================\n` +
+                    `[✓] DESTINO           : ${destino.toUpperCase()}\n` +
+                    `[✓] ARCHIVO GUARDADO  : ${d.archivo_guardado}\n` +
+                    `[✓] ACTIVO ASIGNADO   : ${d.activo}\n` +
+                    `[✓] SLOT EN DAEMON    : Slot ${d.slot_id}\n` +
+                    `[✓] CONFIANZA TÁCTICA : ${d.confianza}%\n` +
+                    `[✓] BUZÓN RADAR       : Registrada en buzon_radar.json (ID: ${d.card_id})\n` +
+                    `==========================================================================================\n`;
+      } catch (err) {
+        alert('Error al promover: ' + err.message);
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.textContent = '🚀 CONFIRMAR Y PROMOVER';
+      }
+    }
+
+    async function actualizarVelasAlDia() {
+      const btn = document.getElementById('btnActualizarVelas');
+      const out = document.getElementById('output');
+      btn.classList.add('btn-loading');
+      btn.textContent = '⏳ Velas...';
+      out.value = '>>> Descargando últimas velas al día...\n';
+      try {
+        const res = await fetch('/api/datasets/actualizar', { method: 'POST' });
+        const d = await res.json();
+        out.value = d.log || 'Velas actualizadas con éxito.';
+      } catch (err) {
+        out.value = 'Error al actualizar velas: ' + err.message;
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.textContent = '🔄 Velas';
+      }
+    }
+
+    async function copiarConsola() {
+      const txt = document.getElementById('output').value;
+      if (!txt) return;
+      try {
+        await navigator.clipboard.writeText(txt);
+        alert('Copiado al portapapeles');
+      } catch (_) {
+        alert('Selecciona el texto y presiona Ctrl+C');
+      }
+    }
+
+    // --- INICIALIZACIÓN ---
+    window.addEventListener('DOMContentLoaded', async () => {
+      initLabCustomSelects();
+      await cargarEstrategiasUnificadas();
+      const selE = document.getElementById('selEstrategiaUnificada');
+      if (selE.options.length > 1) {
+        selE.selectedIndex = 1;
+        await alCambiarEstrategiaUnificada();
+      }
+    });
+  </script>
+</body>
+</html>

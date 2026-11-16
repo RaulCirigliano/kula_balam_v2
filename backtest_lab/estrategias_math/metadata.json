@@ -1,0 +1,47 @@
+{
+  "1_donchian_breakout_sol_4h.py": {
+    "comentario": "🌊🧩 1. Donchian Breakout SOL 4H (Slot 1 · PF 1.82 · MC DD 7.55%)",
+    "arbitro_sugerido": "arbitro_donchian_breakout_1h.py"
+  },
+  "2_squeeze_dual_eth_4h.py": {
+    "comentario": "⚡🧩 2. Squeeze Dual ETH 4H (Slot 2 · PF 1.66 · MC DD 6.91%)",
+    "arbitro_sugerido": "arbitro_squeeze_dual_4h.py"
+  },
+  "squeeze_dual_eth_4h.py": {
+    "comentario": "⚡🧩 Squeeze Dual BB/Donchian 4H (ETH 3Y · PF 1.66 · DD 2.50%)",
+    "arbitro_sugerido": "arbitro_squeeze_dual_4h.py"
+  },
+  "squeeze_dual_eth_fondeo_strict_4h.py": {
+    "comentario": "⚡🧩 Squeeze Dual ETH 4H (Fondeo Strict · Max DD 6.50%)",
+    "arbitro_sugerido": "arbitro_eth_fondeo_4h.py"
+  },
+  "cava_fallo_macd_eurusd_1h.py": {
+    "comentario": "🐅🧩 Cava Fallo MACD EURUSD 1H (PF 1.79 · OOS PF 9.30 · RFC-2026-11)",
+    "arbitro_sugerido": "arbitro_cava_forex_1h.py"
+  },
+  "donchian_breakout_1h.py": {
+    "comentario": "🌊🧩 Donchian Breakout 1H (Multi-Marco Estructural)",
+    "arbitro_sugerido": "arbitro_donchian_breakout_1h.py"
+  },
+  "ensamble_campeon_binance_ETH_USDT_4h.py": {
+    "comentario": "🏆🧩 Ensamble Campeón ETH 4H (Donchian + Squeeze)",
+    "arbitro_sugerido": "arbitro_donchian_breakout_1h.py"
+  },
+  "freqtrade_freqtradestrategy_auto.py": {
+    "comentario": "🤖🧩 Freqtrade Benchmark Strategy 4H (R:R 1:2.0)",
+    "arbitro_sugerido": "arbitro_freqtrade.py"
+  },
+  "mejorada cava_fallo_macd_eurusd_1h.py": {
+    "comentario": "🐅🔬 Variante Lab Forex · TP 4.5x ATR · Árbitro RFC-2026-11",
+    "arbitro_sugerido": "arbitro_mejorada cava_fallo_macd_eurusd_1h.py"
+  },
+  "cava_fallo_macd_eurusd_1h_slot1.py": {
+    "comentario": "🐅🏦 Cava Fallo MACD EURUSD 1H (Slot 1 · PF 1.79 · OOS PF 9.30)",
+    "arbitro_sugerido": "arbitro_cava_forex_1h.py"
+  },
+  "mejorada_cava_fallo_macd_eurusd_1h.py": "🏆 [PROMOVIDA] mejorada_cava_fallo_macd_eurusd_1h (EURUSD=X) Slot 1",
+  "1_donchian_breakout_sol_4h_slot1.py": "🏆 [PROMOVIDA] 1_donchian_breakout_sol_4h_slot1 (SOL/USDT) Slot 1",
+  "21_donchian_breakout_sol_4h.py": "🏆 [PROMOVIDA] 21_donchian_breakout_sol_4h (SOL/USDT) Slot 1",
+  "ensamble_campeon_binance_ETH_USDT_4h_slot1.py": "🏆 [PROMOVIDA] ensamble_campeon_binance_ETH_USDT_4h_slot1 (ETH/USDT) Slot 1",
+  "31_donchian_breakout_sol_4h.py": "🏆 [PROMOVIDA] 31_donchian_breakout_sol_4h (SOL/USDT) Slot 1"
+}

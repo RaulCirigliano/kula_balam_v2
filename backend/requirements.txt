@@ -1,0 +1,10 @@
+fastapi>=0.100
+uvicorn
+watchfiles>=1.0.0
+ccxt
+pydantic>=2.0
+pandas
+ta
+requests
+python-dotenv
+yfinance

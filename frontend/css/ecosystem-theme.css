@@ -1,0 +1,537 @@
+/* ==========================================================================
+   KULA · BALAM — DESIGN SYSTEM & ECOSYSTEM TOKENS (TRADINGVIEW PRO DARK)
+   Módulo de tokens CSS nativos compartidos entre las 6 páginas del ecosistema.
+   Compatible con Tailwind CSS compilado, styles.css y selectores estándar.
+   ========================================================================== */
+
+:root {
+  /* --- PALETA DE FONDOS (Obsidiana Institucional de Baja Fatiga) --- */
+  --tv-bg-base: #06090e;        /* Fondo base general ultradark */
+  --tv-bg-panel: #0b0f19;       /* Fondo de paneles principales, canvas y gráficos */
+  --tv-bg-card: #0f172a;        /* Fondo de tarjetas, bloques y sidebars */
+  --tv-bg-surface: #111827;     /* Modales, flyouts y tooltips */
+  --tv-bg-elevated: #161f30;    /* Estados activos y hover elevados */
+
+  /* --- PALETA DE BORDES Y LÍNEAS DE CORTE --- */
+  --tv-border-subtle: #1e293b;  /* Separadores y bordes estándar */
+  --tv-border-medium: #334155;  /* Bordes secundarios y divisores de tabla */
+  --tv-border-active: #3b82f6;  /* Borde de foco y elementos seleccionados */
+  --tv-border-gold: rgba(245, 158, 11, 0.45);   /* Borde Proporción Áurea */
+  --tv-border-emerald: rgba(16, 185, 129, 0.45);/* Borde Balam / Éxito */
+
+  /* --- PALETA TIPOGRÁFICA --- */
+  --tv-text-primary: #f8fafc;   /* Texto principal de alto contraste */
+  --tv-text-secondary: #94a3b8; /* Subtítulos, etiquetas y descripciones */
+  --tv-text-muted: #64748b;     /* Texto deshabilitado o de menor jerarquía */
+  --tv-text-accent: #38bdf8;    /* Acento cian para tickers y claves */
+
+  /* --- PALETA FINANCIERA INSTITUCIONAL --- */
+  --tv-bull: #10b981;           /* Verde alcista institucional (Emerald) */
+  --tv-bull-bg: rgba(16, 185, 129, 0.12);
+  --tv-bull-border: rgba(16, 185, 129, 0.35);
+
+  --tv-bear: #ef4444;           /* Rojo bajista institucional (Rose) */
+  --tv-bear-bg: rgba(239, 68, 68, 0.12);
+  --tv-bear-border: rgba(239, 68, 68, 0.35);
+
+  --tv-gold: #f59e0b;           /* Dorado Áureo Φ / Fibonacci (Amber) */
+  --tv-gold-bg: rgba(245, 158, 11, 0.12);
+  --tv-gold-border: rgba(245, 158, 11, 0.4);
+
+  --tv-cio-purple: #818cf8;     /* Púrpura CIO / Inteligencia (Indigo) */
+  --tv-cio-bg: rgba(99, 102, 241, 0.12);
+  --tv-cio-border: rgba(99, 102, 241, 0.35);
+
+  --tv-radar-cyan: #06b6d4;     /* Cian Scanner / Radar */
+  --tv-radar-bg: rgba(6, 182, 212, 0.12);
+  --tv-radar-border: rgba(6, 182, 212, 0.35);
+
+  /* --- PILAS TIPOGRÁFICAS --- */
+  --tv-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --tv-font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+}
+
+/* ==========================================================================
+   HOMOGENEIZACIÓN DE FONDO GLOBAL (Cero fondos blancos)
+   ========================================================================== */
+html, body {
+  background-color: #06090e !important;
+  color: #f8fafc !important;
+}
+
+/* ==========================================================================
+   MONITOR DEL CEREBRO: FLUJO NATURAL SIN SCROLL EXTERNO
+   El contenedor general no confina el scroll; el scroll reside exclusivamente
+   en la consola interna de logs (#terminal) con barra lateral arrastrable.
+   ========================================================================== */
+#strategyAndRegimeBlock {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* ==========================================================================
+   TIPOGRAFÍA TABULAR OBLIGATORIA (Cero saltos de ancho en cotizaciones)
+   ========================================================================== */
+.font-tabular,
+.font-mono,
+code,
+pre,
+[data-tabular="true"] {
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: "tnum" 1 !important;
+}
+
+/* ==========================================================================
+   SCROLLBAR LATERAL ROBUSTO Y ARRASTRABLE (TradingView Style)
+   Permite agarre y arrastre directo con el ratón / cursor en Linux, Chrome y Firefox
+   ========================================================================== */
+.custom-scrollbar::-webkit-scrollbar,
+.terminal-visible-scrollbar::-webkit-scrollbar,
+#terminal::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track,
+.terminal-visible-scrollbar::-webkit-scrollbar-track,
+#terminal::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: #090d16;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.terminal-visible-scrollbar::-webkit-scrollbar-thumb,
+#terminal::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 5px;
+  border: 2px solid #090d16;
+  min-height: 32px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.terminal-visible-scrollbar::-webkit-scrollbar-thumb:hover,
+#terminal::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active,
+.terminal-visible-scrollbar::-webkit-scrollbar-thumb:active,
+#terminal::-webkit-scrollbar-thumb:active,
+body::-webkit-scrollbar-thumb:active {
+  background: #38bdf8;
+}
+
+/* Soporte Firefox */
+.custom-scrollbar,
+.terminal-visible-scrollbar,
+#terminal {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #090d16;
+}
+
+/* ==========================================================================
+   BLINDAJE DE MODO OSCURO PARA SELECTORES (Linux / Chrome / Firefox)
+   Evita fondos blancos cegadores en elementos select y sus opciones
+   ========================================================================== */
+select {
+  background-color: var(--tv-bg-surface) !important;
+  color: var(--tv-text-primary) !important;
+}
+
+select option,
+select optgroup {
+  background-color: #0b1329 !important;
+  color: var(--tv-text-primary) !important;
+}
+
+select optgroup {
+  font-weight: 800 !important;
+  color: var(--tv-text-accent) !important;
+  background-color: #060b18 !important;
+  padding: 6px 4px !important;
+}
+
+select option {
+  padding: 6px 12px !important;
+  color: #e2e8f0 !important;
+  background-color: #0b1329 !important;
+}
+
+select option:hover,
+select option:focus,
+select option:checked {
+  background-color: #1e293b !important;
+  color: var(--tv-bull) !important;
+}
+
+/* ==========================================================================
+   ESTILOS COMPARTIDOS DEL COMPONENTE DE NAVEGACIÓN UNIVERSAL
+   ========================================================================== */
+.ecosystem-nav-wrapper {
+  position: relative;
+  display: inline-block;
+  text-align: left;
+}
+
+.ecosystem-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, rgba(49, 46, 129, 0.85) 0%, rgba(88, 28, 135, 0.75) 50%, rgba(49, 46, 129, 0.85) 100%);
+  color: #e0e7ff;
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.4);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  user-select: none;
+}
+
+.ecosystem-nav-btn:hover {
+  background: linear-gradient(135deg, rgba(67, 56, 202, 0.95) 0%, rgba(107, 33, 168, 0.85) 100%);
+  border-color: rgba(129, 140, 248, 0.8);
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+
+.ecosystem-dropdown-panel {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.35rem);
+  width: 22rem;
+  max-width: 95vw;
+  background: rgba(9, 13, 22, 0.98);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+  padding: 0.5rem;
+  z-index: 1000;
+}
+
+.ecosystem-dropdown-panel.open {
+  display: block;
+}
+
+.ecosystem-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.15s ease-in-out;
+  text-decoration: none;
+  border: 1px solid transparent;
+  color: inherit;
+}
+
+.ecosystem-item:hover {
+  background-color: rgba(30, 41, 59, 0.8);
+}
+
+.ecosystem-item.active {
+  background-color: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+/* ==========================================================================
+   SISTEMA UNIVERSAL ANTI-RECORTE Y AUTO-ENVOLTURA DE CONTROLES (REGLA SISTÉMICA)
+   Si un título, casilla de verificación, badge o botón interactivo no cabe
+   en el ancho de la fila, salta de manera natural a la fila superior o inferior
+   en lugar de ser cortado con overflow: hidden o solapado por detrás.
+   ========================================================================== */
+.chart-header-row,
+.controls-header,
+.toolbar-container,
+.nav-controls,
+.card-header,
+#chart-legend,
+.legend-overlay,
+.legend-bar {
+  flex-wrap: wrap !important;
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+  row-gap: 6px !important;
+}
+
+/* Casillas de verificación e interruptores interactivos protegidos contra corte entre cajita y texto */
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]),
+label.checkbox-label,
+.badge-control,
+.checkbox-control,
+input[type="checkbox"],
+input[type="checkbox"] + span,
+.control-pill,
+.btn-control {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Blindaje de contención: etiquetas descriptivas de campo y títulos de formulario NUNCA desbordan */
+.strategy-input-label,
+label.strategy-input-label,
+.strategy-window-title,
+.strategy-card-title,
+label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"])) {
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  max-width: 100% !important;
+}
+
+/* ==========================================================================
+   DESPLEGABLES Y SELECTORES: BLINDAJE DE PROFUNDIDAD Y Z-INDEX DINÁMICO
+   Garantiza que ningún select, menú o lista desplegable quede oculto o cortado
+   por las tarjetas, paneles o ventanas inferiores del dashboard.
+   ========================================================================== */
+select,
+.dropdown-menu,
+.ecosystem-dropdown-panel,
+[data-dropdown] {
+  position: relative;
+  z-index: 40;
+}
+
+/* Elevación de máxima jerarquía al hacer foco, hover o interactuar con un select */
+select:hover,
+select:focus,
+select:active,
+.dropdown-menu:hover,
+.dropdown-menu:focus-within,
+.ecosystem-dropdown-panel.open {
+  position: relative !important;
+  z-index: 999999 !important;
+}
+
+/* Cuando un select dentro de una tarjeta recibe interacción, eleva la tarjeta completa
+   sobre sus hermanas inferiores y desbloquea el desborde para que las opciones floten libres */
+*:has(> select:focus),
+*:has(> select:active),
+.bg-gray-800:has(select:focus),
+.bg-gray-800:has(select:active),
+.bg-gray-900:has(select:focus),
+.bg-gray-900:has(select:active),
+.bg-slate-900:has(select:focus),
+.bg-slate-900:has(select:active),
+.bg-slate-950:has(select:focus),
+.bg-slate-950:has(select:active),
+section:has(select:focus),
+section:has(select:active),
+div:has(> select:focus),
+div:has(> select:active) {
+  position: relative !important;
+  z-index: 99999 !important;
+  overflow: visible !important;
+}
+
+/* ==========================================================================
+   MODALES Y VENTANAS FLOTANTES: BLINDAJE DE POSICIONAMIENTO Y CONTENCIÓN
+   Previene el bug de centrado flex que desplaza la cabecera del modal a un
+   espacio Y negativo fuera de la ventana del navegador (detrás de marcadores/tabs).
+   Garantiza que la cabecera y el botón [X CERRAR] estén siempre anclados y visibles.
+   ========================================================================== */
+#strategyManagerModal {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 100000 !important;
+  background-color: rgba(0, 0, 0, 0.88) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  padding: 20px 12px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+}
+
+#strategyManagerModal.hidden {
+  display: none !important;
+}
+
+#strategyManagerModal > div {
+  width: 100% !important;
+  max-width: 960px !important;
+  max-height: calc(100vh - 40px) !important;
+  height: calc(100vh - 40px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  margin: 0 auto !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+#strategyManagerModal > div > div:first-child {
+  flex-shrink: 0 !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+#strategyManagerModal #strategyManagerContainer {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+}
+
+#strategyManagerModal > div > div:last-child {
+  flex-shrink: 0 !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+/* Blindaje de z-index y contención para otros modales del sistema */
+#copilotModal,
+#modalAddExpense {
+  z-index: 100000 !important;
+}
+
+/* ==========================================================================
+   SISTEMA DE DISEÑO CANÓNICO DE VENTANAS DEL ECOSISTEMA (MARCO BLANCO SÓLIDO)
+   Registro visual institucional unificado: mismo borde blanco sólido,
+   mismo padding, mismo margin y misma sombra para todas las ventanas del proyecto.
+   ========================================================================== */
+
+:root {
+  --eco-window-border: 1.5px solid #ffffff;
+  --eco-window-border-thick: 2px solid #ffffff;
+  --eco-window-radius: 0.875rem;       /* 14px */
+  --eco-subwindow-radius: 0.75rem;      /* 12px */
+  --eco-window-padding: 1.25rem;        /* 20px */
+  --eco-subwindow-padding: 1.125rem;    /* 18px */
+  --eco-window-margin-bottom: 1.125rem; /* 18px */
+  --eco-window-bg: rgba(15, 23, 42, 0.88);
+  --eco-window-bg-card: rgba(15, 23, 42, 0.70);
+  --eco-window-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --eco-window-hover-shadow: 0 8px 24px rgba(255, 255, 255, 0.16);
+}
+
+/* 1. VENTANA PRINCIPAL / SECTOR CARD (Marco blanco sólido institucional) */
+.ecosystem-window,
+.ecosystem-sector-card,
+.strategy-sector-card {
+  background: var(--eco-window-bg-card) !important;
+  border: var(--eco-window-border) !important;
+  border-radius: var(--eco-window-radius) !important;
+  padding: var(--eco-window-padding) !important;
+  margin-bottom: var(--eco-window-margin-bottom) !important;
+  box-shadow: var(--eco-window-shadow) !important;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease !important;
+  box-sizing: border-box !important;
+}
+
+.ecosystem-window:last-child,
+.ecosystem-sector-card:last-child,
+.strategy-sector-card:last-child {
+  margin-bottom: 0 !important;
+}
+
+.ecosystem-window:hover,
+.ecosystem-sector-card:hover,
+.strategy-sector-card:hover {
+  box-shadow: var(--eco-window-hover-shadow) !important;
+}
+
+/* 2. SUB-VENTANA / FUNCIÓN INDIVIDUAL (Marco blanco sólido interno) */
+.ecosystem-subwindow,
+.ecosystem-function-card,
+.strategy-function-card {
+  background: var(--eco-window-bg) !important;
+  border: var(--eco-window-border) !important;
+  border-radius: var(--eco-subwindow-radius) !important;
+  padding: var(--eco-subwindow-padding) !important;
+  margin-bottom: var(--eco-window-margin-bottom) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease !important;
+  box-sizing: border-box !important;
+}
+
+.ecosystem-subwindow:last-child,
+.ecosystem-function-card:last-child,
+.strategy-function-card:last-child {
+  margin-bottom: 0 !important;
+}
+
+.ecosystem-subwindow:hover,
+.ecosystem-function-card:hover,
+.strategy-function-card:hover {
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.18) !important;
+}
+
+/* 3. VENTANA MAESTRA DESTACADA / COMPOSITE */
+.ecosystem-composite-card,
+.strategy-composite-card {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 41, 59, 0.88) 100%) !important;
+  border: var(--eco-window-border-thick) !important;
+  border-radius: var(--eco-window-radius) !important;
+  padding: var(--eco-window-padding) !important;
+  margin-bottom: var(--eco-window-margin-bottom) !important;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+  box-sizing: border-box !important;
+}
+
+/* 4. VENTANAS Y PANELES DE GRÁFICOS (TRÍADA DE 3 VELAS Y GRÁFICOS DEL SISTEMA) */
+.ecosystem-chart-card,
+.ecosystem-triad-panel {
+  border: var(--eco-window-border) !important;
+  border-radius: var(--eco-window-radius) !important;
+  box-shadow: var(--eco-window-shadow) !important;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease !important;
+  box-sizing: border-box !important;
+}
+
+.ecosystem-chart-card:hover,
+.ecosystem-triad-panel:hover {
+  box-shadow: var(--eco-window-hover-shadow) !important;
+}
+
+/* ==========================================================================
+   VENTANA DE INTELIGENCIA DE MERCADO (RECOMENDACIONES HORARIAS)
+   ========================================================================== */
+.market-intel-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-family: var(--tv-font-sans);
+  line-height: 1.6;
+  font-size: 13.5px;
+  color: #ffffff;
+}
+
+.market-intel-item {
+  margin-bottom: 12px;
+}
+
+.market-intel-item:last-child {
+  margin-bottom: 0;
+}
+
+.market-intel-asset-title {
+  color: #fbbf24 !important; /* Amarillo institucional unificado para todos los activos (#fbbf24) */
+  font-weight: 700 !important;
+}
+
+.market-intel-hours {
+  color: #4ade80 !important;
+  font-weight: 600 !important;
+}
+
+
+
+

@@ -1,0 +1,16 @@
+{
+  "auditar_donchian_tp.py": "✅ [POSITIVA] Donchian con TP Parcial (PF 1.9 en 1H)",
+  "backtest_donchian_breakeven.py": "✅ [POSITIVA] Donchian + Breakeven (Ideal Crypto/Stocks)",
+  "auditar_trailing_sin_techo_1h.py": "✅ [POSITIVA] Trailing Stop tendencial sin techo",
+  "auditar_fibo_bos_diario.py": "✅ [POSITIVA] Fibo 61.8% + BOS en Swing Diario TradFi",
+  "test_cava_limpio.py": "✅ [POSITIVA] Metodología Cava-Ruiz en temporalidad diaria",
+  "auditar_pairs_trading_nvda_amd.py": "✅ [POSITIVA] Pairs Trading Cointegración NVDA/AMD",
+  "auditar_orb_acciones_15m.py": "⚠️ [NEUTRA] Ruptura de Apertura 15m (Requiere Volumen)",
+  "auditar_vwap_qqq_local.py": "⚠️ [NEUTRA] Rebote VWAP intradía en QQQ",
+  "auditar_forex_4h.py": "⚠️ [NEUTRA] Forex Swing 4H con filtro de sesión",
+  "auditar_forex_spread.py": "📐 [HERRAMIENTA] Cálculo de lotaje exacto y spread",
+  "auditar_zscore_reversion_15m.py": "❌ [DESCARTADA] Reversión a la media (falla en tendencias)",
+  "backtest_1h_puro.py": "✅ [POSITIVA] primera auditada por estudio de velas",
+  "estrategia_con_ia.py": "🤖 [ESTRATEGIA IA] Instrucciones Configurables Antigravity vs Formula Pura",
+  "auditar_kula_balam_vs_antigravity.py": "✅ [KULA BALAM & ANTIGRAVITY] Dual: Formula Pura vs Arbitro CIO (R:R >= 2.0)"
+}

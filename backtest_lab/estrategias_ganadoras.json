@@ -1,0 +1,12 @@
+{
+  "modo": "WALK_FORWARD_SWING_1H_4H_1D",
+  "ticker": "yf_EURUSD_1h.parquet",
+  "total_evaluadas": 128,
+  "con_trades_suficientes": 128,
+  "ganadoras_filtradas": 0,
+  "califica_institucional": false,
+  "archivo_guardado": null,
+  "codigo_optimizado": null,
+  "motivo_no_guardado": "Ninguna combinación superó los umbrales de consistencia dual en In-Sample (IS_H1 + IS_H2).",
+  "top_5": []
+}

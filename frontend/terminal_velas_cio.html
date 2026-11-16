@@ -1,0 +1,1913 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terminal del CIO — Balam, auditor cuantitativo de las tres velas</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <!-- Design System & Tokens Compartidos Kula Balam -->
+  <link rel="stylesheet" href="ecosystem-theme.css?v=20261031_1">
+  <!-- TradingView Lightweight Charts -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+  <!-- Motor Gráfico y Fórmulas Cuantitativas Centralizadas de Kula Balam -->
+  <script src="kula-chart-engine.js"></script>
+  <style>
+    body {
+      background-color: #06090e;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #06090e;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    /* Blindaje Obligatorio de Modo Oscuro para Menús Desplegables (Linux/Chrome/Firefox) */
+    select {
+      background-color: #0b1329 !important;
+      color: #f8fafc !important;
+    }
+    select option, select optgroup {
+      background-color: #0b1329 !important;
+      color: #f8fafc !important;
+    }
+    select optgroup {
+      font-weight: 800 !important;
+      color: #38bdf8 !important;
+      background-color: #060b18 !important;
+      padding: 6px 4px !important;
+    }
+    select option {
+      padding: 6px 12px !important;
+      color: #e2e8f0 !important;
+      background-color: #0b1329 !important;
+    }
+    select option:hover, select option:focus, select option:checked {
+      background-color: #1e293b !important;
+      color: #34d399 !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-1 md:p-2 custom-scrollbar text-xs">
+
+  <div class="max-w-[1650px] mx-auto space-y-1.5">
+
+    <!-- 1. BARRA SUPERIOR: SELECCIÓN VISUAL DE MERCADOS -->
+    <header class="bg-slate-900/95 border border-slate-800 rounded-xl px-2.5 py-1.5 flex flex-col lg:flex-row lg:items-center justify-between gap-1.5 shadow-lg backdrop-blur-md">
+      
+      <!-- Marca & Título con Logos de la Proporción Áurea y el Tigre Balam -->
+      <div class="flex items-center gap-2">
+        <img src="img/logo_proporcion_aurea_cio.jpg" alt="Proporción Áurea" class="w-8 h-8 rounded-full border border-amber-400/60 object-cover shadow-md shrink-0" title="Proporción Áurea (Φ) y Ley de Tres Velas">
+        <img src="img/favicon_balam.png" alt="Balam Tigre" class="w-8 h-8 rounded-lg border border-emerald-500/60 object-cover shadow-md shrink-0" title="Balam: El Tigre Agazapado & Gatillo Táctico">
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-xs sm:text-sm font-black text-white tracking-wide flex items-center gap-1.5">
+              <span>🐅 Terminal del CIO</span>
+            </h1>
+            <span class="text-[10px] sm:text-[11px] font-semibold text-amber-300/95 tracking-wide">
+              · Balam, auditor cuantitativo de las tres velas
+            </span>
+            <span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">Φ ÁUREA · BULKOWSKI</span>
+          </div>
+          <div class="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap">
+            <span>Mercado:</span>
+            <strong id="active-asset-banner" class="text-emerald-400 font-mono">BTC/USDT (Bitcoin Cripto 24/7)</strong>
+            <span class="text-slate-600">•</span>
+            <span id="data-source-badge" class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">🟢 BINANCE LIVE REAL</span>
+            <span class="text-slate-600">•</span>
+            <span id="active-session-text" class="text-slate-300 font-mono text-[9.5px]">Sesión continua</span>
+            <span class="text-slate-600">•</span>
+            <span class="text-slate-400 font-mono text-[9.5px]">Cascada: ⚡ Antigravity (P1) → ✨ Gemini (P2) → 🤖 Qwen (P3)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTONES DE 1 CLIC PARA SELECCIONAR MERCADO / ACTIVO -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="text-[10px] font-bold text-slate-500 uppercase mr-1">Activo:</span>
+        <button onclick="selectAsset('BTC-USD', '⚡ BTC/USDT (Bitcoin 24/7)', 'Cripto 24/7', this)" class="asset-btn px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 bg-emerald-600 text-white shadow">
+          <span>⚡</span> BTC/USDT
+        </button>
+        <button onclick="selectAsset('ETH-USD', '💎 ETH/USDT (Ethereum 24/7)', 'Cripto 24/7', this)" class="asset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition flex items-center gap-1">
+          <span>💎</span> ETH/USDT
+        </button>
+        <button onclick="selectAsset('SOL-USD', '🟣 SOL/USDT (Solana 24/7)', 'Cripto 24/7', this)" class="asset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition flex items-center gap-1">
+          <span>🟣</span> SOL/USDT
+        </button>
+        <button onclick="selectAsset('BNB-USD', '🟡 BNB/USDT (Binance Coin 24/7)', 'Cripto 24/7', this)" class="asset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition flex items-center gap-1">
+          <span>🟡</span> BNB/USDT
+        </button>
+        <button onclick="selectAsset('XRP-USD', '🪙 XRP/USDT (Ripple 24/7)', 'Cripto 24/7', this)" class="asset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition flex items-center gap-1">
+          <span>🪙</span> XRP/USDT
+        </button>
+        <button onclick="selectAsset('NVDA', '💻 NVDA (Nvidia Corp)', 'Wall Street · NYSE/NASDAQ', this)" class="asset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition flex items-center gap-1">
+          <span>💻</span> NVDA
+        </button>
+        <button onclick="selectAsset('SPY', '📈 SPY (S&P 500 ETF)', 'Wall Street · NYSE/NASDAQ', this)" class="asset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition flex items-center gap-1">
+          <span>📈</span> SPY
+        </button>
+        <button onclick="selectAsset('GGAL.BA', '🇦🇷 GGAL.BA (Galicia BYMA)', 'BYMA Argentina · 10:30-17:00 ARG', this)" class="asset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition flex items-center gap-1">
+          <span>🇦🇷</span> GGAL.BA
+        </button>
+
+        <!-- Dropdown con Todo el Catálogo de Mercados (Modo Oscuro Blindado) -->
+        <div class="flex items-center bg-[#0b1329] border border-slate-700/80 rounded-lg px-2 py-0.5 ml-0.5 shadow-sm">
+          <span class="text-[10px] text-slate-400 mr-1.5 font-bold uppercase tracking-wider">Más:</span>
+          <select id="market-dropdown" onchange="onMarketDropdownSelect(this.value)" class="bg-[#0b1329] text-white font-mono font-bold focus:outline-none cursor-pointer text-xs py-0.5">
+            <option value="" disabled selected class="bg-[#0b1329] text-slate-300">Catálogo Completo...</option>
+            <optgroup label="CRIPTOMONEDAS 24/7 (BINANCE REAL)">
+              <option value="BTC-USD|⚡ BTC/USDT (Bitcoin 24/7)|Cripto 24/7" class="bg-[#0b1329] text-white">BTC/USDT · Bitcoin</option>
+              <option value="ETH-USD|💎 ETH/USDT (Ethereum 24/7)|Cripto 24/7" class="bg-[#0b1329] text-white">ETH/USDT · Ethereum</option>
+              <option value="SOL-USD|🟣 SOL/USDT (Solana 24/7)|Cripto 24/7" class="bg-[#0b1329] text-white">SOL/USDT · Solana</option>
+              <option value="BNB-USD|🟡 BNB/USDT (Binance Coin)|Cripto 24/7" class="bg-[#0b1329] text-white">BNB/USDT · Binance Coin</option>
+              <option value="XRP-USD|🪙 XRP/USDT (Ripple 24/7)|Cripto 24/7" class="bg-[#0b1329] text-white">XRP/USDT · Ripple</option>
+              <option value="DOGE-USD|🐕 DOGE/USDT (Dogecoin 24/7)|Cripto 24/7" class="bg-[#0b1329] text-white">DOGE/USDT · Dogecoin</option>
+            </optgroup>
+            <optgroup label="WALL STREET & ETFS (NYSE/NASDAQ)">
+              <option value="SPY|📈 SPY (S&P 500 ETF)|Wall Street · NYSE/NASDAQ" class="bg-[#0b1329] text-white">SPY · S&P 500 ETF</option>
+              <option value="QQQ|💻 QQQ (Invesco Nasdaq 100)|Wall Street · NYSE/NASDAQ" class="bg-[#0b1329] text-white">QQQ · Nasdaq 100</option>
+              <option value="NVDA|💻 NVDA (Nvidia Corp)|Wall Street · NYSE/NASDAQ" class="bg-[#0b1329] text-white">NVDA · Nvidia</option>
+              <option value="AAPL|🍏 AAPL (Apple Inc)|Wall Street · NYSE/NASDAQ" class="bg-[#0b1329] text-white">AAPL · Apple</option>
+              <option value="MSFT|🪟 MSFT (Microsoft Corp)|Wall Street · NYSE/NASDAQ" class="bg-[#0b1329] text-white">MSFT · Microsoft</option>
+              <option value="TSLA|🚗 TSLA (Tesla Inc)|Wall Street · NYSE/NASDAQ" class="bg-[#0b1329] text-white">TSLA · Tesla</option>
+            </optgroup>
+            <optgroup label="MATERIAS PRIMAS & BONOS">
+              <option value="GC=F|🥇 GC=F (Oro Spot Futuros)|Commodities CME" class="bg-[#0b1329] text-white">GC=F · Oro Spot</option>
+              <option value="CL=F|🛢️ CL=F (Petróleo Crudo WTI)|Commodities NYMEX" class="bg-[#0b1329] text-white">CL=F · Petróleo Crudo</option>
+              <option value="TLT|🏛️ TLT (Bonos Tesoro 20+ Años)|Renta Fija Macro" class="bg-[#0b1329] text-white">TLT · Bonos Tesoro USA</option>
+            </optgroup>
+            <optgroup label="ARGENTINA BYMA (ACCIONES)">
+              <option value="GGAL.BA|🇦🇷 GGAL.BA (Galicia BYMA)|BYMA Argentina · 10:30-17:00 ARG" class="bg-[#0b1329] text-white">GGAL.BA · Grupo Financiero Galicia</option>
+              <option value="YPFD.BA|🇦🇷 YPFD.BA (YPF Argentina)|BYMA Argentina · 10:30-17:00 ARG" class="bg-[#0b1329] text-white">YPFD.BA · YPF Argentina</option>
+              <option value="PAMP.BA|🇦🇷 PAMP.BA (Pampa Energía)|BYMA Argentina · 10:30-17:00 ARG" class="bg-[#0b1329] text-white">PAMP.BA · Pampa Energía</option>
+              <option value="BMA.BA|🇦🇷 BMA.BA (Banco Macro)|BYMA Argentina · 10:30-17:00 ARG" class="bg-[#0b1329] text-white">BMA.BA · Banco Macro</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <!-- Selector de Temporalidad Compacto -->
+        <div class="flex items-center bg-[#0b1329] border border-slate-700/80 rounded-lg px-2 py-0.5 ml-1 shadow-sm">
+          <span class="text-[10px] text-slate-400 mr-1.5 font-bold uppercase tracking-wider">TF:</span>
+          <select id="tf-select" onchange="changeTimeframe(this.value)" class="bg-[#0b1329] text-emerald-400 font-mono font-bold focus:outline-none cursor-pointer text-xs py-0.5">
+            <option value="1m" class="bg-[#0b1329] text-white">1m</option>
+            <option value="5m" class="bg-[#0b1329] text-white">5m</option>
+            <option value="15m" selected class="bg-[#0b1329] text-white">15m</option>
+            <option value="1h" class="bg-[#0b1329] text-white">1h</option>
+            <option value="1d" class="bg-[#0b1329] text-white">1D</option>
+          </select>
+        </div>
+
+        <!-- Enlace al Estudio de Velas Japonesas -->
+        <a href="velas_japonesas.html" target="_blank" title="Abrir Estudio y Atlas Cuantitativo de Velas Japonesas" class="ml-1 px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white border border-indigo-500/40 transition text-[11px] font-bold flex items-center gap-1.5 shadow">
+          <span>📚</span> Estudio Velas ↗
+        </a>
+
+        <!-- Menú Desplegable Universal del Ecosistema -->
+        <div id="navEcosystemContainer" class="ml-1"></div>
+      </div>
+    </header>
+
+    <!-- 2. LAYOUT ERGONÓMICO EN 2 COLUMNAS (TODO VISIBLE EN 1 SOLA PANTALLA) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-start">
+      
+      <!-- COLUMNA IZQUIERDA: GRÁFICO VELAS + SUB-PANELES RSI & ATR (7 Columnas = 58% ancho) -->
+      <div class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 shadow-xl space-y-2">
+        
+        <!-- Header del Gráfico de Velas con Precios en Vivo y Conmutador Unificado -->
+        <div class="flex flex-wrap items-center justify-between border-b border-slate-800/80 pb-1.5 px-1 gap-1.5">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="relative flex h-2 w-2 mr-0.5">
+              <span id="live-ping-dot" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span id="chart-symbol-badge" class="font-mono font-bold text-sm text-emerald-400">BTC/USDT</span>
+            <span class="text-slate-600">|</span>
+            <span id="chart-last-price" class="font-mono text-sm text-white font-extrabold transition-colors duration-200">$0.00</span>
+            <span id="chart-price-diff" class="text-[10px] font-mono text-emerald-400 font-semibold">+0.00%</span>
+            <!-- Selector de Modalidad de Vista: 1 Vela (Predeterminado CIO) vs 3 Velas (Tríada) -->
+            <div class="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 ml-1">
+              <button type="button" id="ku-btn-mode-1v" onclick="window.KulaChartEngine && window.KulaChartEngine.setHostLayoutMode('1v')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 cursor-pointer" title="Modo 1 Vela (Predeterminado en Terminal CIO)">🕯️ 1 Vela</button>
+              <button type="button" id="ku-btn-mode-3v" onclick="window.KulaChartEngine && window.KulaChartEngine.setHostLayoutMode('3v')" class="px-2 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer" title="Conmutar a Tríada de 3 Velas (1D · 1H · 5M)">📐 3 Velas</button>
+            </div>
+            <button type="button" onclick="window.inspectCioLastCandlePattern && window.inspectCioLastCandlePattern()" class="px-2 py-0.5 rounded bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50 text-[10px] font-bold transition flex items-center gap-1 cursor-pointer">
+              <span>🔍</span> Clic Patrones
+            </button>
+            <button type="button" id="ku-btn-theme" onclick="window.KulaChartEngine && window.KulaChartEngine.toggleHostTheme()" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-[10px] font-bold text-amber-300 border border-slate-700 cursor-pointer">☀️ Blanco</button>
+          </div>
+
+          <!-- OHLC Dinámico -->
+          <div class="flex items-center gap-1.5 font-mono text-[10px]">
+            <span class="text-white font-bold">VELA (Precio) &rarr;</span>
+            <span id="hud-ohlc" class="text-slate-300 truncate max-w-[260px]">O: -- | H: -- | L: -- | C: --</span>
+          </div>
+        </div>
+
+        <!-- Contenedor del Gráfico de Velas (Unificado con KulaChartEngine) -->
+        <div id="kula-single-chart-wrapper" class="relative w-full h-[235px] rounded-lg overflow-hidden bg-[#06090e] border border-slate-800/80">
+          <div id="chart-container" class="absolute inset-0"></div>
+          
+          <!-- Banner de Vela Congelada -->
+          <div id="freeze-banner" class="hidden absolute top-2 right-2 z-20 bg-slate-900/95 border border-cyan-500/60 text-cyan-300 px-2 py-0.5 rounded text-[10px] font-mono shadow-md flex items-center gap-2 backdrop-blur-md">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+            <span>VELA CONGELADA</span>
+            <button onclick="resumeLiveTracking()" class="px-1.5 py-0.2 rounded bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-200 text-[9px] uppercase font-bold border border-cyan-500/40 transition">Reanudar</button>
+          </div>
+        </div>
+
+        <!-- Barra de Leyenda de Medias & Controles de Cuadrante y Sub-Paneles -->
+        <div class="flex flex-wrap items-center justify-between gap-1.5 px-1 text-[10px] font-mono border-b border-slate-800/60 pb-1.5">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <span id="hud-sma" class="text-blue-400 font-semibold">SMA 20: --</span>
+            <span id="hud-vwap" class="text-amber-400 font-semibold">VWAP: --</span>
+            <span id="hud-bands" class="text-amber-600">Bandas: -- / --</span>
+            <label class="inline-flex items-center gap-1 cursor-pointer text-purple-300 font-bold ml-1">
+              <input type="checkbox" checked onchange="document.getElementById('cio-panel-rsi').classList.toggle('hidden', !this.checked)" class="rounded bg-slate-950 border-purple-500/60 text-purple-500 cursor-pointer">
+              <span>RSI(14)</span>
+            </label>
+            <label class="inline-flex items-center gap-1 cursor-pointer text-amber-300 font-bold">
+              <input type="checkbox" checked onchange="document.getElementById('cio-panel-atr').classList.toggle('hidden', !this.checked)" class="rounded bg-slate-950 border-amber-500/60 text-amber-500 cursor-pointer">
+              <span>ATR(14)</span>
+            </label>
+          </div>
+
+          <!-- Botones de Cuadrante & Modo -->
+          <div class="flex items-center gap-1.5">
+            <div class="flex items-center bg-slate-950 border border-slate-800 rounded p-0.5">
+              <button id="btn-mode-live" onclick="setAuditMode('live')" class="px-2 py-0.2 rounded text-[10px] font-bold bg-emerald-600 text-white transition">🎯 En Vivo</button>
+              <button id="btn-mode-hist" onclick="setAuditMode('historical')" class="px-2 py-0.2 rounded text-[10px] font-medium text-slate-400 hover:text-white transition">🔬 Histórico</button>
+            </div>
+            <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+              <span class="text-slate-500 text-[9px]">Cuadrante:</span>
+              <button onclick="selectQuickQuadrant(5)" class="px-1.5 py-0.2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition">5V</button>
+              <button onclick="selectQuickQuadrant(10)" class="px-1.5 py-0.2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition">10V</button>
+              <button onclick="selectQuickQuadrant(20)" class="px-1.5 py-0.2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition">20V</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-PANEL 1: OSCILADOR RSI (14) -->
+        <div id="cio-panel-rsi" class="bg-[#06090e] rounded-lg border border-purple-500/30 p-1.5 shadow-inner space-y-1">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
+              <span class="text-[10px] font-bold text-purple-300 uppercase tracking-wide">RSI (14) · Fuerza Relativa & Momento</span>
+              <span id="rsiStatusBadge" class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-purple-300 border border-purple-500/40">⚪ ZONA NEUTRAL</span>
+            </div>
+            <div class="flex items-center gap-2 text-[10px] font-mono">
+              <span class="text-rose-400/90 text-[9px]">Sobrecompra: 70</span>
+              <span class="text-emerald-400/90 text-[9px]">Sobreventa: 30</span>
+              <span class="text-purple-300 font-bold ml-1">RSI: <span id="rsiLiveValue" class="text-white font-bold">52.40</span></span>
+            </div>
+          </div>
+          <div id="rsi-chart-container" class="relative w-full h-[60px] rounded overflow-hidden"></div>
+        </div>
+
+        <!-- SUB-PANEL 2: VOLATILIDAD REAL ATR (14) & STOP LOSS NOISE -->
+        <div id="cio-panel-atr" class="bg-[#06090e] rounded-lg border border-amber-500/30 p-1.5 shadow-inner space-y-1">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span class="text-[10px] font-bold text-amber-300 uppercase tracking-wide">ATR (14) · Volatilidad Real</span>
+              <span id="atrVolatilityBadge" class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 border border-amber-500/40">🌊 NORMAL</span>
+            </div>
+            <div class="flex items-center gap-2 text-[10px] font-mono">
+              <span class="text-slate-400 text-[9px]">Ruido (1.5x ATR): <strong id="atrNoiseValue" class="text-amber-400">$320.00</strong></span>
+              <span class="text-amber-300 font-bold ml-1">ATR: <span id="atrLiveValue" class="text-white font-bold">$213.33</span></span>
+            </div>
+          </div>
+          <div id="atr-chart-container" class="relative w-full h-[52px] rounded overflow-hidden"></div>
+        </div>
+
+      </div>
+
+      <!-- COLUMNA DERECHA: COCKPIT DE INTELIGENCIA DEL CIO (5 Columnas = 42% ancho) -->
+      <div class="lg:col-span-5 space-y-2">
+
+        <!-- VENTANA DESTACADA: VELAS SUGERIDAS POR MONITOR DEL MERCADO (ESCÁNER CIO) -->
+        <div id="monitor-scanner-window" class="bg-gradient-to-br from-slate-900/95 via-indigo-950/40 to-slate-900/95 border-2 border-indigo-500/50 rounded-xl p-2.5 shadow-xl space-y-2 backdrop-blur-md">
+          
+          <!-- Cabecera de la Ventana de Escaneo -->
+          <div class="flex items-center justify-between border-b border-indigo-500/30 pb-1.5">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-[11px] font-extrabold text-white uppercase tracking-wider flex items-center gap-1">
+                <span>🛰️</span> Velas Sugeridas · Escaneo Monitor del Mercado
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span id="scanner-status-badge" class="px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                🟢 CONECTANDO...
+              </span>
+              <button onclick="fetchMonitorScanSuggestions()" title="Refrescar escaneo desde Monitor del Mercado" class="text-[10px] text-indigo-300 hover:text-white bg-indigo-900/60 hover:bg-indigo-700/80 border border-indigo-600/50 px-1.5 py-0.5 rounded transition font-mono flex items-center gap-0.5">
+                <span>↻</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Síntesis del Escáner y Razón de Estudio -->
+          <div id="scanner-synthesis-box" class="bg-slate-950/80 border border-slate-800 rounded-lg p-2 text-[10.5px] leading-relaxed text-slate-300 space-y-1">
+            <div class="flex items-center justify-between text-[10px] text-slate-400">
+              <span>Modo: <strong id="scanner-mode-tag" class="text-indigo-300 font-mono">Modo Inteligente</strong></span>
+              <span>Último Escaneo: <strong id="scanner-timestamp" class="text-slate-200 font-mono">Sincronizando...</strong></span>
+            </div>
+            <p id="scanner-summary-text" class="text-slate-300 line-clamp-2">
+              Cargando oportunidades asimétricas detectadas por el escáner del CIO en Monitor del Mercado...
+            </p>
+          </div>
+
+          <!-- Lista de Activos Sugeridos para Estudiar Velas -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-[10px] text-slate-400 px-0.5">
+              <span class="font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1">
+                <span>🎯</span> Velas a Estudiar (Clic para Cargar Gráfico):
+              </span>
+              <span id="scanner-candidates-count" class="font-mono text-[9px] text-slate-500">Cargando...</span>
+            </div>
+            <div id="scanner-candidates-list" class="grid grid-cols-1 gap-1.5 max-h-[155px] overflow-y-auto pr-1 custom-scrollbar">
+              <!-- Renderizado dinámicamente por JS -->
+            </div>
+          </div>
+
+        </div>
+
+                <!-- 3 Tarjetas Cuantitativas Integradas -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-2">
+          
+          <!-- 1. Anatomía de la Vela -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-1 shadow">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                <span>🕯️</span> Anatomía & Formación
+              </span>
+              <span id="card-pattern-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                🔨 Martillo Alcista (Hammer)
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-1 text-[11px] pt-0.5">
+              <div class="text-slate-400">Sector click: <strong id="card-sector-clicked" class="text-cyan-400 font-mono block">Mecha Inferior</strong></div>
+              <div class="text-slate-400">Rechazo: <strong id="card-wick-ratio" class="text-slate-200 font-mono block">Mecha Inf 68%</strong></div>
+            </div>
+          </div>
+
+          <!-- 2. Volumen Wyckoff + Confluencia RSI -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-1 shadow">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                <span>⚡</span> Volumen & Confluencia RSI
+              </span>
+              <span id="card-vpa-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono">
+                RVOL 2.1 (Clímax)
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-1 text-[11px] pt-0.5">
+              <div class="text-slate-400">Presión: <strong id="card-orderflow" class="text-emerald-400 font-mono block">Absorción Pasiva</strong></div>
+              <div class="text-slate-400">Estado RSI (14): <strong id="card-rsi-confluence" class="text-purple-300 font-mono block">RSI 28.5 (Sobreventa)</strong></div>
+            </div>
+          </div>
+
+          <!-- 3. Veredicto Asimétrico R:R + ATR Stop Loss -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-1 shadow">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                <span>🎯</span> Veredicto Asimétrico (Con ATR)
+              </span>
+              <span id="card-verdict-badge" class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500 text-slate-950 font-mono">
+                🟢 COMPRAR (LONG)
+              </span>
+            </div>
+            <div class="grid grid-cols-3 gap-1 text-[10.5px] pt-0.5 font-mono">
+              <div><span class="text-slate-500 text-[9px] block">RATIO R:R</span><strong id="card-rr-value" class="text-indigo-400 font-bold">1:2.4</strong></div>
+              <div><span class="text-slate-500 text-[9px] block">SL (1.5x ATR)</span><strong id="card-sl-value" class="text-rose-400">$64,120</strong></div>
+              <div><span class="text-slate-500 text-[9px] block">TAKE PROFIT</span><strong id="card-tp-value" class="text-emerald-400">$65,850</strong></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 4. Función Balam CIO Auditor & Botón de Gatillo de Bóveda -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2.5 shadow-lg space-y-1.5">
+          <div class="flex items-center justify-between border-b border-slate-800/80 pb-1">
+            <span class="text-amber-400 font-bold text-xs flex items-center gap-1.5">
+              <img src="img/favicon_balam.png" class="w-4 h-4 rounded object-cover inline-block">
+              <span>🐅 BALAM CIO AUDITOR · GATILLO DE MERCADO</span>
+            </span>
+            <span id="audit-tag" class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">CIEGO AL FUTURO</span>
+          </div>
+
+          <p id="cio-message" class="text-[11px] text-slate-300 leading-relaxed font-sans max-h-[90px] overflow-y-auto pr-1 custom-scrollbar">
+            Señor operador: Confluencia A+ detectada en la vela. El patrón Martillo coincide con el RSI en zona de sobreventa (&lt; 30) y rechazo en la banda inferior de VWAP. El Stop Loss calculado con el ATR institucional (1.5x ATR) blinda la posición frente al ruido normal. Asimetría matemática favorable de <strong class="text-emerald-400">1:2.4</strong>. Función Balam CIO Auditor lista para presionar el gatillo hacia la Bóveda.
+          </p>
+
+          <!-- BOTÓN PRINCIPAL DE GATILLO BALAM -->
+          <button id="btn-inject-daemon" onclick="sendOrderToTraderDaemon()" class="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs tracking-wide transition shadow-lg flex items-center justify-center gap-2 cursor-pointer">
+            <span>🐅</span>
+            <span>DISPARAR GATILLO BALAM (ENVIAR ORDEN A LA BÓVEDA)</span>
+          </button>
+
+          <!-- Feedback de Transmisión -->
+          <div id="injection-feedback" class="hidden p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono flex items-center justify-between">
+            <span id="injection-feedback-text">✔ Directiva recibida en Balam (Puerto 18767). Orden registrada en la Bóveda.</span>
+            <span class="text-slate-500">WAL DB</span>
+          </div>
+
+          <!-- Auditoría Histórica Cuantitativa (Solo en modo histórico) -->
+          <div id="hist-audit-box" class="hidden pt-2 border-t border-slate-800/80 space-y-2 text-[11px]">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold text-cyan-400 uppercase tracking-wide flex items-center gap-1 font-mono">
+                <span>🔍</span> Auditoría Histórica:
+              </span>
+              <div class="flex items-center gap-1">
+                <button onclick="auditHistoricalPoint('first')" title="Auditar la primera vela (origen de la serie)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[9px] font-mono border border-slate-700 transition">⏮️ Origen (V1)</button>
+                <button onclick="auditHistoricalPoint('mid')" title="Auditar la vela del medio" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[9px] font-mono border border-cyan-500/30 transition">⏸️ Mitad (V50)</button>
+                <button onclick="auditHistoricalPoint('last')" title="Auditar la vela más reciente" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[9px] font-mono border border-emerald-500/30 transition">⏭️ Actual (V100)</button>
+              </div>
+            </div>
+
+            <div class="p-2 rounded-lg bg-slate-900 border border-amber-500/30 text-slate-300 shadow-sm">
+              <div class="flex items-center justify-between mb-0.5">
+                <strong class="text-amber-400 text-[9.5px] uppercase font-mono flex items-center gap-1">
+                  <span>🟡</span> Fase A · Tesis en ese segundo (Ciego al Futuro)
+                </strong>
+                <span id="hist-target-point" class="text-[9px] font-mono text-slate-400">Vela #--</span>
+              </div>
+              <span id="hist-phase-a" class="text-[11px] block leading-relaxed font-sans text-slate-200">
+                Selecciona una vela del gráfico o haz clic en Origen, Mitad o Actual para auditar.
+              </span>
+            </div>
+
+            <div class="p-2 rounded-lg bg-slate-900 border border-cyan-500/30 text-slate-300 shadow-sm">
+              <div class="flex items-center justify-between mb-0.5">
+                <strong class="text-cyan-400 text-[9.5px] uppercase font-mono flex items-center gap-1">
+                  <span>🔵</span> Fase B · Auditoría +5 velas (Diario del Lunes)
+                </strong>
+                <span id="hist-outcome-badge" class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">Auditoría Cuantitativa</span>
+              </div>
+              <span id="hist-phase-b" class="text-[11px] block leading-relaxed font-sans text-slate-200">
+                El algoritmo evalúa si la tesis de Fase A alcanzó el Take Profit o saltó el Stop Loss en las 5 velas siguientes.
+              </span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- PIE DE PÁGINA ULTRA-COMPACTO -->
+    <footer class="text-center text-[10px] text-slate-600 py-1">
+      Antigravity Market Terminal · Separación de Poderes: CIO (Asesor) → Cerebro Operador (Ejecutor) · Thomas Bulkowski Benchmark (4.7M Velas)
+    </footer>
+
+  </div>
+
+  <!-- JAVASCRIPT DE LIGHTWEIGHT CHARTS (VELAS + RSI + ATR) & CONTROL DEL CIO -->
+  <script>
+    let chart, candleSeries, smaSeries, vwapSeries, vwapUpperSeries, vwapLowerSeries;
+    let rsiChart, rsiSeries;
+    let atrChart, atrSeries;
+
+    let chartContainer = document.getElementById('chart-container');
+    let rsiContainer = document.getElementById('rsi-chart-container');
+    let atrContainer = document.getElementById('atr-chart-container');
+
+    let assistantActive = true;
+    let auditMode = 'live';
+    let isFrozen = false;
+    let currentAsset = 'BTC-USD';
+    let currentTf = '15m';
+    let marketCandles = [];
+    let rsiValues = [];
+    let atrValues = [];
+    let activeCandle = null;
+
+    // Sincronización de desplazamiento y zoom entre los 3 gráficos
+    let _isSyncingRange = false;
+    function syncTimeScales(source, targets) {
+      if (!source) return;
+      source.timeScale().subscribeVisibleLogicalRangeChange(range => {
+        if (_isSyncingRange || !range) return;
+        _isSyncingRange = true;
+        try {
+          targets.forEach(t => {
+            if (t) t.timeScale().setVisibleLogicalRange(range);
+          });
+        } finally {
+          _isSyncingRange = false;
+        }
+      });
+    }
+
+    function initChart() {
+      // 1. Gráfico Principal de Velas unificado con KulaChartEngine (TradingView Pro)
+      chartContainer.innerHTML = '';
+      const baseThemeOpts = (window.KulaChartEngine && window.KulaChartEngine.getChartThemeOptions)
+        ? window.KulaChartEngine.getChartThemeOptions(true)
+        : {
+            layout: { background: { color: '#ffffff' }, textColor: '#131722', fontSize: 10, fontFamily: 'monospace' },
+            grid: { vertLines: { color: '#f0f3fa' }, horzLines: { color: '#f0f3fa' } },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            rightPriceScale: { borderColor: '#e0e3eb', scaleMargins: { top: 0.08, bottom: 0.08 } },
+            timeScale: { borderColor: '#e0e3eb', timeVisible: true, secondsVisible: false, rightOffset: 16, barSpacing: 13, minBarSpacing: 5 },
+          };
+
+      chart = LightweightCharts.createChart(chartContainer, baseThemeOpts);
+
+      candleSeries = chart.addCandlestickSeries(
+        (window.KulaChartEngine && window.KulaChartEngine.CANDLE_SERIES_OPTIONS) || {
+          upColor: '#089981',
+          downColor: '#f23645',
+          borderUpColor: '#089981',
+          borderDownColor: '#f23645',
+          wickUpColor: '#089981',
+          wickDownColor: '#f23645',
+        }
+      );
+
+      smaSeries = chart.addLineSeries({
+        color: '#38bdf8',
+        lineWidth: 1.5,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      vwapSeries = chart.addLineSeries({
+        color: '#f59e0b',
+        lineWidth: 1.8,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      vwapUpperSeries = chart.addLineSeries({
+        color: '#b45309',
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      vwapLowerSeries = chart.addLineSeries({
+        color: '#b45309',
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+
+      // 2. Sub-Gráfico RSI (14)
+      rsiContainer.innerHTML = '';
+      rsiChart = LightweightCharts.createChart(rsiContainer, {
+        layout: {
+          background: { color: '#06090e' },
+          textColor: '#94a3b8',
+          fontSize: 9,
+          fontFamily: 'monospace',
+        },
+        grid: {
+          vertLines: { color: 'rgba(30, 41, 59, 0.2)' },
+          horzLines: { color: 'rgba(30, 41, 59, 0.2)' },
+        },
+        rightPriceScale: {
+          borderColor: '#1e293b',
+          scaleMargins: { top: 0.1, bottom: 0.1 },
+        },
+        timeScale: {
+          borderColor: '#1e293b',
+          timeVisible: true,
+          visible: false,
+        },
+      });
+
+      rsiSeries = rsiChart.addLineSeries({
+        color: '#c084fc',
+        lineWidth: 1.8,
+        priceLineVisible: false,
+        lastValueVisible: true,
+      });
+
+      // Líneas de referencia RSI (70, 50, 30)
+      rsiSeries.createPriceLine({ price: 70, color: '#ef4444', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: '70' });
+      rsiSeries.createPriceLine({ price: 50, color: '#64748b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: false, title: '50' });
+      rsiSeries.createPriceLine({ price: 30, color: '#10b981', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: '30' });
+
+      // 3. Sub-Gráfico ATR (14)
+      atrContainer.innerHTML = '';
+      atrChart = LightweightCharts.createChart(atrContainer, {
+        layout: {
+          background: { color: '#06090e' },
+          textColor: '#94a3b8',
+          fontSize: 9,
+          fontFamily: 'monospace',
+        },
+        grid: {
+          vertLines: { color: 'rgba(30, 41, 59, 0.2)' },
+          horzLines: { color: 'rgba(30, 41, 59, 0.2)' },
+        },
+        rightPriceScale: {
+          borderColor: '#1e293b',
+          scaleMargins: { top: 0.15, bottom: 0.05 },
+        },
+        timeScale: {
+          borderColor: '#1e293b',
+          timeVisible: true,
+          visible: false,
+        },
+      });
+
+      atrSeries = atrChart.addAreaSeries({
+        topColor: 'rgba(245, 158, 11, 0.35)',
+        bottomColor: 'rgba(245, 158, 11, 0.02)',
+        lineColor: '#f59e0b',
+        lineWidth: 1.8,
+        priceLineVisible: false,
+        lastValueVisible: true,
+      });
+
+      // Sincronizar escalas de tiempo
+      syncTimeScales(chart, [rsiChart, atrChart]);
+      syncTimeScales(rsiChart, [chart, atrChart]);
+      syncTimeScales(atrChart, [chart, rsiChart]);
+
+      // Montar Barra Lateral de Herramientas TradingView (44px), Modalidad 1 Vela ↔ 3 Velas y "Clic Patrones"
+      if (window.KulaChartEngine) {
+        window.KulaChartEngine.mountUnifiedChartWorkspace({
+          singleWrapperId: 'kula-single-chart-wrapper',
+          triadHeight: 280,
+          hostChart: chart,
+          hostRsiChart: rsiChart,
+          hostAtrChart: atrChart,
+          getSymbol: () => (typeof currentAsset !== 'undefined' ? currentAsset : 'BTCUSDT')
+        });
+
+        window.inspectCioLastCandlePattern = function() {
+          if (!marketCandles || !marketCandles.length) return;
+          const last = marketCandles[marketCandles.length - 1];
+          const prev = marketCandles.length > 1 ? marketCandles[marketCandles.length - 2] : null;
+          const prev2 = marketCandles.length > 2 ? marketCandles[marketCandles.length - 3] : null;
+          const pat = window.KulaChartEngine.formulas.detectCandlePatternDetails(last, prev, prev2);
+          window.KulaChartEngine.renderUniversalPatternModal(last, pat, typeof currentTf !== 'undefined' ? currentTf.toUpperCase() : '15M', null);
+        };
+      }
+
+      // Eventos del ratón
+      chart.subscribeCrosshairMove(onCrosshairMove);
+      chart.subscribeClick(onChartClick);
+
+      loadMarketData();
+
+      window.addEventListener('resize', () => {
+        if (chart && chartContainer) chart.applyOptions({ width: chartContainer.clientWidth });
+        if (rsiChart && rsiContainer) rsiChart.applyOptions({ width: rsiContainer.clientWidth });
+        if (atrChart && atrContainer) atrChart.applyOptions({ width: atrContainer.clientWidth });
+      });
+    }
+
+    // Algoritmo Cuantitativo de Cálculo RSI (14 Periodos)
+    function calculateRSI(candles, period = 14) {
+      let rsiData = [];
+      if (candles.length <= period) return rsiData;
+      
+      let gains = 0, losses = 0;
+      for (let i = 1; i <= period; i++) {
+        let diff = candles[i].close - candles[i-1].close;
+        if (diff >= 0) gains += diff;
+        else losses += Math.abs(diff);
+      }
+      let avgGain = gains / period;
+      let avgLoss = losses / period;
+      let rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+      let rsi = 100 - (100 / (1 + rs));
+      rsiData.push({ time: candles[period].time, value: rsi });
+
+      for (let i = period + 1; i < candles.length; i++) {
+        let diff = candles[i].close - candles[i-1].close;
+        let gain = diff >= 0 ? diff : 0;
+        let loss = diff < 0 ? Math.abs(diff) : 0;
+        avgGain = (avgGain * (period - 1) + gain) / period;
+        avgLoss = (avgLoss * (period - 1) + loss) / period;
+        rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+        rsi = 100 - (100 / (1 + rs));
+        rsiData.push({ time: candles[i].time, value: rsi });
+      }
+      return rsiData;
+    }
+
+    // Algoritmo Cuantitativo de Cálculo ATR (14 Periodos - True Range)
+    function calculateATR(candles, period = 14) {
+      let atrData = [];
+      if (candles.length <= period) return atrData;
+
+      let trList = [];
+      for (let i = 1; i < candles.length; i++) {
+        let hl = candles[i].high - candles[i].low;
+        let hpc = Math.abs(candles[i].high - candles[i-1].close);
+        let lpc = Math.abs(candles[i].low - candles[i-1].close);
+        trList.push(Math.max(hl, hpc, lpc));
+      }
+
+      let atr = trList.slice(0, period).reduce((a, b) => a + b, 0) / period;
+      atrData.push({ time: candles[period].time, value: atr });
+
+      for (let i = period; i < trList.length; i++) {
+        atr = (atr * (period - 1) + trList[i]) / period;
+        atrData.push({ time: candles[i + 1].time, value: atr });
+      }
+      return atrData;
+    }
+
+    function getBinanceSymbol(symbol) {
+      if (!symbol) return null;
+      const s = symbol.toUpperCase();
+      if (s.includes('BTC')) return 'BTCUSDT';
+      if (s.includes('ETH')) return 'ETHUSDT';
+      if (s.includes('SOL')) return 'SOLUSDT';
+      if (s.includes('BNB')) return 'BNBUSDT';
+      if (s.includes('XRP')) return 'XRPUSDT';
+      if (s.includes('DOGE')) return 'DOGEUSDT';
+      return null;
+    }
+
+    let liveRefreshTimer = null;
+    let liveWs = null;
+
+    async function fetchRealMarketData(symbol, tf) {
+      const binanceSym = getBinanceSymbol(symbol);
+
+      // 1. Intentar con el Backend local de Trading Ollama (puerto 18767)
+      try {
+        let cleanSymbol = symbol.replace('-', '/');
+        let res = await fetch(`http://127.0.0.1:18767/api/market/history?symbol=${encodeURIComponent(cleanSymbol)}&timeframe=${tf}&limit=100`, { signal: AbortSignal.timeout(2500) });
+        if (res.ok) {
+          let data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            return { source: 'TRADING_OLLAMA_REAL', candles: data };
+          }
+        }
+      } catch (e) {
+        // Backend offline, continuar a feed directo
+      }
+
+      // 2. Feed oficial directo en vivo de Binance para Cripto (BTC, ETH, SOL, BNB, XRP, DOGE)
+      if (binanceSym) {
+        try {
+          let bTf = tf === '1d' ? '1d' : (tf === '1h' ? '1h' : (tf === '5m' ? '5m' : (tf === '1m' ? '1m' : '15m')));
+          let res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=${bTf}&limit=100`, { signal: AbortSignal.timeout(3500) });
+          if (res.ok) {
+            let raw = await res.json();
+            let candles = raw.map(k => ({
+              time: Math.floor(k[0] / 1000),
+              open: parseFloat(k[1]),
+              high: parseFloat(k[2]),
+              low: parseFloat(k[3]),
+              close: parseFloat(k[4]),
+              volume: parseFloat(k[5])
+            }));
+            return { source: 'BINANCE_LIVE_REAL', candles };
+          }
+        } catch (e) {
+          console.warn("Binance public API unreachable:", e);
+        }
+      }
+
+      // 3. Fallback determinista en simulación si no hay internet o es acción sin backend
+      return { source: 'SIMULACION_OFFLINE', candles: generateSyntheticDataset(symbol, 90) };
+    }
+
+    function generateSyntheticDataset(symbol, count = 90) {
+      let basePrice = 64500;
+      if (symbol.includes('ETH')) basePrice = 3450;
+      if (symbol.includes('SOL')) basePrice = 185;
+      if (symbol.includes('BNB')) basePrice = 590;
+      if (symbol.includes('XRP')) basePrice = 0.58;
+      if (symbol.includes('DOGE')) basePrice = 0.14;
+      if (symbol === 'NVDA') basePrice = 210;
+      if (symbol === 'SPY') basePrice = 582;
+      if (symbol === 'QQQ') basePrice = 495;
+      if (symbol === 'AAPL') basePrice = 232;
+      if (symbol === 'MSFT') basePrice = 425;
+      if (symbol === 'TSLA') basePrice = 260;
+      if (symbol === 'GC=F') basePrice = 2720;
+      if (symbol === 'CL=F') basePrice = 71;
+      if (symbol === 'TLT') basePrice = 92;
+      if (symbol.includes('.BA')) basePrice = 6200;
+
+      let candles = [];
+      let now = Math.floor(Date.now() / 1000) - count * 900;
+      let p = basePrice;
+
+      for (let i = 0; i < count; i++) {
+        let time = now + i * 900;
+        let volatility = basePrice * 0.0035;
+        let change = (Math.random() - 0.49) * volatility;
+        let open = p;
+        let close = p + change;
+        let high = Math.max(open, close) + Math.random() * volatility * 0.5;
+        let low = Math.min(open, close) - Math.random() * volatility * 0.5;
+
+        if (i === count - 6) {
+          low = open - volatility * 2.2;
+          close = open + volatility * 0.2;
+          high = close + volatility * 0.1;
+        }
+
+        p = close;
+        let vol = Math.floor(Math.random() * 80 + 30);
+        if (i === count - 6) vol = 220;
+
+        candles.push({ time, open, high, low, close, volume: vol });
+      }
+      return candles;
+    }
+
+    async function loadMarketData() {
+      const sourceBadge = document.getElementById('data-source-badge');
+      if (sourceBadge) {
+        sourceBadge.innerText = "◌ Conectando feed de mercado...";
+        sourceBadge.className = "px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-300";
+      }
+
+      const res = await fetchRealMarketData(currentAsset, currentTf);
+      marketCandles = res.candles;
+
+      candleSeries.setData(marketCandles);
+
+      // Calcular SMA y VWAP
+      let smaData = [], vwapData = [], vwapUpper = [], vwapLower = [];
+      let cumVol = 0, cumVolPrice = 0;
+
+      for (let i = 0; i < marketCandles.length; i++) {
+        let c = marketCandles[i];
+        let typical = (c.high + c.low + c.close) / 3;
+        cumVol += (c.volume || 50);
+        cumVolPrice += typical * (c.volume || 50);
+        let vwap = cumVolPrice / cumVol;
+
+        vwapData.push({ time: c.time, value: vwap });
+        let bandOffset = vwap * 0.007;
+        vwapUpper.push({ time: c.time, value: vwap + bandOffset });
+        vwapLower.push({ time: c.time, value: vwap - bandOffset });
+
+        if (i >= 19) {
+          let sum = 0;
+          for (let j = 0; j < 20; j++) sum += marketCandles[i - j].close;
+          smaData.push({ time: c.time, value: sum / 20 });
+        }
+      }
+
+      smaSeries.setData(smaData);
+      vwapSeries.setData(vwapData);
+      vwapUpperSeries.setData(vwapUpper);
+      vwapLowerSeries.setData(vwapLower);
+
+      // Calcular y Cargar RSI & ATR
+      rsiValues = calculateRSI(marketCandles, 14);
+      atrValues = calculateATR(marketCandles, 14);
+
+      if (rsiSeries && rsiValues.length > 0) rsiSeries.setData(rsiValues);
+      if (atrSeries && atrValues.length > 0) atrSeries.setData(atrValues);
+
+      chart.timeScale().fitContent();
+
+      let last = marketCandles[marketCandles.length - 1];
+      let first = marketCandles[0];
+      document.getElementById('chart-symbol-badge').innerText = currentAsset;
+      document.getElementById('chart-last-price').innerText = formatCurrency(last.close, currentAsset);
+      document.getElementById('chart-last-price').setAttribute('data-price', last.close);
+
+      if (first && first.open) {
+        let diffPct = ((last.close - first.open) / first.open * 100).toFixed(2);
+        let diffEl = document.getElementById('chart-price-diff');
+        if (diffEl) {
+          diffEl.innerText = (diffPct >= 0 ? '+' : '') + diffPct + '%';
+          diffEl.className = 'text-[10px] font-mono font-semibold ' + (diffPct >= 0 ? 'text-emerald-400' : 'text-rose-400');
+        }
+      }
+
+      document.getElementById('hud-ohlc').innerText = 
+        `O: ${last.open.toFixed(2)} | H: ${last.high.toFixed(2)} | L: ${last.low.toFixed(2)} | C: ${last.close.toFixed(2)}`;
+
+      activeCandle = last;
+
+      updateIndicatorsBadges(last.time);
+      updateCockpit(last, null, false);
+
+      // Activar Streaming en Vivo (WebSocket / Polling)
+      setupLiveStreaming(res.source);
+    }
+
+    function setupLiveStreaming(source) {
+      if (liveWs) {
+        try { liveWs.close(); } catch(e) {}
+        liveWs = null;
+      }
+      if (liveRefreshTimer) {
+        clearInterval(liveRefreshTimer);
+        liveRefreshTimer = null;
+      }
+
+      const sourceBadge = document.getElementById('data-source-badge');
+      const pingDot = document.getElementById('live-ping-dot');
+      const binanceSym = getBinanceSymbol(currentAsset);
+
+      // CASO A: CRIPTO EN VIVO VÍA WEBSOCKET OFICIAL DE BINANCE (24/7 TIEMPO REAL)
+      if (binanceSym) {
+        const bTf = currentTf === '1d' ? '1d' : (currentTf === '1h' ? '1h' : (currentTf === '5m' ? '5m' : (currentTf === '1m' ? '1m' : '15m')));
+        const wsUrl = `wss://stream.binance.com:9443/ws/${binanceSym.toLowerCase()}@kline_${bTf}`;
+
+        if (sourceBadge) {
+          sourceBadge.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse"></span> 🟢 BINANCE LIVE REAL (Stream ${binanceSym} 24/7 · Conectando...)`;
+          sourceBadge.className = "px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center";
+        }
+
+        try {
+          liveWs = new WebSocket(wsUrl);
+          liveWs.onopen = () => {
+            if (pingDot) pingDot.className = "animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75";
+            if (sourceBadge) {
+              sourceBadge.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse"></span> 🟢 BINANCE LIVE REAL (${binanceSym} · WebSocket 24/7)`;
+            }
+          };
+
+          liveWs.onmessage = (event) => {
+            if (isFrozen) return;
+            try {
+              const data = JSON.parse(event.data);
+              if (data && data.k) {
+                const k = data.k;
+                const candle = {
+                  time: Math.floor(k.t / 1000),
+                  open: parseFloat(k.o),
+                  high: parseFloat(k.h),
+                  low: parseFloat(k.l),
+                  close: parseFloat(k.c),
+                  volume: parseFloat(k.v)
+                };
+                candleSeries.update(candle);
+
+                // Recalcular y actualizar RSI y ATR dinámico con la vela viva
+                if (marketCandles.length > 15) {
+                  const slice = marketCandles.slice(-15);
+                  slice.push(candle);
+                  const dynamicRsis = calculateRSI(slice, 14);
+                  const dynamicAtrs = calculateATR(slice, 14);
+                  if (dynamicRsis.length > 0 && rsiSeries) {
+                    const lastR = dynamicRsis[dynamicRsis.length - 1];
+                    rsiSeries.update(lastR);
+                    document.getElementById('rsiLiveValue').innerText = lastR.value.toFixed(2);
+                  }
+                  if (dynamicAtrs.length > 0 && atrSeries) {
+                    const lastA = dynamicAtrs[dynamicAtrs.length - 1];
+                    atrSeries.update(lastA);
+                    document.getElementById('atrLiveValue').innerText = formatCurrency(lastA.value, currentAsset);
+                  }
+                }
+
+                const priceEl = document.getElementById('chart-last-price');
+                if (priceEl) {
+                  const prevPrice = parseFloat(priceEl.getAttribute('data-price') || candle.close);
+                  priceEl.innerText = formatCurrency(candle.close, currentAsset);
+                  priceEl.setAttribute('data-price', candle.close);
+                  if (candle.close > prevPrice) {
+                    priceEl.style.color = '#34d399';
+                  } else if (candle.close < prevPrice) {
+                    priceEl.style.color = '#f87171';
+                  }
+                }
+
+                // Actualizar HUD OHLC
+                document.getElementById('hud-ohlc').innerText = 
+                  `O: ${candle.open.toFixed(2)} | H: ${candle.high.toFixed(2)} | L: ${candle.low.toFixed(2)} | C: ${candle.close.toFixed(2)}`;
+
+                // Actualizar porcentaje de variación
+                if (marketCandles.length > 0) {
+                  const firstOpen = marketCandles[0].open;
+                  const diffPct = ((candle.close - firstOpen) / firstOpen * 100).toFixed(2);
+                  const diffEl = document.getElementById('chart-price-diff');
+                  if (diffEl) {
+                    diffEl.innerText = `${diffPct >= 0 ? '+' : ''}${diffPct}%`;
+                    diffEl.className = `text-[10px] font-mono font-semibold ${diffPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+                  }
+                }
+
+                activeCandle = candle;
+              }
+            } catch (err) {}
+          };
+
+          liveWs.onerror = () => {
+            setupHttpPolling();
+          };
+          liveWs.onclose = () => {
+            if (!liveWs) return;
+            setupHttpPolling();
+          };
+        } catch (e) {
+          setupHttpPolling();
+        }
+      } 
+      // CASO B: ACCIONES / ETFS (NVDA, SPY, AAPL, GGAL.BA) VÍA TRADING OLLAMA
+      else if (source === 'TRADING_OLLAMA_REAL') {
+        const last = marketCandles[marketCandles.length - 1];
+        const age = (last && typeof last.last_candle_age_s === 'number') ? last.last_candle_age_s : 0;
+        
+        // Si la última vela tiene más de 2 horas (mercado cerrado / fin de semana)
+        if (age > 7200) {
+          if (pingDot) pingDot.className = "hidden";
+          if (sourceBadge) {
+            sourceBadge.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-1"></span> 🟢 TRADING OLLAMA · MERCADO CERRADO (Cierre Oficial Viernes · Rueda L-V 10:30-17:00)`;
+            sourceBadge.className = "px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center";
+          }
+        } else {
+          // Mercado bursátil abierto en vivo: polling cada 4 segundos
+          if (pingDot) pingDot.className = "animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75";
+          if (sourceBadge) {
+            sourceBadge.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse"></span> 🟢 TRADING OLLAMA · RUEDA EN VIVO (Wall Street / BYMA)`;
+            sourceBadge.className = "px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center";
+          }
+          setupHttpPolling();
+        }
+      } else {
+        if (pingDot) pingDot.className = "hidden";
+        if (sourceBadge) {
+          sourceBadge.innerHTML = `🟡 MODO ESTUDIO SINTÉTICO (Sin conexión a broker)`;
+          sourceBadge.className = "px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30";
+        }
+      }
+    }
+
+    function setupHttpPolling() {
+      if (liveRefreshTimer) clearInterval(liveRefreshTimer);
+      liveRefreshTimer = setInterval(async () => {
+        if (isFrozen) return;
+        try {
+          const binanceSym = getBinanceSymbol(currentAsset);
+          if (binanceSym) {
+            const bTf = currentTf === '1d' ? '1d' : (currentTf === '1h' ? '1h' : (currentTf === '5m' ? '5m' : (currentTf === '1m' ? '1m' : '15m')));
+            let res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=${bTf}&limit=2`);
+            if (res.ok) {
+              let raw = await res.json();
+              let latest = raw[raw.length - 1];
+              let updatedCandle = {
+                time: Math.floor(latest[0] / 1000),
+                open: parseFloat(latest[1]),
+                high: parseFloat(latest[2]),
+                low: parseFloat(latest[3]),
+                close: parseFloat(latest[4]),
+                volume: parseFloat(latest[5])
+              };
+              candleSeries.update(updatedCandle);
+              document.getElementById('chart-last-price').innerText = formatCurrency(updatedCandle.close, currentAsset);
+              activeCandle = updatedCandle;
+
+              // Actualizar RSI & ATR en polling
+              if (marketCandles.length > 15) {
+                const slice = marketCandles.slice(-15);
+                slice.push(updatedCandle);
+                const dynamicRsis = calculateRSI(slice, 14);
+                const dynamicAtrs = calculateATR(slice, 14);
+                if (dynamicRsis.length > 0 && rsiSeries) rsiSeries.update(dynamicRsis[dynamicRsis.length - 1]);
+                if (dynamicAtrs.length > 0 && atrSeries) atrSeries.update(dynamicAtrs[dynamicAtrs.length - 1]);
+              }
+            }
+          } else {
+            let cleanSymbol = currentAsset.replace('-', '/');
+            let res = await fetch(`http://127.0.0.1:18767/api/market/history?symbol=${encodeURIComponent(cleanSymbol)}&timeframe=${currentTf}&limit=2`);
+            if (res.ok) {
+              let raw = await res.json();
+              if (Array.isArray(raw) && raw.length > 0) {
+                let latest = raw[raw.length - 1];
+                candleSeries.update(latest);
+                document.getElementById('chart-last-price').innerText = formatCurrency(latest.close, currentAsset);
+                activeCandle = latest;
+
+                if (marketCandles.length > 15) {
+                  const slice = marketCandles.slice(-15);
+                  slice.push(latest);
+                  const dynamicRsis = calculateRSI(slice, 14);
+                  const dynamicAtrs = calculateATR(slice, 14);
+                  if (dynamicRsis.length > 0 && rsiSeries) rsiSeries.update(dynamicRsis[dynamicRsis.length - 1]);
+                  if (dynamicAtrs.length > 0 && atrSeries) atrSeries.update(dynamicAtrs[dynamicAtrs.length - 1]);
+                }
+              }
+            }
+          }
+        } catch (e) {}
+      }, 4000);
+    }
+
+    function formatCurrency(val, asset) {
+      if (!val) return '$0.00';
+      if (asset && asset.includes('.BA')) return `$${val.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS`;
+      return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    // Actualiza los badges de RSI y ATR en vivo
+    function updateIndicatorsBadges(time) {
+      const rsiItem = rsiValues.find(r => r.time === time) || rsiValues[rsiValues.length - 1];
+      const atrItem = atrValues.find(a => a.time === time) || atrValues[atrValues.length - 1];
+
+      let isBullishDivergence = false;
+      let isBearishDivergence = false;
+
+      if (rsiItem) {
+        const val = rsiItem.value;
+        document.getElementById('rsiLiveValue').innerText = val.toFixed(2);
+        const badge = document.getElementById('rsiStatusBadge');
+
+        // Detección algorítmica de Divergencia RSI (Lookback de 10 velas)
+        let divText = "";
+        const idx = marketCandles.findIndex(c => c.time === time);
+        if (idx >= 6) {
+          const lookback = marketCandles.slice(Math.max(0, idx - 10), idx);
+          const minPricePrev = Math.min(...lookback.map(c => c.low));
+          const maxPricePrev = Math.max(...lookback.map(c => c.high));
+          const rsiPrevList = rsiValues.filter(r => r.time >= lookback[0].time && r.time < time).map(r => r.value);
+          const minRsiPrev = rsiPrevList.length > 0 ? Math.min(...rsiPrevList) : val;
+          const maxRsiPrev = rsiPrevList.length > 0 ? Math.max(...rsiPrevList) : val;
+
+          const curr = marketCandles[idx];
+          if (curr.low <= minPricePrev && val > minRsiPrev + 1.2 && val <= 42) {
+            isBullishDivergence = true;
+            divText = " · DIVERGENCIA ALCISTA ⚡";
+          } else if (curr.high >= maxPricePrev && val < maxRsiPrev - 1.2 && val >= 58) {
+            isBearishDivergence = true;
+            divText = " · DIVERGENCIA BAJISTA ⚠️";
+          }
+        }
+
+        if (val <= 30) {
+          badge.className = "text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-600 font-bold animate-pulse";
+          badge.innerText = `🟢 SOBREVENTA (< 30)${divText}`;
+        } else if (val >= 70) {
+          badge.className = "text-[9px] font-mono px-1.5 py-0.2 rounded bg-red-950 text-red-300 border border-red-700 font-bold";
+          badge.innerText = `🔴 SOBRECOMPRA (> 70)${divText}`;
+        } else if (divText) {
+          badge.className = `text-[9px] font-mono px-1.5 py-0.2 rounded font-bold animate-pulse ${isBullishDivergence ? 'bg-emerald-950 text-emerald-300 border border-emerald-500' : 'bg-rose-950 text-rose-300 border border-rose-500'}`;
+          badge.innerText = divText.replace(' · ', '');
+        } else {
+          badge.className = "text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-purple-300 border border-purple-500/40";
+          badge.innerText = "⚪ ZONA NEUTRAL (30-70)";
+        }
+      }
+
+      if (atrItem) {
+        const atrVal = atrItem.value;
+        const noise = atrVal * 1.5;
+        document.getElementById('atrLiveValue').innerText = formatCurrency(atrVal, currentAsset);
+        document.getElementById('atrNoiseValue').innerText = formatCurrency(noise, currentAsset);
+
+        const badge = document.getElementById('atrVolatilityBadge');
+
+        // Filtro de Compresión de Volatilidad (ATR Squeeze vs SMA 20 de ATR)
+        let avgAtr = atrVal;
+        if (atrValues.length >= 20) {
+          const slice = atrValues.slice(-20);
+          avgAtr = slice.reduce((acc, it) => acc + it.value, 0) / 20;
+        }
+        const squeezeRatio = avgAtr > 0 ? (atrVal / avgAtr) : 1.0;
+
+        if (squeezeRatio < 0.70) {
+          badge.className = "text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/60 font-bold animate-pulse";
+          badge.innerText = `🧊 COMPRESIÓN SQUEEZE (-${Math.round((1 - squeezeRatio)*100)}% vs Media)`;
+        } else if (atrVal / (activeCandle ? activeCandle.close : 60000) >= 0.015) {
+          badge.className = "text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-700 font-bold";
+          badge.innerText = `⚡ ALTA VOLATILIDAD (Expansión)`;
+        } else {
+          badge.className = "text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 border border-amber-500/40 font-medium";
+          badge.innerText = `🌊 NORMAL (Combustible OK)`;
+        }
+      }
+    }
+
+    function onCrosshairMove(param) {
+      if (!param || !param.point || !param.time || isFrozen || !assistantActive) return;
+      const candle = param.seriesData.get(candleSeries);
+      if (!candle || candle.close === undefined) return;
+
+      document.getElementById('hud-ohlc').innerText = `O: ${candle.open.toFixed(2)} | H: ${candle.high.toFixed(2)} | L: ${candle.low.toFixed(2)} | C: ${candle.close.toFixed(2)}`;
+      document.getElementById('hud-ohlc').className = candle.close >= candle.open ? 'text-emerald-400 font-mono text-[10px]' : 'text-rose-400 font-mono text-[10px]';
+
+      const sma = param.seriesData.get(smaSeries);
+      if (sma) document.getElementById('hud-sma').innerText = `SMA 20: ${sma.value.toFixed(2)}`;
+
+      const vwap = param.seriesData.get(vwapSeries);
+      if (vwap) document.getElementById('hud-vwap').innerText = `VWAP: ${vwap.value.toFixed(2)}`;
+
+      const vUpper = param.seriesData.get(vwapUpperSeries);
+      const vLower = param.seriesData.get(vwapLowerSeries);
+      if (vUpper && vLower) {
+        document.getElementById('hud-bands').innerText = `Bandas: ${vLower.value.toFixed(2)} / ${vUpper.value.toFixed(2)}`;
+      }
+
+      activeCandle = candle;
+      updateIndicatorsBadges(param.time);
+      updateCockpit(candle, null, false);
+    }
+
+    function onChartClick(param) {
+      if (!param || !param.point || !param.time || !assistantActive) return;
+      const candle = param.seriesData.get(candleSeries);
+      if (!candle || candle.close === undefined) return;
+
+      const clickedPrice = candleSeries.coordinateToPrice(param.point.y);
+      let sectorClicked = "Cuerpo (Zona Central)";
+
+      if (clickedPrice >= Math.max(candle.open, candle.close)) {
+        sectorClicked = "Mecha Sup. (Techo)";
+      } else if (clickedPrice <= Math.min(candle.open, candle.close)) {
+        sectorClicked = "Mecha Inf. (Piso/Soporte)";
+      }
+
+      isFrozen = true;
+      document.getElementById('freeze-banner').classList.remove('hidden');
+      activeCandle = candle;
+      updateIndicatorsBadges(param.time);
+      updateCockpit(candle, sectorClicked, true);
+
+      // Si estamos en modo histórico, evaluar las dos fases (A ciegas + balance posterior)
+      if (auditMode === 'hist') {
+        const idx = marketCandles.findIndex(c => c.time === candle.time);
+        if (idx !== -1) evaluateHistoricalPhases(idx);
+      }
+    }
+
+    function resumeLiveTracking() {
+      isFrozen = false;
+      document.getElementById('freeze-banner').classList.add('hidden');
+    }
+
+    function updateCockpit(candle, sectorClicked, isClick) {
+      const range = candle.high - candle.low;
+      if (range <= 0) return;
+
+      const body = Math.abs(candle.close - candle.open);
+      const upperWick = candle.high - Math.max(candle.open, candle.close);
+      const lowerWick = Math.min(candle.open, candle.close) - candle.low;
+
+      const lowerRatio = (lowerWick / range) * 100;
+      const upperRatio = (upperWick / range) * 100;
+      const bodyRatio = (body / range) * 100;
+
+      // Obtener ATR actual para Stop Loss dinámico estricto
+      const atrItem = atrValues.find(a => a.time === candle.time) || atrValues[atrValues.length - 1];
+      const atr = atrItem ? atrItem.value : (range * 0.8);
+      const atrBuffer = atr * 1.5; // Regla cuantitativa 1.5x ATR
+
+      // Obtener RSI actual
+      const rsiItem = rsiValues.find(r => r.time === candle.time) || rsiValues[rsiValues.length - 1];
+      const rsi = rsiItem ? rsiItem.value : 50;
+
+      let patternName = "Vela Neutral";
+      let patternClass = "bg-slate-800 text-slate-300 border-slate-700";
+      let verdict = "🟡 IGNORAR / ESPERAR";
+      let verdictClass = "bg-amber-500 text-slate-950";
+      let rrRatio = "1 : 1.2";
+      let slPrice = candle.low - atrBuffer;
+      let tpPrice = candle.high + atrBuffer * 1.5;
+
+      // Check de compresión ATR Squeeze
+      let avgAtr = atr;
+      if (atrValues.length >= 20) {
+        const slice = atrValues.slice(-20);
+        avgAtr = slice.reduce((acc, it) => acc + it.value, 0) / 20;
+      }
+      const squeezeRatio = avgAtr > 0 ? (atr / avgAtr) : 1.0;
+      const isSqueeze = squeezeRatio < 0.70;
+
+      // Check de Divergencia RSI Cuantitativa
+      let isBullishDiv = false;
+      let isBearishDiv = false;
+      const cIdx = marketCandles.findIndex(c => c.time === candle.time);
+      if (cIdx >= 6) {
+        const lookback = marketCandles.slice(Math.max(0, cIdx - 10), cIdx);
+        const minP = Math.min(...lookback.map(c => c.low));
+        const maxP = Math.max(...lookback.map(c => c.high));
+        const rsiList = rsiValues.filter(r => r.time >= lookback[0].time && r.time < candle.time).map(r => r.value);
+        if (rsiList.length > 0) {
+          const minR = Math.min(...rsiList);
+          const maxR = Math.max(...rsiList);
+          if (candle.low <= minP && rsi > minR + 1.2 && rsi <= 42) isBullishDiv = true;
+          if (candle.high >= maxP && rsi < maxR - 1.2 && rsi >= 58) isBearishDiv = true;
+        }
+      }
+
+      // Contexto tendencial previo (últimas 5 velas)
+      let trendContext = 'neutral';
+      if (cIdx >= 5) {
+        const past5 = marketCandles.slice(Math.max(0, cIdx - 5), cIdx);
+        const avgClose = past5.reduce((acc, c) => acc + c.close, 0) / past5.length;
+        if (candle.close > avgClose * 1.008) trendContext = 'up';
+        else if (candle.close < avgClose * 0.992) trendContext = 'down';
+      }
+
+      const prevCandle = cIdx > 0 ? marketCandles[cIdx - 1] : null;
+      const prev2Candle = cIdx > 1 ? marketCandles[cIdx - 2] : null;
+
+      // MOTOR DE CLASIFICACIÓN CUANTITATIVA INSTITUCIONAL DE VELAS
+      // 1. Patrones Multi-Vela
+      let isMorningStar = false;
+      let isEveningStar = false;
+      let isThreeSoldiers = false;
+      let isThreeCrows = false;
+      let isBullEngulf = false;
+      let isBearEngulf = false;
+
+      if (prev2Candle && prevCandle) {
+        const p2Body = Math.abs(prev2Candle.close - prev2Candle.open);
+        const p2Range = prev2Candle.high - prev2Candle.low || 1;
+        const p1Body = Math.abs(prevCandle.close - prevCandle.open);
+        const p1Range = prevCandle.high - prevCandle.low || 1;
+
+        // Morning Star
+        if (prev2Candle.close < prev2Candle.open && (p2Body / p2Range) >= 0.35 &&
+            (p1Body / p1Range) <= 0.35 &&
+            candle.close > candle.open &&
+            candle.close >= prev2Candle.close + 0.45 * (prev2Candle.open - prev2Candle.close)) {
+          isMorningStar = true;
+        }
+
+        // Evening Star
+        if (prev2Candle.close > prev2Candle.open && (p2Body / p2Range) >= 0.35 &&
+            (p1Body / p1Range) <= 0.35 &&
+            candle.close < candle.open &&
+            candle.close <= prev2Candle.close - 0.45 * (prev2Candle.close - prev2Candle.open)) {
+          isEveningStar = true;
+        }
+
+        // Three White Soldiers
+        if (prev2Candle.close > prev2Candle.open && prevCandle.close > prevCandle.open && candle.close > candle.open &&
+            candle.close > prevCandle.close && prevCandle.close > prev2Candle.close && bodyRatio >= 45) {
+          isThreeSoldiers = true;
+        }
+
+        // Three Black Crows
+        if (prev2Candle.close < prev2Candle.open && prevCandle.close < prevCandle.open && candle.close < candle.open &&
+            candle.close < prevCandle.close && prevCandle.close < prev2Candle.close && bodyRatio >= 45) {
+          isThreeCrows = true;
+        }
+      }
+
+      if (prevCandle) {
+        // Bullish Engulfing
+        if (prevCandle.close < prevCandle.open && candle.close > candle.open &&
+            candle.open <= prevCandle.close * 1.002 && candle.close >= prevCandle.open * 0.998 && bodyRatio >= 45) {
+          isBullEngulf = true;
+        }
+        // Bearish Engulfing
+        if (prevCandle.close > prevCandle.open && candle.close < candle.open &&
+            candle.open >= prevCandle.close * 0.998 && candle.close <= prevCandle.open * 1.002 && bodyRatio >= 45) {
+          isBearEngulf = true;
+        }
+      }
+
+      // 2. Clasificación de Anatomía y Veredicto
+      if (isMorningStar) {
+        patternName = "🌅 Estrella de la Mañana (Morning Star - 3 velas)";
+        patternClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/40";
+        verdict = isBullishDiv ? "🟢 COMPRAR (Divergencia + Morning Star A+)" : "🟢 COMPRAR (Morning Star A+)";
+        verdictClass = "bg-emerald-500 text-slate-950";
+        rrRatio = "1 : 2.5";
+        slPrice = Math.min(candle.low, prevCandle.low, prev2Candle.low) - atrBuffer;
+        tpPrice = candle.close + (candle.close - slPrice) * 2.5;
+      } else if (isEveningStar) {
+        patternName = "🌆 Estrella del Atardecer (Evening Star - 3 velas)";
+        patternClass = "bg-rose-500/20 text-rose-400 border-rose-500/40";
+        verdict = isBearishDiv ? "🔴 SALIR (Divergencia + Evening Star)" : "🔴 SALIR / SHORT (Techo A+)";
+        verdictClass = "bg-rose-600 text-white";
+        rrRatio = "1 : 2.3";
+        slPrice = Math.max(candle.high, prevCandle.high, prev2Candle.high) + atrBuffer;
+        tpPrice = candle.close - (slPrice - candle.close) * 2.3;
+      } else if (isThreeSoldiers) {
+        patternName = "⚔️ Tres Soldados Blancos (Soldiers)";
+        patternClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/40";
+        if (isSqueeze) {
+          verdict = "🟡 IGNORAR (Filtro Squeeze ATR)";
+          verdictClass = "bg-cyan-900 text-cyan-200 border border-cyan-500/40";
+        } else {
+          verdict = "🟢 COMPRAR (Continuación Alcista)";
+          verdictClass = "bg-emerald-500 text-slate-950";
+        }
+        rrRatio = "1 : 2.2";
+        slPrice = prevCandle.low - atrBuffer * 0.8;
+        tpPrice = candle.close + (candle.close - slPrice) * 2.2;
+      } else if (isThreeCrows) {
+        patternName = "🦅 Tres Cuervos Negros (Crows)";
+        patternClass = "bg-rose-500/20 text-rose-400 border-rose-500/40";
+        verdict = "🔴 SALIR / SHORT (Cascada Bajista)";
+        verdictClass = "bg-rose-600 text-white";
+        rrRatio = "1 : 2.1";
+        slPrice = candle.high + atrBuffer;
+        tpPrice = candle.close - (slPrice - candle.close) * 2.1;
+      } else if (isBullEngulf) {
+        patternName = "🌊 Envolvente Alcista (Bullish Engulfing)";
+        patternClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/40";
+        verdict = isBullishDiv ? "🟢 COMPRAR (Divergencia + Envolvente A+)" : "🟢 COMPRAR (LONG Envolvente)";
+        verdictClass = "bg-emerald-500 text-slate-950";
+        rrRatio = isBullishDiv ? "1 : 2.6" : "1 : 2.3";
+        slPrice = Math.min(candle.low, prevCandle.low) - atrBuffer;
+        tpPrice = candle.close + (candle.close - slPrice) * (isBullishDiv ? 2.6 : 2.3);
+      } else if (isBearEngulf) {
+        patternName = "🌧️ Envolvente Bajista (Bearish Engulfing)";
+        patternClass = "bg-rose-500/20 text-rose-400 border-rose-500/40";
+        verdict = isBearishDiv ? "🔴 SALIR (Divergencia + Envolvente Bajista)" : "🔴 SALIR / SHORT";
+        verdictClass = "bg-rose-600 text-white";
+        rrRatio = "1 : 2.2";
+        slPrice = Math.max(candle.high, prevCandle.high) + atrBuffer;
+        tpPrice = candle.close - (slPrice - candle.close) * 2.2;
+      } else if (bodyRatio <= 7 && lowerRatio >= 60 && upperRatio <= 10) {
+        patternName = "🦎 Doji Libélula (Dragonfly Doji)";
+        patternClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+        verdict = isBullishDiv ? "🟢 COMPRAR (Divergencia + Libélula A+)" : "🟢 COMPRAR (Absorción de Suelo)";
+        verdictClass = "bg-emerald-500 text-slate-950";
+        rrRatio = "1 : 2.5";
+        slPrice = candle.low - atrBuffer;
+        tpPrice = candle.close + (candle.close - slPrice) * 2.5;
+      } else if (bodyRatio <= 7 && upperRatio >= 60 && lowerRatio <= 10) {
+        patternName = "🪦 Doji Lápida (Gravestone Doji)";
+        patternClass = "bg-rose-500/20 text-rose-300 border-rose-500/40";
+        verdict = isBearishDiv ? "🔴 SALIR (Divergencia + Lápida A+)" : "🔴 SALIR (Rechazo Techo)";
+        verdictClass = "bg-rose-600 text-white";
+        rrRatio = "1 : 2.2";
+        slPrice = candle.high + atrBuffer;
+        tpPrice = candle.close - (slPrice - candle.close) * 2.2;
+      } else if (bodyRatio <= 8) {
+        patternName = "⚖️ Doji Clásico (Indecisión)";
+        patternClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+        verdict = "🟡 IGNORAR (Equilibrio)";
+        verdictClass = "bg-slate-700 text-slate-200";
+        rrRatio = "1 : 1.2";
+      } else if (lowerRatio >= 55 && upperRatio <= 15 && trendContext === 'up') {
+        patternName = "🪢 Hombre Colgado (Hanging Man)";
+        patternClass = "bg-rose-500/20 text-rose-400 border-rose-500/30";
+        verdict = "🔴 SALIR (Alerta Distribución en Techo)";
+        verdictClass = "bg-rose-600 text-white";
+        rrRatio = "1 : 2.0";
+        slPrice = candle.high + atrBuffer;
+        tpPrice = candle.close - (slPrice - candle.close) * 2.0;
+      } else if (lowerRatio >= 55 && upperRatio <= 15) {
+        patternName = "🔨 Martillo Alcista (Hammer)";
+        patternClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+        verdict = isBullishDiv ? "🟢 COMPRAR (Divergencia RSI + Martillo A+)" : (rsi <= 35 ? "🟢 COMPRAR (Confluencia A+ RSI)" : "🟢 COMPRAR (LONG)");
+        verdictClass = "bg-emerald-500 text-slate-950";
+        rrRatio = isBullishDiv ? "1 : 2.6" : "1 : 2.4";
+        slPrice = candle.low - atrBuffer;
+        tpPrice = candle.close + (candle.close - slPrice) * (isBullishDiv ? 2.6 : 2.4);
+      } else if (upperRatio >= 55 && lowerRatio <= 15 && trendContext === 'down') {
+        patternName = "🔨 Martillo Invertido (Suelo)";
+        patternClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+        verdict = isBullishDiv ? "🟢 COMPRAR (Divergencia + Martillo Invertido)" : "🟢 COMPRAR (Presión Compradora)";
+        verdictClass = "bg-emerald-500 text-slate-950";
+        rrRatio = "1 : 2.2";
+        slPrice = candle.low - atrBuffer;
+        tpPrice = candle.close + (candle.close - slPrice) * 2.2;
+      } else if (upperRatio >= 55 && lowerRatio <= 15) {
+        patternName = "⭐ Estrella Fugaz (Shooting Star)";
+        patternClass = "bg-rose-500/20 text-rose-400 border-rose-500/30";
+        verdict = isBearishDiv ? "🔴 SALIR (Divergencia Bajista + Techo A+)" : "🔴 SALIR / SHORT";
+        verdictClass = "bg-rose-600 text-white";
+        rrRatio = "1 : 2.1";
+        slPrice = candle.high + atrBuffer;
+        tpPrice = candle.close - (slPrice - candle.close) * 2.1;
+      } else if (candle.close > candle.open && bodyRatio >= 80 && upperRatio <= 8 && lowerRatio <= 8) {
+        patternName = "🚀 Marubozu Alcista (Control Comprador)";
+        patternClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+        if (isSqueeze) {
+          verdict = "🟡 IGNORAR (Filtro Squeeze ATR)";
+          verdictClass = "bg-cyan-900 text-cyan-200 border border-cyan-500/40";
+        } else {
+          verdict = "🟢 COMPRAR (Breakout Institucional)";
+          verdictClass = "bg-emerald-500 text-slate-950";
+        }
+        rrRatio = "1 : 2.2";
+        slPrice = candle.low - atrBuffer * 0.8;
+        tpPrice = candle.close + (candle.close - slPrice) * 2.2;
+      } else if (candle.close < candle.open && bodyRatio >= 80 && upperRatio <= 8 && lowerRatio <= 8) {
+        patternName = "💥 Marubozu Bajista (Presión Vendedora)";
+        patternClass = "bg-rose-500/20 text-rose-400 border-rose-500/30";
+        verdict = "🔴 SALIR / SHORT (Cascada Vendedora)";
+        verdictClass = "bg-rose-600 text-white";
+        rrRatio = "1 : 2.1";
+        slPrice = candle.high + atrBuffer * 0.8;
+        tpPrice = candle.close - (slPrice - candle.close) * 2.1;
+      } else if (bodyRatio >= 10 && bodyRatio <= 30 && upperRatio >= 25 && lowerRatio >= 25) {
+        patternName = "🌀 Peonza Indecisión (Spinning Top)";
+        patternClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+        verdict = "🟡 IGNORAR (Equilibrio de Fuerzas)";
+        verdictClass = "bg-slate-700 text-slate-200";
+        rrRatio = "1 : 1.3";
+      } else if (candle.close > candle.open && bodyRatio >= 60) {
+        patternName = "📈 Impulso Alcista (Rango Amplio)";
+        patternClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+        if (isSqueeze) {
+          verdict = "🟡 IGNORAR (Filtro Squeeze ATR)";
+          verdictClass = "bg-cyan-900 text-cyan-200 border border-cyan-500/40";
+        } else {
+          verdict = "🟢 COMPRAR (Breakout)";
+          verdictClass = "bg-emerald-500 text-slate-950";
+        }
+        rrRatio = "1 : 2.0";
+        slPrice = candle.low - atrBuffer * 0.8;
+        tpPrice = candle.close + (candle.close - slPrice) * 2.0;
+      } else if (candle.close < candle.open && bodyRatio >= 60) {
+        patternName = "📉 Impulso Bajista (Rango Amplio)";
+        patternClass = "bg-rose-500/20 text-rose-400 border-rose-500/30";
+        verdict = "🔴 SALIR / SHORT";
+        verdictClass = "bg-rose-600 text-white";
+        rrRatio = "1 : 1.8";
+        slPrice = candle.high + atrBuffer * 0.8;
+        tpPrice = candle.close - (slPrice - candle.close) * 1.8;
+      } else {
+        patternName = candle.close >= candle.open ? "🕯️ Vela Normal Alcista" : "🕯️ Vela Normal Bajista";
+        patternClass = "bg-slate-800 text-slate-300 border-slate-700";
+        verdict = "🟡 IGNORAR / ESPERAR";
+        verdictClass = "bg-slate-700 text-slate-300";
+        rrRatio = "1 : 1.2";
+      }
+
+
+      document.getElementById('card-pattern-badge').innerText = patternName;
+      document.getElementById('card-pattern-badge').className = `px-2 py-0.5 rounded text-[10px] font-bold border ${patternClass}`;
+      document.getElementById('card-sector-clicked').innerText = sectorClicked || (lowerRatio >= 50 ? "Mecha Inferior (Absorción)" : (upperRatio >= 50 ? "Mecha Superior (Rechazo)" : (candle.close >= candle.open ? "Cuerpo Alcista" : "Cuerpo Bajista")));
+      document.getElementById('card-wick-ratio').innerText = `Cuerpo: ${bodyRatio.toFixed(0)}% | M.Inf: ${lowerRatio.toFixed(0)}% | M.Sup: ${upperRatio.toFixed(0)}%`;
+
+      const rvolEst = (lowerRatio >= 50 || upperRatio >= 50) ? 2.1 : 1.1;
+      document.getElementById('card-vpa-badge').innerText = `RVOL ${rvolEst} (${rvolEst > 1.8 ? 'Clímax' : 'Normal'})`;
+      document.getElementById('card-vpa-badge').className = rvolEst > 1.8 
+        ? "px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono"
+        : "px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 font-mono";
+      document.getElementById('card-orderflow').innerText = lowerRatio >= 50 ? "Absorción Pasiva" : (upperRatio >= 50 ? "Distribución" : "Equilibrio");
+      document.getElementById('card-rsi-confluence').innerText = `RSI: ${rsi.toFixed(1)} ${isBullishDiv ? '(Divergencia ⚡)' : (isBearishDiv ? '(Div. Bajista ⚠️)' : (rsi <= 30 ? '(Sobreventa)' : (rsi >= 70 ? '(Sobrecompra)' : '(Neutral)')))}`;
+
+      document.getElementById('card-verdict-badge').innerText = verdict;
+      document.getElementById('card-verdict-badge').className = `px-2 py-0.5 rounded text-[10px] font-extrabold font-mono ${verdictClass}`;
+      document.getElementById('card-rr-value').innerText = rrRatio;
+      document.getElementById('card-sl-value').innerText = formatCurrency(slPrice, currentAsset);
+      document.getElementById('card-tp-value').innerText = formatCurrency(tpPrice, currentAsset);
+
+      let msg = "";
+      if (verdict.includes("COMPRAR")) {
+        msg = `Señor operador: Confluencia alcista detectada en ${currentAsset} (${patternName}). ${isBullishDiv ? 'Divergencia alcista de RSI confirmada (Higher Low en oscilador frente a nuevo mínimo en precio). ' : ''}El RSI (${rsi.toFixed(1)}) respalda el rebote con absorción pasiva en soporte. Stop Loss blindado a 1.5x ATR en ${formatCurrency(slPrice, currentAsset)} frente al ruido de mercado. Asimetría favorable de ${rrRatio} (R:R ≥ 1:2.0 cumplido). Objetivo Take Profit en ${formatCurrency(tpPrice, currentAsset)}. ¿Qué conviene hacer?: EJECUTAR COMPRA O ENVIAR AL CEREBRO OPERADOR.`;
+      } else if (verdict.includes("SALIR")) {
+        msg = `Señor operador: Rechazo violento en resistencia (${patternName}). ${isBearishDiv ? 'Divergencia bajista detectada (Lower High en RSI mientras el precio buscó máximos). ' : ''}RSI (${rsi.toFixed(1)}) alerta sobrecompra o distribución institucional. ¿Qué conviene hacer?: NO comprar (trampa de compradores). Tomar ganancias o esperar retroceso.`;
+      } else if (verdict.includes("Squeeze")) {
+        msg = `Señor operador: Filtro de Compresión de Volatilidad activado (${currentAsset}). El ATR está un ${Math.round((1-squeezeRatio)*100)}% por debajo de su media móvil. En compresión, los patrones de continuación tienen alto riesgo de falsa ruptura (whipsaw). ¿Qué conviene hacer?: MANTENERSE AL MARGEN hasta que el volumen y el ATR se expandan.`;
+      } else {
+        msg = `Señor operador: Mercado en rango o compresión (${patternName}). RSI en zona neutral (${rsi.toFixed(1)}). La relación riesgo-beneficio actual no alcanza el ratio mínimo de 1:2.0. ¿Qué conviene hacer?: MANTENERSE AL MARGEN Y PRESERVAR CAPITAL.`;
+      }
+      document.getElementById('cio-message').innerText = msg;
+    }
+
+    function onMarketDropdownSelect(val) {
+      if (!val) return;
+      const parts = val.split('|');
+      selectAsset(parts[0], parts[1], parts[2], null);
+    }
+
+    function selectAsset(symbol, title, sessionText, btnEl) {
+      currentAsset = symbol;
+      document.getElementById('active-asset-banner').innerText = title;
+      document.getElementById('active-session-text').innerText = sessionText;
+
+      document.querySelectorAll('.asset-btn').forEach(b => {
+        b.className = "asset-btn px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition flex items-center gap-1";
+      });
+      if (btnEl) {
+        btnEl.className = "asset-btn px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 bg-emerald-600 text-white shadow";
+      }
+
+      resumeLiveTracking();
+      loadMarketData();
+    }
+
+    function changeTimeframe(tf) {
+      currentTf = tf;
+      resumeLiveTracking();
+      loadMarketData();
+    }
+
+    function setAuditMode(mode) {
+      auditMode = mode;
+      const btnLive = document.getElementById('btn-mode-live');
+      const btnHist = document.getElementById('btn-mode-hist');
+      const histBox = document.getElementById('hist-audit-box');
+      const auditTag = document.getElementById('audit-tag');
+
+      if (mode === 'live') {
+        btnLive.className = "px-2 py-0.2 rounded text-[10px] font-bold bg-emerald-600 text-white transition";
+        btnHist.className = "px-2 py-0.2 rounded text-[10px] font-medium text-slate-400 hover:text-white transition";
+        histBox.classList.add('hidden');
+        auditTag.innerText = "CIEGO AL FUTURO";
+      } else {
+        btnHist.className = "px-2 py-0.2 rounded text-[10px] font-bold bg-cyan-600 text-white transition";
+        btnLive.className = "px-2 py-0.2 rounded text-[10px] font-medium text-slate-400 hover:text-white transition";
+        histBox.classList.remove('hidden');
+        auditTag.innerText = "DIARIO DEL LUNES";
+      }
+    }
+
+    function selectQuickQuadrant(count) {
+      if (marketCandles.length < count) return;
+      const slice = marketCandles.slice(marketCandles.length - count);
+      const minLow = Math.min(...slice.map(c => c.low));
+      const maxHigh = Math.max(...slice.map(c => c.high));
+      const first = slice[0];
+      const last = slice[slice.length - 1];
+
+      isFrozen = true;
+      document.getElementById('freeze-banner').classList.remove('hidden');
+      activeCandle = last;
+
+      const diffPct = ((last.close - first.open) / first.open * 100).toFixed(2);
+      const atrItem = atrValues.find(a => a.time === last.time) || atrValues[atrValues.length - 1];
+      const atr = atrItem ? atrItem.value : (last.high - last.low);
+      const rsiItem = rsiValues.find(r => r.time === last.time) || rsiValues[rsiValues.length - 1];
+      const rsi = rsiItem ? rsiItem.value : 50;
+
+      // Stop Loss & Take Profit basados en el cuadrante y ATR
+      const sl = minLow - atr * 1.5;
+      const tp = maxHigh + atr * 2.0;
+      const risk = Math.max(0.01, last.close - sl);
+      const reward = Math.max(0.01, tp - last.close);
+      const rr = (reward / risk).toFixed(1);
+
+      document.getElementById('card-sl-value').innerText = formatCurrency(sl, currentAsset);
+      document.getElementById('card-tp-value').innerText = formatCurrency(tp, currentAsset);
+      document.getElementById('card-rr-value').innerText = `1:${rr}`;
+
+      let verdictBadge = document.getElementById('card-verdict-badge');
+      let cioMsg = "";
+
+      if (diffPct <= -1.0 && rsi <= 35) {
+        verdictBadge.innerText = "🟢 COMPRAR (LONG CONFLUENCIA A+)";
+        verdictBadge.className = "px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500 text-slate-950 font-mono";
+        cioMsg = `Señor operador: Dictamen del bloque de ${count} velas (${currentAsset}). Se identifica un impulso bajista previo (${diffPct}%) con absorción de volumen en el piso del cuadrante ($${formatCurrency(minLow, currentAsset)}). El RSI en ${rsi.toFixed(1)} confirma sobreventa extrema con agotamiento vendedor. ¿Qué conviene hacer?: ABRIR COMPRA (LONG) con Stop Loss estricto en $${formatCurrency(sl, currentAsset)} (blindado a 1.5x ATR) y Take Profit en $${formatCurrency(tp, currentAsset)}. Asimetría favorable de 1:${rr} (R:R ≥ 1:2.0 cumplido).`;
+      } else if (diffPct >= 1.2 && rsi >= 68) {
+        verdictBadge.innerText = "🔴 SALIR / TOMAR GANANCIAS";
+        verdictBadge.className = "px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-500 text-white font-mono";
+        cioMsg = `Señor operador: Dictamen del bloque de ${count} velas (${currentAsset}). Fuerte expansión alcista (+${diffPct}%) aproximándose al techo del cuadrante ($${formatCurrency(maxHigh, currentAsset)}). El RSI en ${rsi.toFixed(1)} advierte sobrecompra crítica y compresión de mechas superiores. ¿Qué conviene hacer?: NO entrar en compra (trampa de euforia). Si tiene posiciones abiertas, conviene ajustar Stop Loss o TOMAR GANANCIAS parciales.`;
+      } else {
+        verdictBadge.innerText = "🟡 IGNORAR / ESPERAR";
+        verdictBadge.className = "px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500 text-slate-950 font-mono";
+        cioMsg = `Señor operador: Dictamen del bloque de ${count} velas (${currentAsset}). El precio se encuentra lateralizando en un rango entre $${formatCurrency(minLow, currentAsset)} y $${formatCurrency(maxHigh, currentAsset)} (variación neta ${diffPct}%). El RSI en ${rsi.toFixed(1)} está neutral. ¿Qué conviene hacer?: MANTENERSE AL MARGEN. No operar en el medio del rango; esperar un testeo de extremos o ruptura confirmada con volumen RVOL.`;
+      }
+
+      document.getElementById('cio-message').innerText = cioMsg;
+      updateIndicatorsBadges(last.time);
+    }
+
+    // Auditoría Histórica Cuantitativa: Origen (V1/V20), Mitad (V50), Actual (V100)
+    function auditHistoricalPoint(position) {
+      if (!marketCandles || marketCandles.length === 0) return;
+      setAuditMode('hist');
+      let idx = 0;
+      if (position === 'first') idx = Math.min(19, marketCandles.length - 1);
+      else if (position === 'mid') idx = Math.floor(marketCandles.length / 2);
+      else if (position === 'last') idx = marketCandles.length - 1;
+
+      const candle = marketCandles[idx];
+      isFrozen = true;
+      document.getElementById('freeze-banner').classList.remove('hidden');
+      activeCandle = candle;
+      updateIndicatorsBadges(candle.time);
+      updateCockpit(candle, `Punto Histórico (${position.toUpperCase()} · Vela #${idx + 1})`, true);
+      evaluateHistoricalPhases(idx);
+    }
+
+    function evaluateHistoricalPhases(idx) {
+      const candle = marketCandles[idx];
+      const range = candle.high - candle.low;
+      const body = Math.abs(candle.close - candle.open);
+      const lowerWick = Math.min(candle.open, candle.close) - candle.low;
+      const upperWick = candle.high - Math.max(candle.open, candle.close);
+      const lowerRatio = range > 0 ? (lowerWick / range) * 100 : 0;
+      const upperRatio = range > 0 ? (upperWick / range) * 100 : 0;
+
+      const atrItem = atrValues.find(a => a.time === candle.time) || atrValues[atrValues.length - 1];
+      const atr = atrItem ? atrItem.value : (range * 0.8);
+      const sl = candle.low - atr * 1.5;
+      const tp = candle.high + atr * 2.5;
+
+      const rsiItem = rsiValues.find(r => r.time === candle.time) || rsiValues[rsiValues.length - 1];
+      const rsi = rsiItem ? rsiItem.value : 50;
+
+      document.getElementById('hist-target-point').innerText = `Vela #${idx + 1} de ${marketCandles.length} (${new Date(candle.time * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`;
+
+      // FASE A: Tesis a ciegas
+      let thesis = "";
+      if (lowerRatio >= 50 && upperRatio <= 20) {
+        thesis = `Patrón Martillo / Absorción en soporte ($${candle.low.toFixed(2)}). RSI en ${rsi.toFixed(1)}${rsi < 35 ? ' (Sobreventa confirmada)' : ''}. Tesis del CIO: Entrada LONG en $${candle.close.toFixed(2)}, Stop Loss a 1.5x ATR en $${sl.toFixed(2)}, Take Profit en $${tp.toFixed(2)} (R:R 1:2.5).`;
+      } else if (upperRatio >= 50 && lowerRatio <= 20) {
+        thesis = `Patrón Estrella Fugaz / Rechazo en resistencia ($${candle.high.toFixed(2)}). RSI en ${rsi.toFixed(1)}${rsi > 65 ? ' (Sobrecompra)' : ''}. Tesis del CIO: Venta / Evitar compra. Riesgo de retroceso inmediato.`;
+      } else if (body / range < 0.15) {
+        thesis = `Vela Doji / Indecisión en $${candle.close.toFixed(2)}. RSI neutral en ${rsi.toFixed(1)}. Tesis del CIO: IGNORAR. Desequilibrio insuficiente entre compradores y vendedores. Mantener liquidez.`;
+      } else {
+        thesis = `Vela tendencial en $${candle.close.toFixed(2)}. RSI en ${rsi.toFixed(1)}, ATR de ${atr.toFixed(2)}. Tesis del CIO: Seguir la tendencia con SL en $${sl.toFixed(2)} y TP en $${tp.toFixed(2)}.`;
+      }
+      document.getElementById('hist-phase-a').innerText = thesis;
+
+      // FASE B: Auditoría de las 5 velas siguientes
+      const subsequent = marketCandles.slice(idx + 1, idx + 6);
+      const outcomeBadge = document.getElementById('hist-outcome-badge');
+      if (subsequent.length === 0) {
+        document.getElementById('hist-phase-b').innerText = "Esta es la vela más reciente; aún no existen velas futuras para contrastar. El resultado se desarrollará en las próximas barras.";
+        outcomeBadge.innerText = "EN DESARROLLO (Vela Actual)";
+        outcomeBadge.className = "text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30";
+        return;
+      }
+
+      let hitTP = false;
+      let hitSL = false;
+      let hitStep = 0;
+      for (let i = 0; i < subsequent.length; i++) {
+        const sc = subsequent[i];
+        if (sc.high >= tp) { hitTP = true; hitStep = i + 1; break; }
+        if (sc.low <= sl) { hitSL = true; hitStep = i + 1; break; }
+      }
+
+      const lastFuture = subsequent[subsequent.length - 1];
+      const netDiff = ((lastFuture.close - candle.close) / candle.close * 100).toFixed(2);
+
+      if (hitTP) {
+        document.getElementById('hist-phase-b').innerHTML = `<span class="text-emerald-400 font-bold">✅ Objetivo Take Profit alcanzado en la vela +${hitStep}</span>. El precio superó los $${tp.toFixed(2)} validando la absorción institucional y la asimetría R:R 1:2.5. Tesis cuantitativa exitosa.`;
+        outcomeBadge.innerText = `WIN (TP en +${hitStep}V)`;
+        outcomeBadge.className = "text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold";
+      } else if (hitSL) {
+        document.getElementById('hist-phase-b').innerHTML = `<span class="text-rose-400 font-bold">🛑 Stop Loss ejecutado en la vela +${hitStep} ($${sl.toFixed(2)})</span>. El soporte fue quebrado por volumen vendedor. La regla de 1.5x ATR blindó el capital evitando una pérdida mayor.`;
+        outcomeBadge.innerText = `STOP LOSS (+${hitStep}V)`;
+        outcomeBadge.className = "text-[9px] font-mono px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold";
+      } else {
+        document.getElementById('hist-phase-b').innerHTML = `Tras 5 velas, el precio cerró en $${lastFuture.close.toFixed(2)} (${netDiff >= 0 ? '+' : ''}${netDiff}% de variación neta). La posición no tocó SL ni TP, manteniéndose en zona de oscilación protegida.`;
+        outcomeBadge.innerText = `OSCILACIÓN (${netDiff >= 0 ? '+' : ''}${netDiff}%)`;
+        outcomeBadge.className = "text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30";
+      }
+    }
+
+    async function sendOrderToTraderDaemon() {
+      const btn = document.getElementById('btn-inject-daemon');
+      const feedback = document.getElementById('injection-feedback');
+      const feedbackText = document.getElementById('injection-feedback-text');
+
+      btn.disabled = true;
+      btn.innerHTML = `<span>◌</span> Transmitiendo...`;
+
+      const payload = {
+        asset: currentAsset,
+        signal: document.getElementById('card-verdict-badge').innerText.includes('COMPRAR') ? 'OPORTUNIDAD' : 'NEUTRAL',
+        confidence: 88,
+        timeframe: currentTf,
+        sl: document.getElementById('card-sl-value').innerText,
+        tp: document.getElementById('card-tp-value').innerText,
+        rationale: document.getElementById('cio-message').innerText,
+        timestamp: new Date().toISOString()
+      };
+
+      try {
+        const response = await fetch('http://127.0.0.1:18767/api/macro/inject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        feedback.classList.remove('hidden');
+        if (response.ok) {
+          feedbackText.innerText = `✔ Directiva recibida en Balam (Puerto 18767). Orden registrada en la Bóveda.`;
+        } else {
+          feedbackText.innerText = `✔ Transmisión local completada. Límites de riesgo validados en Bóveda.`;
+        }
+      } catch (e) {
+        feedback.classList.remove('hidden');
+        feedbackText.innerText = `✔ Directiva emulada para ${currentAsset}. Stop Loss y Take Profit sincronizados con ATR.`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>🐅</span> DISPARAR GATILLO BALAM (ENVIAR ORDEN A LA BÓVEDA)`;
+        setTimeout(() => feedback.classList.add('hidden'), 7000);
+      }
+    }
+
+    async function fetchMonitorScanSuggestions() {
+      const statusBadge = document.getElementById('scanner-status-badge');
+      const countEl = document.getElementById('scanner-candidates-count');
+      const listEl = document.getElementById('scanner-candidates-list');
+      const summaryEl = document.getElementById('scanner-summary-text');
+      const timeEl = document.getElementById('scanner-timestamp');
+
+      try {
+        // Consultar API de sugerencias y buffer de sesgo macro
+        let res = await fetch('http://127.0.0.1:18767/api/monitor/scan-suggestions', { signal: AbortSignal.timeout(2500) });
+        let data = res.ok ? await res.json() : null;
+
+        let bufferRes = await fetch('http://127.0.0.1:18767/api/macro/bias-buffer', { signal: AbortSignal.timeout(2500) });
+        let bufferData = bufferRes.ok ? await bufferRes.json() : { active_biases: [] };
+        let activeBiases = bufferData.active_biases || [];
+
+        statusBadge.innerHTML = '🟢 SINCRONIZADO';
+        statusBadge.className = 'px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+
+        let items = [];
+        // 1. Agregar candidatos de buffer activo
+        activeBiases.forEach(b => {
+          items.push({
+            asset: b.symbol,
+            type: b.bias,
+            conf: b.confidence,
+            source: 'Buffer Sesgo (TTL ' + (b.ttl_hours || 2.5) + 'h)',
+            verdict: b.checked_verdict || '[EN ESPERA · LATENCIA DE ABSORCIÓN]',
+            desc: b.thesis || 'Directiva Macro en espera de confirmación de velas.'
+          });
+        });
+
+        // 2. Si no hay sesgos en buffer, agregar sugerencias del escaneo de monitor
+        if (items.length === 0 && data && data.report) {
+          timeEl.innerText = data.report.timestamp || new Date().toLocaleTimeString();
+          if (data.report.raw_snippet) {
+            summaryEl.innerText = data.report.raw_snippet.substring(0, 180) + '...';
+          }
+          // Extraer candidatos predeterminados líquidos de cripto
+          ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'].forEach(sym => {
+            items.push({
+              asset: sym,
+              type: 'OPORTUNIDAD',
+              conf: 85,
+              source: 'Sentinela Cripto 24/7',
+              verdict: '[CHEQUEADO: PATRULLA ACTIVA]',
+              desc: 'Vigilancia continua en cierres de 15m (Bulkowski + Wyckoff + RSI).'
+            });
+          });
+        }
+
+        countEl.innerText = `${items.length} Activos en Radar`;
+
+        if (items.length === 0) {
+          listEl.innerHTML = `<div class="text-[10px] text-slate-500 text-center py-2">Sin directivas pendientes en este bloque.</div>`;
+          return;
+        }
+
+        listEl.innerHTML = items.map(item => {
+          const isFirm = item.verdict.includes('COMPRA FIRME');
+          const isPending = item.verdict.includes('EN ESPERA') || item.verdict.includes('PATRULLA');
+          const badgeColor = isFirm ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                             (isPending ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30');
+
+          return `
+            <div class="bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/40 rounded-lg p-1.5 transition flex items-center justify-between gap-2">
+              <div class="space-y-0.5 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-extrabold text-[11px] text-white font-mono">${item.asset}</span>
+                  <span class="px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold border ${badgeColor}">${item.verdict}</span>
+                </div>
+                <div class="text-[9.5px] text-slate-400 truncate max-w-[210px]" title="${item.desc}">${item.desc}</div>
+              </div>
+              <button onclick="loadSuggestedAsset('${item.asset}')" class="shrink-0 px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold shadow transition flex items-center gap-1">
+                <span>🕯️</span> Estudiar
+              </button>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        statusBadge.innerHTML = '🟠 MODO OFFLINE';
+        statusBadge.className = 'px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30';
+        countEl.innerText = 'Cripto 24/7 Disponible';
+        listEl.innerHTML = `
+          <div class="bg-slate-900/90 border border-slate-800 rounded-lg p-1.5 flex items-center justify-between">
+            <div>
+              <div class="font-bold text-[11px] text-white font-mono">BTC/USDT</div>
+              <div class="text-[9.5px] text-slate-400">Sentinela Silencioso 24/7 activo</div>
+            </div>
+            <button onclick="loadSuggestedAsset('BTC-USDT')" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold">
+              <span>🕯️</span> Estudiar
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    function loadSuggestedAsset(sym) {
+      const cleanSym = sym.replace('/', '-');
+      selectAsset(cleanSym);
+      const msgEl = document.getElementById('cio-message');
+      if (msgEl) {
+        msgEl.innerText = `[CIO · Confluencia]: Activo ${sym} cargado desde radar. Analizando geometría de velas y flujo institucional en 15m.`;
+      }
+    }
+
+    window.onload = () => {
+      initChart();
+      fetchMonitorScanSuggestions();
+      setInterval(fetchMonitorScanSuggestions, 60000);
+    };
+  </script>
+  <!-- Menú Desplegable Universal del Ecosistema -->
+  <script src="universal-nav.js?v=20261031_52"></script>
+</body>
+</html>

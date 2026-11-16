@@ -1,0 +1,2255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kula Balam - Dashboard Cuantitativo</title>
+    <link rel="stylesheet" href="css/style.css?v=20261110_sem">
+    <link rel="stylesheet" href="css/ecosystem-theme.css?v=20261031_scroll2">
+    <!-- Tailwind CSS compilado (build documentado en CONTEXTO.md Secc. 2 y docs/auditorias/GUIA_Y_REGISTRO_DE_AUDITORIAS.md). Debe ir DESPUÉS de style.css: el CDN anterior inyectaba su <style> al final del head y esa precedencia se conserva. -->
+    <link rel="stylesheet" href="css/tailwind.css?v=20261031_scroll2">
+    <!-- TradingView Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <!-- Motor Gráfico y Fórmulas Cuantitativas Centralizadas de Kula Balam -->
+    <script src="js/kula-chart-engine.js?v=20261031_52"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-[#06090e] bg-gray-900 text-white min-h-screen custom-scrollbar" style="background-color: #06090e; color: #f8fafc;">
+    
+    <!-- Navbar -->
+    <nav class="bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center relative z-50">
+        <div class="flex items-center space-x-3">
+            <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+            <h1 class="text-xl font-bold tracking-wider flex items-center gap-1.5">
+                <img src="img/favicon_kula.png" alt="Kula" class="w-5 h-5 rounded object-cover inline-block" title="Módulo Kula: Las Tres Velas">
+                <span>Kula</span> <span class="text-blue-500">Balam</span>
+                <img src="img/favicon_balam.png" alt="Balam" class="w-5 h-5 rounded object-cover inline-block" title="Módulo Balam: El Tigre Agazapado & Gatillo">
+            </h1>
+
+            <!-- Menú Desplegable: Terminales y Páginas del Proyecto (EN PRIMER LUGAR) -->
+            <div class="relative inline-block text-left ml-2" id="navEcosystemDropdownWrapper">
+                <button id="navEcosystemBtn" type="button" 
+                        class="px-2.5 py-1 text-xs font-semibold rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 transition flex items-center gap-1.5 cursor-pointer shadow-sm select-none"
+                        title="Terminales y Páginas del Proyecto (Clic para fijar)">
+                    <span>🗂️</span>
+                    <span>Terminales & Páginas</span>
+                    <span class="text-[9px] text-slate-400 transition-transform duration-200" id="navEcosystemArrow">▼</span>
+                </button>
+
+                <!-- Panel Flotante del Desplegable (Minimalista) -->
+                <div id="navEcosystemMenu" 
+                     class="hidden absolute left-0 top-full pt-1 w-80 z-[1000]">
+                    <div class="bg-[#0b0f19] border border-slate-800 rounded-lg shadow-2xl p-1.5 space-y-0.5 text-left backdrop-blur-md">
+                        <div class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800/80 mb-1 flex justify-between items-center">
+                            <span>Ecosistema Kula Balam</span>
+                            <span class="font-mono text-slate-400 text-[9px]">6 Vistas</span>
+                        </div>
+                        <div class="space-y-0.5">
+                            <a href="/index.html" class="flex items-center justify-between px-2 py-1.5 rounded transition text-xs select-none bg-indigo-600/25 text-white font-bold border border-indigo-500/40">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="text-sm shrink-0">📈</span>
+                                    <div class="truncate">
+                                        <span class="text-indigo-300 font-semibold">Kula Balam</span>
+                                        <span class="text-[10px] text-slate-500 ml-1">(Dashboard Cuantitativo)</span>
+                                    </div>
+                                </div>
+                                <span class="text-[9.5px] font-mono shrink-0 ml-2 px-1.5 py-0.2 rounded bg-indigo-500/30 text-indigo-200 font-bold">Activo</span>
+                            </a>
+                            <a href="/terminal_tres_velas.html" target="_blank" class="flex items-center justify-between px-2 py-1.5 rounded transition text-xs select-none text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="text-sm shrink-0">🕯️</span>
+                                    <div class="truncate">
+                                        <span class="text-slate-200 font-semibold">La Tríada Multitemporal</span>
+                                        <span class="text-[10px] text-slate-500 ml-1">(Kula Balam: Los tres tiempos y el tigre agazapado)</span>
+                                    </div>
+                                </div>
+                                <span class="text-[9.5px] font-mono shrink-0 ml-2 px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">Tríada</span>
+                            </a>
+                            <a href="http://127.0.0.1:8520/index.html" target="_blank" class="flex items-center justify-between px-2 py-1.5 rounded transition text-xs select-none text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="text-sm shrink-0">🖥️</span>
+                                    <div class="truncate">
+                                        <span class="text-slate-200 font-semibold">Monitor del Mercado</span>
+                                        <span class="text-[10px] text-slate-500 ml-1">(Balam recorre los mercados en busca de su presa)</span>
+                                    </div>
+                                </div>
+                                <span class="text-[9.5px] font-mono shrink-0 ml-2 px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">:8520</span>
+                            </a>
+                            <a href="/terminal_velas_cio.html" target="_blank" class="flex items-center justify-between px-2 py-1.5 rounded transition text-xs select-none text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="text-sm shrink-0">⚡</span>
+                                    <div class="truncate">
+                                        <span class="text-slate-200 font-semibold">Terminal del CIO</span>
+                                        <span class="text-[10px] text-slate-500 ml-1">(Balam, auditor cuantitativo de las tres velas)</span>
+                                    </div>
+                                </div>
+                                <span class="text-[9.5px] font-mono shrink-0 ml-2 px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">CIO</span>
+                            </a>
+                            <a href="/velas_japonesas.html" target="_blank" class="flex items-center justify-between px-2 py-1.5 rounded transition text-xs select-none text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="text-sm shrink-0">📊</span>
+                                    <div class="truncate">
+                                        <span class="text-slate-200 font-semibold">Atlas Cuantitativo de Velas Japonesas</span>
+                                        <span class="text-[10px] text-slate-500 ml-1">(Estudio de Velas)</span>
+                                    </div>
+                                </div>
+                                <span class="text-[9.5px] font-mono shrink-0 ml-2 px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">Atlas</span>
+                            </a>
+                            <a href="/auditor_visual.html" target="_blank" class="flex items-center justify-between px-2 py-1.5 rounded transition text-xs select-none text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="text-sm shrink-0">🏛️</span>
+                                    <div class="truncate">
+                                        <span class="text-slate-200 font-semibold">Auditor Visual de Bóveda</span>
+                                        <span class="text-[10px] text-slate-500 ml-1">(Ledger SQLite)</span>
+                                    </div>
+                                </div>
+                                <span class="text-[9.5px] font-mono shrink-0 ml-2 px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">SQLite</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de Vista: Trading / Inversores -->
+            <div class="flex items-center bg-gray-900 rounded-lg p-0.5 border border-gray-700 ml-2 shadow-inner">
+                <button id="navTradingBtn" type="button" class="px-3 py-1 text-xs font-bold rounded bg-blue-600 text-white transition cursor-pointer">📈 Trading</button>
+                <button id="navInvestorsBtn" type="button" class="px-3 py-1 text-xs font-bold rounded text-gray-400 hover:text-white transition cursor-pointer">👥 Inversores</button>
+            </div>
+
+            <!-- Reloj en Vivo y Pulso de Red (Ticks Fluidos sin F5) -->
+            <div id="liveClockWidget" class="hidden md:flex items-center gap-2 bg-gray-900/90 px-3 py-1 rounded-lg border border-gray-700/80 text-xs font-mono shadow-inner ml-2" title="Reloj sincronizado y cotizaciones fluidas en vivo">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]"></span>
+                <span id="liveClockDisplay" class="text-emerald-300 font-bold">--:--:-- ART</span>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="bg-gray-900 px-3 py-1 rounded-lg border border-gray-700 flex items-center mr-4">
+                <span class="text-xs text-gray-400 uppercase mr-2 font-bold">Activo:</span>
+                <select id="symbolSelect" class="bg-transparent text-white font-bold outline-none cursor-pointer max-w-[260px] truncate">
+                    <optgroup label="🛢️ Materias Primas y Energía" class="bg-gray-800 text-amber-400 font-bold">
+                        <option class="bg-gray-900 text-white font-semibold" value="CL=F">🛢️ Petróleo WTI (CL=F)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="GC=F">🥇 Oro (GC=F)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="SI=F">🥈 Plata (SI=F)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="NG=F">🔥 Gas Natural (NG=F)</option>
+                    </optgroup>
+
+                    <optgroup label="📉 Micro-Futuros CME (Simulación 1D-1H-5M)" class="bg-gray-800 text-cyan-400 font-bold">
+                        <option class="bg-gray-900 text-white font-semibold" value="MES=F">📊 Micro S&P 500 (MES=F)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="MNQ=F">💻 Micro Nasdaq 100 (MNQ=F)</option>
+                    </optgroup>
+
+                    <optgroup label="⚡ Criptomonedas" class="bg-gray-800 text-yellow-400 font-bold">
+                        <option class="bg-gray-900 text-white font-semibold" value="ETH/USDT" selected>⚡ Ethereum (ETH / USDT)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="SOL/USDT">⚡ Solana (SOL / USDT)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="BTC/USDT">⚡ Bitcoin (BTC / USDT)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="BNB/USDT">🟡 Binance Coin (BNB / USDT)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="XRP/USDT">🪙 Ripple (XRP / USDT)</option>
+                    </optgroup>
+
+                    <optgroup label="💱 Divisas y Forex (24/5)" class="bg-gray-800 text-emerald-400 font-bold">
+                        <option class="bg-gray-900 text-white font-semibold" value="EURUSD=X">💶 Euro / Dólar (EUR/USD)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="GBPUSD=X">💷 Libra / Dólar (GBP/USD)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="USDJPY=X">💴 Dólar / Yen (USD/JPY)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="AUDUSD=X">🇦🇺 Dólar Australiano / Dólar (AUD/USD)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="USDCAD=X">🇨🇦 Dólar / Dólar Canadiense (USD/CAD)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="USDCHF=X">🇨🇭 Dólar / Franco Suizo (USD/CHF)</option>
+                    </optgroup>
+
+                    <optgroup label="🏛️ Bonos e Índices Macro" class="bg-gray-800 text-blue-400 font-bold">
+                        <option class="bg-gray-900 text-white font-semibold" value="TLT">🏛️ Bonos Tesoro EE.UU. 20+ Años (TLT)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="^GSPC">📈 S&P 500 - Índice (^GSPC)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="SPY">📊 S&P 500 - ETF Operable (SPY)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="QQQ">💻 Nasdaq 100 - ETF (QQQ)</option>
+                    </optgroup>
+
+                    <optgroup label="🏢 Acciones / Empresas Globales" class="bg-gray-800 text-purple-400 font-bold">
+                        <option class="bg-gray-900 text-white font-semibold" value="BABA">🏢 Alibaba (BABA)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="NVDA">🤖 Nvidia (NVDA)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="AAPL">🍎 Apple (AAPL)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="AMD">⚡ AMD (AMD)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="AVGO">📡 Broadcom (AVGO)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="META">🌐 Meta Platforms (META)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="TSLA">🚗 Tesla (TSLA)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="MSFT">🪟 Microsoft (MSFT)</option>
+                    </optgroup>
+
+                    <optgroup label="🇦🇷 Mercado Argentino (Acciones / CEDEARs)" class="bg-gray-800 text-cyan-400 font-bold">
+                        <option class="bg-gray-900 text-white font-semibold" value="GGAL.BA">🇦🇷 Grupo Fin. Galicia (GGAL)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="YPFD.BA">🇦🇷 YPF / Vaca Muerta (YPFD)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="PAMP.BA">🇦🇷 Pampa Energía (PAMP)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="BMA.BA">🇦🇷 Banco Macro (BMA)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="ALUA.BA">🇦🇷 Aluar Aluminio (ALUA)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="TXAR.BA">🇦🇷 Ternium Argentina (TXAR)</option>
+                    </optgroup>
+
+                    <optgroup label="🌐 ETFs Temáticos y Emergentes" class="bg-gray-800 text-emerald-400 font-bold">
+                        <option class="bg-gray-900 text-white font-semibold" value="MCHI">🇨🇳 ETF Mercado Chino (MCHI)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="KWEB">🇨🇳 ETF Internet China (KWEB)</option>
+                        <option class="bg-gray-900 text-white font-semibold" value="BOTZ">🤖 ETF Robótica y AI (BOTZ)</option>
+                    </optgroup>
+                </select>
+            </div>
+            <span class="text-gray-400 text-xs hidden md:inline" title="Patrimonio total en el Broker (Efectivo en Bóveda + Invertido en Activos Abiertos)">Patrimonio Broker:</span>
+            <span id="capitalDisplay" class="font-mono text-green-400 hidden md:inline font-bold px-2 py-1 bg-gray-900 rounded border border-gray-700 text-xs">$0.00</span>
+            <div class="flex items-center space-x-1.5 bg-gray-900 p-1 rounded-lg border border-gray-700">
+                <label for="navAgentModeSelect" class="text-xs text-gray-400 uppercase font-bold px-1 hidden sm:inline">Modo:</label>
+                <select id="navAgentModeSelect" class="bg-gray-800 text-white font-semibold text-xs p-1.5 rounded border border-gray-600 outline-none cursor-pointer">
+                    <option value="smart" selected>🧠 Inteligente (Multi-Activo)</option>
+                    <option value="auto">⚡ Autónomo (Activo Fijo)</option>
+                    <option value="copilot">🛡️ Copiloto (Preguntar)</option>
+                </select>
+            </div>
+            <span id="smartRoutingBadge" class="text-[11px] bg-purple-900/80 text-purple-200 border border-purple-500/80 px-2 py-1 rounded font-mono font-bold shadow-[0_0_10px_rgba(168,85,247,0.4)]">⚡ MODO INTELIGENTE</span>
+            <button id="agentToggle" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-semibold transition">
+                Activar Agente
+            </button>
+        </div>
+    </nav>
+
+    <!-- ==================== COCKPIT OPERATIVO ==================== -->
+    <div id="tradingView">
+
+        <!-- BARRA TÁCTICA DE SCALPING PRESENCIAL (TRADING CON PRESENCIA) -->
+        <div id="scalping-presencial-bar" class="container mx-auto px-4 mt-3">
+            <div class="bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 border border-indigo-500/40 rounded-xl p-3 shadow-xl flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-3">
+                    <span class="p-2 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-lg">⚡</span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-black tracking-wide text-white uppercase">Trading con Presencia · Scalping 5M</span>
+                            <span id="badgeScalpingState" class="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-400 border border-slate-700">INACTIVO</span>
+                            <span id="txtScalpingTelemetry" class="text-[11px] font-mono text-indigo-300 hidden"></span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">Supervisión en vivo con Árbitro IA. Al pulsar finalizar, entra en Drenado Elegante y restaura el modo automático de fondo.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex items-center gap-1.5 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700">
+                        <label for="selScalpingStrategy" class="text-[11px] text-slate-400 font-bold uppercase">Fórmula:</label>
+                        <select id="selScalpingStrategy" class="bg-slate-900 text-white text-xs font-semibold px-2 py-1 rounded border border-slate-600 outline-none cursor-pointer">
+                            <option value="" disabled selected>⚠️ Sin fórmulas autorizadas (en cuarentena)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700">
+                        <label for="selScalpingSymbol" class="text-[11px] text-slate-400 font-bold uppercase">Activo:</label>
+                        <select id="selScalpingSymbol" class="bg-slate-900 text-white text-xs font-semibold px-2 py-1 rounded border border-slate-600 outline-none cursor-pointer">
+                            <option value="ETH/USDT" selected>🔷 ETH/USDT (Recomendado)</option>
+                            <option value="BTC/USDT">🟠 BTC/USDT</option>
+                            <option value="SOL/USDT">🟣 SOL/USDT</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700">
+                        <label for="inputScalpingLot" class="text-[11px] text-slate-400 font-bold uppercase">Lote:</label>
+                        <input type="number" id="inputScalpingLot" value="0.01" step="0.005" min="0.001" class="w-16 bg-slate-900 text-white text-xs font-mono font-bold px-2 py-1 rounded border border-slate-600 outline-none text-center" title="Lotaje calibrable para esta sesión presencial">
+                    </div>
+
+                    <button id="btnScalpingToggle" type="button" onclick="window.toggleScalpingSession && window.toggleScalpingSession()" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30">
+                        <span id="scalpingBtnIcon">⚡</span>
+                        <span id="scalpingBtnText">Iniciar Scalping Presencial</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- DESPLEGABLE DE ALERTA FAILOVER GEMINI (CONMUTACIÓN AUTOMÁTICA) -->
+        <div id="gemini-failover-bar" class="container mx-auto px-4 mt-3 hidden">
+            <div class="bg-gradient-to-r from-red-950/80 via-amber-950/70 to-gray-900 border border-red-500/60 rounded-xl shadow-lg p-3 cursor-pointer transition hover:border-red-400" onclick="window.toggleFailoverDropdown && window.toggleFailoverDropdown()">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]"></span>
+                        <span class="text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40">🚨 ALERTA OPERATIVA</span>
+                        <span id="failover-bar-title" class="text-xs font-bold text-white">Interrupción en Motor IA · Conmutación Automática a Google Gemini</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] font-bold font-mono px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-500/50">✨ Google Gemini Activo</span>
+                        <button type="button" id="failover-toggle-btn" class="text-[11px] font-semibold px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600">▼ Ver Detalle</button>
+                    </div>
+                </div>
+            </div>
+            <div id="failover-dropdown-content" class="bg-gray-900/95 border border-red-500/40 border-t-0 rounded-b-xl p-4 space-y-3 shadow-2xl hidden">
+                <div class="p-2.5 bg-red-950/30 border-l-4 border-red-500 rounded text-xs text-red-200">
+                    <div class="font-bold text-[11px] uppercase tracking-wider text-red-400 mb-1">⚠️ Causa de la Interrupción:</div>
+                    <p id="failover-reason-msg" class="leading-relaxed">El motor (CIO o el Operador) ha dejado de operar debido a agotamiento de tokens, límite de cuota o indisponibilidad técnica.</p>
+                </div>
+                <div class="p-2.5 bg-purple-950/30 border-l-4 border-purple-500 rounded text-xs text-purple-200">
+                    <div class="font-bold text-[11px] uppercase tracking-wider text-purple-400 mb-1">📢 Protocolo de Emergencia Activado:</div>
+                    <p class="leading-relaxed">
+                        Se ha ejecutado el cambio automático e inmediato a la <strong>API de Google (Google Gemini 2.0 Flash)</strong> tanto en el <strong>Director de Inversiones (CIO · Monitor del Mercado)</strong> como en el <strong>Operador Táctico (Trading Bot)</strong> para sostener la operativa 24/7 sin detención de algoritmos.
+                    </p>
+                </div>
+                <div class="p-2.5 bg-amber-950/30 border-l-4 border-amber-500 rounded text-xs text-amber-200">
+                    <div class="font-bold text-[11px] uppercase tracking-wider text-amber-400 mb-1">🔒 Límite de Presupuesto Obligatorio (Google Cloud):</div>
+                    <p class="leading-relaxed">
+                        Al activar la API de pago de Google, es mandatorio configurar en Google Cloud Console una alerta con tope máximo de <strong>$5 a $10 USD mensuales</strong> para blindar tu tarjeta contra sobreconsumo imprevisto.
+                    </p>
+                </div>
+                <div class="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-800 text-xs">
+                    <div class="flex items-center gap-3 font-mono text-gray-400 text-[11px]">
+                        <span>🛰️ CIO (8520): <strong class="text-emerald-400">Gemini Conectado</strong></span>
+                        <span>|</span>
+                        <span>⚡ Operador (18767): <strong class="text-emerald-400">Gemini Conectado</strong></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="window.forceSyncGemini && window.forceSyncGemini()" class="px-3 py-1 text-xs font-bold rounded bg-purple-600 hover:bg-purple-500 text-white transition">🔄 Reconfirmar Conmutación</button>
+                        <button type="button" onclick="window.dismissFailoverAlert && window.dismissFailoverAlert()" class="px-3 py-1 text-xs font-semibold rounded bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">Ocultar Alerta</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEMÁFORO OPERATIVO DETERMINISTA DE 4 LUCES (0 TOKENS) -->
+        <div class="px-2 sm:px-2.5">
+            <div id="kula-semaforo-bar" class="kula-sem-strip" aria-label="Semáforo de salud operativo">
+                <div class="kula-sem-pills">
+                    <span id="kula-sem-motor" class="kula-sem-pill sem-yellow" title="Estado del ciclo de análisis del TraderDaemon"><span class="kula-sem-dot"></span><span>Motor: Verificando</span></span>
+                    <span id="kula-sem-guardian" class="kula-sem-pill sem-yellow" title="Guardián SL / Breakeven / Trailing Stop"><span class="kula-sem-dot"></span><span>Guardián: --</span></span>
+                    <span id="kula-sem-formulas" class="kula-sem-pill sem-yellow" title="Auto-test sintético en memoria de estrategias autorizadas (0 tokens)"><span class="kula-sem-dot"></span><span>Fórmulas: --</span></span>
+                    <span id="kula-sem-balam" class="kula-sem-pill sem-yellow" title="Monitor del Mercado: RSS Feeds y Puente Macro"><span class="kula-sem-dot"></span><span>Balam/RSS: --</span></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="kula-sem-mode-note" class="text-[10px] font-mono text-slate-400">0 tokens IA</span>
+                    <button id="btnKulaWatchdogProbe" type="button" class="kula-sem-btn" onclick="window.checkKulaSemaforo && window.checkKulaSemaforo(true)" title="Ejecutar auto-test sintético inmediato sin consumir tokens IA">🔄 Auto-Check</button>
+                </div>
+            </div>
+            <div id="kula-semaforo-alert" class="kula-sem-alert hidden"></div>
+        </div>
+
+    <!-- Main Content -->
+    <div class="max-w-[1720px] mx-auto p-2 sm:p-2.5 grid grid-cols-1 lg:grid-cols-3 gap-2.5 mt-1">
+        
+        <!-- Columna Izquierda: Gráfico y Métricas -->
+        <div class="lg:col-span-2 space-y-2.5">
+            <!-- Gráfico de Trading -->
+            <div class="bg-gray-800 rounded-lg p-2.5 sm:p-3 shadow-lg border border-gray-700">
+                <!-- Cabecera Rígida Anti-Vibración (Altura Fija Estabilizada: NUNCA salta ni empuja el gráfico al pasar el ratón) -->
+                <div id="kula-chart-header" class="chart-header-row flex justify-between items-center mb-1.5 gap-2 overflow-x-auto overflow-y-hidden" style="height: 38px; min-height: 38px; max-height: 38px; white-space: nowrap;">
+                    <div class="flex items-center gap-2 shrink-0 min-w-0">
+                        <h2 class="text-base font-semibold whitespace-nowrap shrink-0"><span id="chartTitleSymbol">BTC/USDT</span> <span class="text-xs text-gray-400 font-normal">TF: <span id="chartTitleTf">1 Minuto</span></span></h2>
+                        <!-- Selector de Modalidad de Vista: 1 Vela (Predeterminada) vs 3 Velas (Tríada) -->
+                        <div class="flex items-center bg-gray-950 p-0.5 rounded-lg border border-gray-700 shrink-0">
+                            <button type="button" id="ku-btn-mode-1v" onclick="window.KulaChartEngine && window.KulaChartEngine.setHostLayoutMode('1v')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 cursor-pointer whitespace-nowrap" title="Modo 1 Vela (Predeterminado en Cockpit)">🕯️ 1 Vela</button>
+                            <button type="button" id="ku-btn-mode-3v" onclick="window.KulaChartEngine && window.KulaChartEngine.setHostLayoutMode('3v')" class="px-2 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer whitespace-nowrap" title="Conmutar a Tríada de 3 Velas (1D · 1H · 5M)">📐 3 Velas</button>
+                        </div>
+                        <!-- Selector Directo de Temporalidad en Ventana Principal (1m, 5m, 15m, 1h, 4h, 1d) -->
+                        <div id="ku-quick-tf-bar" class="flex items-center bg-gray-950 p-0.5 rounded-lg border border-gray-700 shrink-0 gap-0.5 font-mono">
+                            <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('1m')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="1m" title="1 Minuto">1m</button>
+                            <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('5m')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 cursor-pointer transition" data-tf="5m" title="5 Minutos">5m</button>
+                            <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('15m')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="15m" title="15 Minutos">15m</button>
+                            <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('1h')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="1h" title="1 Hora">1h</button>
+                            <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('4h')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="4h" title="4 Horas (Donchian Breakout)">4h</button>
+                            <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('1d')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="1d" title="1 Día (Macro / Posicional)">1d</button>
+                        </div>
+                        <!-- BADGE INDICADOR DE TIPO DE VELA (ANCHO FIJO ESTABILIZADO) + CLIC PATRONES -->
+                        <span id="chart-pattern-badge-header" onclick="window.inspectHostLastCandlePattern && window.inspectHostLastCandlePattern()" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-900/90 border border-gray-700 text-gray-300 shadow cursor-pointer hover:border-emerald-400 shrink-0 w-[195px] min-w-[195px] max-w-[195px] whitespace-nowrap overflow-hidden" title="Tipo de vela detectada según las reglas de Thomas Bulkowski (Clic para auditar)">
+                            <span id="header-candle-icon" class="shrink-0">🕯️</span>
+                            <span id="header-candle-name" class="block w-full truncate">Detectando patrón...</span>
+                        </span>
+                        <button type="button" onclick="window.inspectHostLastCandlePattern && window.inspectHostLastCandlePattern()" class="px-2 py-1 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50 text-[11px] font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 shadow-sm">
+                            <span>🔍</span> Clic Patrones
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0 ml-auto">
+                        <!-- Botón / Tilde para poner y sacar la Demo / Cajas de Take Profit y Stop Loss (Desmarcado predeterminado) -->
+                        <label id="lblToggleTpSlDemo" class="inline-flex items-center gap-1.5 text-xs text-slate-300 font-bold cursor-pointer bg-slate-900/80 hover:bg-slate-800 px-2.5 py-1 rounded border border-slate-700 hover:border-emerald-500/60 select-none whitespace-nowrap shadow-sm shrink-0" title="Poner o sacar del gráfico la demostración y cajas de Take Profit (Verde) y Stop Loss (Rojo)">
+                            <input type="checkbox" id="chkShowTpSlDemo" class="w-3.5 h-3.5 rounded border-gray-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer" onchange="window.toggleTpSlDemoOverlay && window.toggleTpSlDemoOverlay(this.checked)">
+                            <span>🎯 Demo TP / SL</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1.5 text-xs text-gray-300 cursor-pointer bg-slate-900/80 hover:bg-slate-800 px-2 py-1 rounded border border-gray-700 hover:border-emerald-500/50 select-none whitespace-nowrap shrink-0" title="Muestra u oculta las marcas de patrones en las velas del gráfico.">
+                            <input type="checkbox" id="chkShowCandlePatterns" class="w-3.5 h-3.5 rounded border-gray-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer" onchange="window.toggleCandlePatternIndicator(this.checked)">
+                            <span>Patrones 🕯️</span>
+                        </label>
+                        <button type="button" id="ku-btn-theme" onclick="window.KulaChartEngine && window.KulaChartEngine.toggleHostTheme()" class="px-2 py-1 rounded bg-gray-900/80 hover:bg-gray-700 text-xs font-bold text-amber-300 border border-gray-700 cursor-pointer whitespace-nowrap shrink-0" title="Alternar Lienzo Oscuro / Blanco">🌙 Oscuro</button>
+                        <span class="text-green-500 font-mono text-lg font-bold whitespace-nowrap shrink-0 ml-1" style="min-width: 95px; text-align: right; font-variant-numeric: tabular-nums;" id="currentPrice">$--.---</span>
+                    </div>
+                </div>
+
+                <!-- BARRA DE TELEMETRÍA VELA (PRECIO) + MEDIAS MÓVILES (ALTURA ESTRICTA FIJA: NO SALTA AL PASAR EL RATÓN) -->
+                <div id="chart-legend" class="font-mono text-[11px] text-gray-300 mb-2 flex items-center justify-between gap-3 overflow-hidden" style="height: 30px; min-height: 30px; max-height: 30px; padding: 4px 10px; border-radius: 6px; background-color: #0b0f19; border: 1px solid #334155; font-variant-numeric: tabular-nums; white-space: nowrap;">
+                    <div class="flex items-center gap-2 font-bold text-gray-400 shrink-0 min-w-0">
+                        <span class="text-white shrink-0">VELA &rarr;</span> 
+                        <span id="legend-ohlc" class="shrink-0 overflow-hidden text-ellipsis">Apertura: --- | Máx: --- | Mín: --- | Cierre: ---</span>
+                        <span id="legend-candle-pattern" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                            <span id="legend-candle-icon" class="shrink-0">🕯️</span>
+                            <span id="legend-candle-name" class="block truncate max-w-[170px]">En espera</span>
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-3 text-[10.5px] flex-wrap shrink-0 ml-auto">
+                        <div id="legend-sma" class="text-blue-400 font-semibold shrink-0">SMA 20: ---</div>
+                        <div id="legend-ema" class="text-purple-400 font-semibold shrink-0">EMA 20: ---</div>
+                        <div id="legend-vwap" class="text-yellow-500 font-semibold shrink-0">VWAP: ---</div>
+                        <div id="legend-vwap-bands" class="text-yellow-700 shrink-0">Bandas: --- / ---</div>
+                    </div>
+                </div>
+
+                <div id="kula-single-chart-wrapper" class="relative w-full overflow-hidden rounded-lg border border-gray-700/80 bg-[#0b0e14]" style="height: 440px;">
+                    <!-- CAPA 1: ZONA BLUREADA TP/SL Y R:R (DETRÁS DEL GRÁFICO DE VELAS, z-index: 1) -->
+                    <div id="active-trade-rr-box-overlay" style="position: absolute; top: 0; left: 0; right: 74px; bottom: 26px; pointer-events: none; z-index: 1; overflow: hidden;"></div>
+                    <!-- CAPA 2: LIENZO PRINCIPAL DE VELAS, INDICADORES Y ACCIÓN DEL PRECIO (POR DELANTE, z-index: 2) -->
+                    <div id="chart-container" style="width: 100%; height: 440px; position: relative; z-index: 2;"></div>
+                </div>
+
+                <!-- BANNER DE TELEMETRÍA DE OPERACIÓN ACTIVA / PARÁMETROS TP-SL (DEBAJO DEL GRÁFICO, FUERA DEL LIENZO DE VELAS) -->
+                <div id="kula-trade-telemetry-banner" class="mt-1.5 px-3 py-1.5 rounded-lg bg-gray-950/95 border border-gray-800 flex items-center justify-between gap-2.5 text-xs font-mono shadow-sm flex-wrap" style="min-height: 32px;">
+                    <div class="flex items-center gap-2.5 flex-wrap min-w-0" id="trade-telemetry-left">
+                        <span class="text-gray-400 font-bold shrink-0">📊 PARÁMETROS &rarr;</span>
+                        <span id="tel-entry" class="text-sky-400 font-semibold shrink-0">🔵 Entrada: ---</span>
+                        <span id="tel-sl" class="text-rose-400 font-semibold shrink-0">🛑 SL: ---</span>
+                        <span id="tel-tp" class="text-emerald-400 font-semibold shrink-0">🎯 TP: ---</span>
+                        <span id="tel-rr" class="text-purple-400 font-semibold shrink-0">⚖️ R:R: ---</span>
+                    </div>
+                    <div class="flex items-center gap-2.5 shrink-0 ml-auto" id="trade-telemetry-right">
+                        <span id="tel-peak" class="text-cyan-300 font-semibold shrink-0">🏔️ Pico: ---</span>
+                        <span id="tel-status" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 shrink-0">En espera</span>
+                    </div>
+                </div>
+
+                <!-- BARRA DE PANELES AUXILIARES (DESPLEGABLES POR TILDE/CHECKBOX) -->
+                <div class="mt-2.5 flex flex-wrap items-center justify-between bg-gray-900/90 border border-slate-800 rounded-lg px-3 py-1.5 text-xs shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>📊</span> Paneles Auxiliares:
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <!-- Tilde RSI -->
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-purple-300 hover:text-purple-200 select-none">
+                            <input type="checkbox" id="chkPanelRsi" onchange="toggleAuxiliaryPanel('panelRsi', this.checked)" class="rounded bg-gray-950 border-purple-500/60 text-purple-500 focus:ring-0 cursor-pointer">
+                            <span>RSI (14)</span>
+                        </label>
+                        <!-- Tilde ATR -->
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-amber-300 hover:text-amber-200 select-none">
+                            <input type="checkbox" id="chkPanelAtr" onchange="toggleAuxiliaryPanel('panelAtr', this.checked)" class="rounded bg-gray-950 border-amber-500/60 text-amber-500 focus:ring-0 cursor-pointer">
+                            <span>ATR (14)</span>
+                        </label>
+                        <!-- Tilde Guía Rápida -->
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-300 hover:text-white select-none">
+                            <input type="checkbox" id="chkPanelGuide" onchange="toggleAuxiliaryPanel('panelGuide', this.checked)" class="rounded bg-gray-950 border-slate-600 text-cyan-500 focus:ring-0 cursor-pointer">
+                            <span>📖 Guía Rápida</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- SUB-PANEL 1: OSCILADOR RSI (14) (OCULTO POR DEFECTO, DESPLEGABLE POR TILDE) -->
+                <div id="panelRsi" class="hidden mt-2.5 bg-gray-900/95 rounded-lg border border-purple-500/40 p-2.5 shadow-md">
+                    <div class="flex flex-wrap justify-between items-center mb-1.5 px-1 gap-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse"></span>
+                            <span class="text-xs font-bold text-purple-300 uppercase tracking-wider">RSI (14) · Fuerza Relativa & Momento</span>
+                            <span id="rsiStatusBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-800 text-gray-300 border border-gray-700">Zona Neutral</span>
+                        </div>
+                        <div class="flex items-center space-x-3 text-[11px] font-mono">
+                            <span class="text-red-400/90">Sobrecompra: 70</span>
+                            <span class="text-gray-400">Media: 50</span>
+                            <span class="text-green-400/90">Sobreventa: 30</span>
+                            <span class="text-purple-300 font-bold ml-1">RSI: <span id="rsiLiveValue" class="text-white text-sm font-semibold">--.--</span></span>
+                        </div>
+                    </div>
+                    <div id="rsi-chart-container" style="width: 100%; height: 130px; position: relative;"></div>
+                </div>
+
+                <!-- SUB-PANEL 2: INDICADOR ATR (14) (OCULTO POR DEFECTO, DESPLEGABLE POR TILDE) -->
+                <div id="panelAtr" class="hidden mt-2.5 bg-gray-900/95 rounded-lg border border-amber-500/40 p-2.5 shadow-md">
+                    <div class="flex flex-wrap justify-between items-center mb-1.5 px-1 gap-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                            <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">ATR (14) · Volatilidad Real & Ruido</span>
+                            <span id="atrVolatilityBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-700/60">Volatilidad Normal</span>
+                        </div>
+                        <div class="flex items-center space-x-3 text-[11px] font-mono">
+                            <span class="text-amber-400/90">Ruido Mínimo (1.5x ATR): <span id="atrNoiseValue" class="text-white font-semibold">$--.--</span></span>
+                            <span class="text-amber-300 font-bold ml-1">ATR: <span id="atrLiveValue" class="text-white text-sm font-semibold">$--.--</span></span>
+                        </div>
+                    </div>
+                    <div id="atr-chart-container" style="width: 100%; height: 110px; position: relative;"></div>
+                </div>
+
+                <!-- Guía de Indicadores del Gráfico (OCULTO POR DEFECTO, DESPLEGABLE POR TILDE) -->
+                <div id="panelGuide" class="hidden mt-2.5 bg-gray-900 border border-gray-700 rounded p-3 text-xs text-gray-300 shadow-inner">
+                    <h3 class="font-semibold text-gray-400 mb-2 border-b border-gray-800 pb-1">📚 Guía Rápida de Indicadores</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- SMA -->
+                        <div class="flex items-start space-x-2">
+                            <span class="w-4 h-1 bg-blue-500 mt-1.5 shrink-0 rounded"></span>
+                            <div>
+                                <p class="font-bold text-blue-300">SMA 20 (Media Móvil)</p>
+                                <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">Promedio de las últimas 20 velas. Marca la tendencia general a corto plazo. Si el precio la cruza hacia arriba, señala fuerza; hacia abajo, debilidad.</p>
+                            </div>
+                        </div>
+                        <!-- VWAP -->
+                        <div class="flex items-start space-x-2">
+                            <span class="w-4 h-1 bg-yellow-500 mt-1.5 shrink-0 rounded"></span>
+                            <div>
+                                <p class="font-bold text-yellow-300">VWAP (Precio Ponderado por Volumen)</p>
+                                <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">El precio promedio real pagado por las instituciones en la sesión. Actúa como centro de masa. Por encima domina la demanda institucional; por debajo, la oferta. Clave en la apertura de Wall Street (Estrategia Araujo).</p>
+                            </div>
+                        </div>
+                        <!-- RSI 14 -->
+                        <div class="flex items-start space-x-2">
+                            <span class="w-4 h-1 bg-purple-500 mt-1.5 shrink-0 rounded"></span>
+                            <div>
+                                <p class="font-bold text-purple-300">RSI 14 (Oscilador & Motor de Divergencias)</p>
+                                <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">Mide la velocidad del precio (0 a 100). &lt;30 Sobreventa, &gt;70 Sobrecompra. Su señal institucional suprema es la <strong>Divergencia</strong>: si el precio marca un nuevo mínimo pero el RSI marca un mínimo más alto, delata agotamiento vendedor y acumulación pasiva (gatillo A+ para Martillos). Sin divergencia en giros, se penaliza un -15% de confianza.</p>
+                            </div>
+                        </div>
+                        <!-- ATR 14 -->
+                        <div class="flex items-start space-x-2">
+                            <span class="w-4 h-1 bg-amber-500 mt-1.5 shrink-0 rounded"></span>
+                            <div>
+                                <p class="font-bold text-amber-300">ATR 14 (Volatilidad & Filtro Squeeze)</p>
+                                <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">Mide el combustible y rango real en dinero. Tu Stop Loss dinámico se fija en <span class="text-rose-400 font-semibold">1.5 &times; ATR</span> para blindarte del ruido del broker. Además actúa como <strong>Filtro Squeeze</strong>: si el ATR cae un 30% bajo su promedio (<span class="text-amber-300">Ratio &lt; 0.70</span>), el mercado está comprimido/muerto y se vetan las compras de continuación.</p>
+                            </div>
+                        </div>
+                        <!-- Bandas VWAP -->
+                        <div class="flex items-start space-x-2">
+                            <span class="w-4 h-0 border-t-2 border-dotted border-yellow-700 mt-1.5 shrink-0"></span>
+                            <div>
+                                <p class="font-bold text-yellow-600">Bandas VWAP (Límites)</p>
+                                <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">Muestran el máximo estiramiento posible (Desviación Estándar). Si el precio toca una banda, está muy sobrecomprado o sobrevendido, y tiende a rebotar.</p>
+                            </div>
+                        </div>
+                        <!-- Velas Japonesas -->
+                        <div class="flex items-start space-x-2">
+                            <div class="flex space-x-0.5 shrink-0 mt-0.5">
+                                <span class="w-2 h-3 bg-green-500 rounded-sm"></span>
+                                <span class="w-2 h-3 bg-red-500 rounded-sm"></span>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-200">Velas Japonesas (Precio)</p>
+                                <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">Cada vela representa la temporalidad elegida. Verde si subió, Roja si bajó. Las mechas marcan el Máximo (High) y Mínimo (Low).</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RADAR DE MICROESTRUCTURA DE MERCADO EN VIVO (5 ACTIVOS CLAVE) -->
+            <div id="microstructureRadarCard" class="bg-gray-800 rounded-lg p-2.5 sm:p-3 shadow-lg border border-cyan-500/40">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2 border-b border-gray-700/80 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">📡</span>
+                        <div>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <h2 class="text-xs sm:text-sm font-bold text-white tracking-wide uppercase flex items-center gap-1">
+                                    <span>Radar de Activos en Vivo (5 Cestas Cripto)</span>
+                                </h2>
+                                <span class="text-[9px] bg-amber-950 text-amber-300 border border-amber-600/60 px-2 py-0.5 rounded font-mono font-bold">ENCARGADO: 🕯️ KULA CEREBRO</span>
+                                <span class="text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-600/50 px-2 py-0.5 rounded font-mono font-bold">MOTOR: ⚙️ MATEMÁTICO PURO</span>
+                                <span class="text-[9px] bg-purple-950 text-purple-300 border border-purple-600/50 px-2 py-0.5 rounded font-mono font-bold">BINANCE SPOT 24/7</span>
+                            </div>
+                            <p class="text-[10px] text-gray-400 mt-0.5">Auditoría algorítmica operada por <strong>🕯️ Kula Cerebro</strong> mediante cálculo matemático continuo de RSI, RVOL y pendiente de EMA200 sin latencia de LLM.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="microstructureRadarPulse" class="inline-flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 bg-emerald-950/70 border border-emerald-600/50 px-2.5 py-0.5 rounded-full shadow-sm">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span>Enlace en Vivo</span>
+                        </span>
+                        <button type="button" onclick="window.fetchMicrostructureRadar && window.fetchMicrostructureRadar(true)" class="text-[10px] font-mono text-cyan-300 hover:text-white bg-gray-900 border border-gray-700 hover:border-cyan-500 px-2.5 py-0.5 rounded transition cursor-pointer" title="Refrescar cotizaciones ahora">
+                            🔄 Refrescar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-gray-300">
+                        <thead class="text-[10px] uppercase font-bold text-gray-400 bg-gray-900/90 border-b border-gray-700">
+                            <tr>
+                                <th class="px-2.5 py-2 rounded-tl">Activo</th>
+                                <th class="px-2.5 py-2">Precio Vivo</th>
+                                <th class="px-2.5 py-2">Var 24h</th>
+                                <th class="px-2.5 py-2">Régimen EMA</th>
+                                <th class="px-2.5 py-2 text-center">RSI (14)</th>
+                                <th class="px-2.5 py-2 text-center">RVOL</th>
+                                <th class="px-2.5 py-2">Diagnóstico Cuantitativo</th>
+                                <th class="px-2.5 py-2 rounded-tr text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="microstructureRadarBody" class="divide-y divide-gray-700/60 font-mono">
+                            <tr>
+                                <td colspan="8" class="px-3 py-3 text-center text-gray-500 italic">Sincronizando telemetría institucional de Binance...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Posiciones Activas -->
+            <div class="bg-gray-800 rounded-lg p-2.5 sm:p-3 shadow-lg border border-gray-700">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                            <img src="img/favicon_balam.png" alt="Balam" class="w-4 h-4 rounded object-cover inline-block">
+                            <span>🐅 Posiciones Vivas en Custodia (Balam Bóveda)</span>
+                        </h2>
+                        <!-- Checkbox / Toggle para Marcas E / S en el Gráfico -->
+                        <label class="inline-flex items-center gap-2 text-xs text-slate-200 cursor-pointer bg-gray-900/90 hover:bg-gray-900 px-3 py-1 rounded-md border border-gray-700 hover:border-emerald-500/60 transition shadow-inner select-none" title="Muestra flechas E (Entrada) y S (Salida) en la vela correspondiente del gráfico">
+                            <input type="checkbox" id="chkShowTradeMarkers" class="w-3.5 h-3.5 rounded border-gray-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer" checked onchange="window.toggleTradeMarkers(this.checked)">
+                            <span>🎯 Marcas: <strong class="text-emerald-400 font-mono font-bold">E</strong> / <strong class="text-rose-400 font-mono font-bold">S</strong></span>
+                        </label>
+
+                        <!-- Selector Llave Trailing Stop (IA Adaptativa) -->
+                        <div class="inline-flex items-center gap-1.5 bg-gray-900/90 px-2.5 py-1 rounded-md border border-gray-700 text-xs shadow-inner">
+                            <span class="text-slate-400 font-medium">🎚️ Llave Trailing:</span>
+                            <select id="selTrailingKeyMode" onchange="window.changeTrailingKeyMode(this.value)" class="bg-gray-800 text-emerald-300 font-bold text-xs rounded border border-gray-600 px-2 py-0.5 focus:outline-none focus:border-emerald-500 cursor-pointer" title="Modo de la Llave de Trailing Stop: Auto (IA decide según mercado), Holgado o Comprimido">
+                                <option value="auto">🤖 Auto (IA Decide)</option>
+                                <option value="holgado">🟢 Holgado Fijo (2.0%)</option>
+                                <option value="comprimido">⚡ Comprimido Escalonado</option>
+                            </select>
+                        </div>
+
+                        <!-- Tilde 1: Potenciar Ganadoras (+Capital con Candado de Ganancia Segura) -->
+                        <label class="inline-flex items-center gap-1.5 text-xs text-emerald-300 cursor-pointer bg-gray-900/90 hover:bg-gray-900 px-2.5 py-1 rounded-md border border-emerald-700/60 hover:border-emerald-400 transition shadow-inner select-none" title="Activa o desactiva la opción de inyectar más dinero a una operación que ya está en ganancia (desde Cupo Libre o Billetera de Ganancia Segura) protegiendo el Stop Loss en ganancia.">
+                            <input type="checkbox" id="chkEnableScaleIn" class="w-3.5 h-3.5 rounded border-gray-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer" checked onchange="window.toggleScaleInFeature(this.checked)">
+                            <span>🚀 Potenciar Ganadora</span>
+                        </label>
+
+                        <!-- Tilde 2: Rotar Operaciones Tranquilas a la Vigorosa -->
+                        <label class="inline-flex items-center gap-1.5 text-xs text-cyan-300 cursor-pointer bg-gray-900/90 hover:bg-gray-900 px-2.5 py-1 rounded-md border border-cyan-700/60 hover:border-cyan-400 transition shadow-inner select-none" title="Activa o desactiva la opción de cerrar una operación tranquila/lenta y pasar su capital directamente a la operación más vigorosa en ganancia.">
+                            <input type="checkbox" id="chkEnableRotation" class="w-3.5 h-3.5 rounded border-gray-700 text-cyan-500 focus:ring-cyan-500 cursor-pointer" checked onchange="window.toggleRotationFeature(this.checked)">
+                            <span>🔄 Rotar Lentas</span>
+                        </label>
+                    </div>
+                    <span id="posGracefulStatus" class="text-xs text-yellow-400 bg-yellow-950/60 border border-yellow-700/60 px-2 py-0.5 rounded font-mono hidden">⏹️ Apagado Programado ACTIVO</span>
+                </div>
+
+                <!-- TARJETAS DESTACADAS: POSICIONES VIVAS EN PRIMER PLANO (CUSTODIA REAL) -->
+                <div id="activePositionsCardsGrid" class="mb-4">
+                    <!-- Dinámicamente poblado por renderPositions() -->
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-400">
+                        <thead class="text-xs text-gray-400 uppercase bg-gray-900 border-b border-gray-700">
+                            <tr>
+                                <th class="px-2.5 py-2 rounded-tl">Activo</th>
+                                <th class="px-2.5 py-2">Cantidad</th>
+                                <th class="px-2.5 py-2">Precio Entrada</th>
+                                <th class="px-2.5 py-2">Precio Actual</th>
+                                <th class="px-2.5 py-2 text-cyan-400">Monto Operación</th>
+                                <th class="px-2.5 py-2 text-emerald-400" title="PnL Neto estimado tras descontar comisiones de entrada y salida">PnL Neto ($)</th>
+                                <th class="px-2.5 py-2" title="Retorno neto porcentual sobre el costo de la operación">PnL Neto (%)</th>
+                                <th class="px-2.5 py-2 rounded-tr text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activePositionsBody" class="divide-y divide-gray-700">
+                            <tr id="emptyPositionsRow">
+                                <td colspan="8" class="px-4 py-4 text-center text-gray-600 italic">No tienes posiciones activas (100% liquidez en USDT).</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Historial de Operaciones -->
+            <div class="bg-gray-800 rounded-lg p-2.5 sm:p-3 shadow-lg border border-gray-700 mt-2.5">
+                <div class="flex justify-between items-center mb-2.5 border-b border-gray-700 pb-1.5">
+                    <h2 class="text-lg font-semibold text-white flex items-center">
+                        <span class="mr-2">📝</span> Historial de Operaciones y Rendimiento
+                    </h2>
+                    <div class="flex items-center space-x-2">
+                        <button id="btnToggleHistory" onclick="window.toggleTradeHistory()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition shadow border border-blue-400/40 flex items-center gap-1.5 cursor-pointer hidden">
+                            <span id="btnToggleHistoryIcon">▼</span>
+                            <span id="btnToggleHistoryText">Ver todas</span>
+                        </button>
+                        <div class="bg-gray-900 px-2.5 py-1 rounded border border-yellow-700/50 text-xs text-yellow-400">
+                            Comisiones Broker: <span id="totalFeesDisplay" class="font-bold text-yellow-300">$0.00</span>
+                        </div>
+                        <div class="bg-gray-900 px-3 py-1 rounded border border-gray-600 text-xs">
+                            Rendimiento Neto: <span id="pnlDisplay" class="font-bold text-gray-400">$0.00 (0.00%)</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-400">
+                        <thead class="text-xs text-gray-400 uppercase bg-gray-900 border-b border-gray-700">
+                            <tr>
+                                <th class="px-3 py-2.5 rounded-tl">Hora</th>
+                                <th class="px-3 py-2.5">Activo</th>
+                                <th class="px-3 py-2.5">Tipo</th>
+                                <th class="px-3 py-2.5">Precio</th>
+                                <th class="px-3 py-2.5 text-cyan-400">Monto Operación</th>
+                                <th class="px-3 py-2.5 text-emerald-400">Ganancia ($)</th>
+                                <th class="px-3 py-2.5">Saldo Cuenta</th>
+                                <th class="px-3 py-2.5 rounded-tr">Motivo / Modo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tradeHistoryBody" class="divide-y divide-gray-700">
+                            <tr id="emptyHistoryRow">
+                                <td colspan="8" class="px-4 py-4 text-center text-gray-600 italic">No hay operaciones registradas aún.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pie del Historial: Indicador de Operaciones y Botón Desplegable -->
+                <div id="historyPaginationFooter" class="flex justify-between items-center text-xs text-gray-400 pt-2.5 px-1 border-t border-gray-700/60 mt-3 hidden">
+                    <span id="historyCountNotice" class="font-mono text-[11px] text-gray-400">Mostrando las 5 operaciones más recientes</span>
+                    <button type="button" onclick="window.toggleTradeHistory()" id="btnToggleHistoryFooter" class="text-cyan-400 hover:text-cyan-300 font-bold font-mono text-[11px] flex items-center gap-1 transition cursor-pointer">
+                        ▼ Desplegar historial completo
+                    </button>
+                </div>
+            </div>
+
+            <!-- Terminal Táctica y Chat en Vivo con Kula Cerebro (Marco Blanco Sólido Canónico) -->
+            <div id="operadorTerminalSection" class="ecosystem-window bg-gray-800 rounded-xl p-4 shadow-lg mt-6 relative overflow-hidden">
+                <!-- Header del Operador Táctico -->
+                <div class="flex flex-wrap justify-between items-center mb-4 border-b border-gray-700 pb-3 gap-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl">🕯️</span>
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                                    <span>🕯️ Kula Cerebro</span>
+                                </h2>
+                                <span class="text-[10px] bg-amber-950 text-amber-300 border border-amber-700/60 px-2 py-0.5 rounded font-mono font-bold">ROL: 🕯️ KULA CEREBRO · TRINCHERA TÁCTICA</span>
+                                <span id="kulaCerebroLiveEngineBadge" class="text-[9px] bg-amber-950 text-amber-300 border border-amber-600/60 px-2 py-0.5 rounded font-mono font-bold">MOTOR: ⚡ ANTIGRAVITY (PRIORIDAD 1)</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-0.5">Canal directo con el Cerebro de Trinchera: auditoría de velas vivas, trailing de stop, cálculo de asimetría R:R y ejecución de órdenes en Binance.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <div id="operadorStatusBadge" class="flex items-center space-x-2 bg-gray-900 px-3 py-1.5 rounded-md border border-amber-700/60 text-xs">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                            <span id="operadorStatusText" class="font-mono text-amber-300 font-bold tracking-wider">OPERADOR ACTIVO</span>
+                        </div>
+                        <button type="button" onclick="window.copiarContenidoCerebro && window.copiarContenidoCerebro('operador', this)" class="bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 border border-emerald-500/50 text-xs py-1.5 px-2.5 rounded font-semibold transition flex items-center gap-1 cursor-pointer shadow" title="Copiar al portapapeles el razonamiento en vivo, reportes y actividad del Cerebro">
+                            📋 Copiar
+                        </button>
+                        <button type="button" onclick="window.clearOperadorChat()" class="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs py-1.5 px-2.5 rounded transition flex items-center gap-1 cursor-pointer" title="Limpiar historial de chat">
+                            🧹 Limpiar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tarjeta de Telemetría Táctica Rápida -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 text-xs font-mono">
+                    <div class="bg-gray-900/90 p-2.5 rounded border border-gray-700">
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-semibold">Último Veredicto</span>
+                        <div class="flex items-center justify-between mt-1">
+                            <strong id="operadorSignalBadge" class="text-amber-400 font-bold">ESPERAR / MANTENER</strong>
+                            <span id="operadorTimeframeBadge" class="text-[9px] bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded border border-gray-600">Velas M15</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900/90 p-2.5 rounded border border-gray-700">
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-semibold">Regla de Asimetría</span>
+                        <div class="flex items-center justify-between mt-1">
+                            <strong class="text-emerald-400 font-bold">R:R Neto ≥ 1.0</strong>
+                            <span class="text-[9px] text-gray-400">SL &gt; 1.5×ATR</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900/90 p-2.5 rounded border border-gray-700">
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-semibold">Carga de Hardware</span>
+                        <div class="flex items-center justify-between mt-1">
+                            <strong class="text-cyan-400 font-bold">0% CPU Local</strong>
+                            <span class="text-[9px] text-emerald-400 font-bold">Google Cloud AI</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bitácora de Pensamiento y Razonamiento Cuantitativo en Tiempo Real -->
+                <div class="mb-4 bg-gray-950/80 p-3 rounded-md border border-gray-700/80">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24]"></span>
+                            🧠 Razonamiento del Operador en Vivo (¿Qué está pensando y auditando ahora?):
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <span id="operadorLiveEvalTime" class="text-[10px] text-gray-500 font-mono">En vivo</span>
+                            <button type="button" onclick="window.copiarContenidoCerebro && window.copiarContenidoCerebro('razonamiento', this)" class="text-[11px] bg-amber-900/60 hover:bg-amber-800 text-amber-200 border border-amber-600/50 px-2 py-0.5 rounded font-semibold transition flex items-center gap-1 cursor-pointer" title="Copiar este razonamiento en vivo al portapapeles">
+                                📋 Copiar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="operadorLiveActionLog" class="text-xs font-mono text-amber-200 leading-relaxed bg-black/40 p-2.5 rounded border border-gray-800">
+                        Vigilancia activa: Analizando microestructura y confluencia matemática...
+                    </div>
+                </div>
+
+                <!-- Consola de Telemetría y Reporte Táctico del Operador -->
+                <div class="border border-gray-700 rounded-md bg-gray-900/60 flex flex-col h-72">
+                    <div id="operadorChatMessages" class="flex-1 overflow-y-auto p-3 space-y-3 font-sans text-xs custom-scrollbar">
+                        <div class="flex items-start space-x-2">
+                            <div class="w-6 h-6 rounded-full bg-amber-600 flex items-center justify-center shrink-0 text-white font-bold text-[10px]">OP</div>
+                            <div class="bg-gray-800 text-gray-200 p-2.5 rounded-lg border border-gray-700 max-w-[85%] leading-relaxed shadow">
+                                <p class="font-semibold text-amber-400 text-[11px] mb-1">Operador · Trinchera Cuantitativa</p>
+                                Panel de Estado en Vivo. Supervisa en tiempo real cada vela de 15m/1h sin consumo de CPU. Haz clic en <strong>📋 Generar Reporte</strong> para auditar el ciclo de patrullaje, las bóvedas y los motivos técnicos de descarte.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botonera de Acción y Generación de Reporte -->
+                    <div class="p-2.5 bg-gray-950 border-t border-gray-800 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <button id="operadorChatSendBtn" type="button" onclick="window.sendOperadorQuickPrompt('Generar Reporte de Estado')" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-amber-950/40 cursor-pointer">
+                                <span>📋 Generar Reporte de Estado</span>
+                            </button>
+                            <button type="button" onclick="window.sendOperadorQuickPrompt('Auditar Volumen RVOL y EMA200')" class="bg-gray-800 hover:bg-gray-700 text-amber-300 border border-gray-700 px-3 py-2 rounded text-xs font-semibold transition cursor-pointer">
+                                📊 Auditar Filtros
+                            </button>
+                        </div>
+                        <span class="text-[10px] text-gray-500 font-mono hidden sm:inline">100% Determinista · Sin cuelgues ni falsos chats</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terminal de Control, Telemetría y Chat en Vivo con Balam CIO (Director de Inversiones) -->
+            <div id="cioTerminalSection" class="bg-gray-800 rounded-lg p-4 shadow-lg border border-cyan-800/60 mt-6 relative overflow-hidden">
+                <!-- Header con Título, Estado y Botón de Recarga -->
+                <div class="flex flex-wrap justify-between items-center mb-4 border-b border-gray-700 pb-3 gap-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl">🐅</span>
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                                    <span>🐅 Balam CIO</span>
+                                </h2>
+                                <span class="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-700/60 px-2 py-0.5 rounded font-mono font-bold">ROL: 🐅 BALAM CIO · DIRECTOR DE INVERSIONES</span>
+                                <span id="balamCioLiveEngineBadge" class="text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-600/60 px-2 py-0.5 rounded font-mono font-bold">MOTOR: 🛰️ ANTIGRAVITY CIO (MONITOR :8520)</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-0.5">Auditoría macroeconómica institucional, radar contrarian de noticias, preservación de capital y supervisión de confluencia.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <div id="cioLivenessBadge" class="flex items-center space-x-2 bg-gray-900 px-3 py-1.5 rounded-md border border-emerald-700/60 text-xs">
+                            <span id="cioStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span id="cioStatusText" class="font-mono text-emerald-400 font-bold tracking-wider">CONECTADO</span>
+                        </div>
+                        <button onclick="window.refreshCioTelemetry()" class="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs py-1.5 px-2.5 rounded transition flex items-center gap-1 cursor-pointer" title="Actualizar telemetría">
+                            🔄
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ALERTA DE DESCONEXIÓN (Visible automáticamente si el agente o motor no responde) -->
+                <div id="cioDisconnectedBanner" class="hidden mb-4 p-3 bg-red-950/90 border-2 border-red-600 rounded-lg text-red-200 text-xs flex flex-wrap items-center justify-between gap-2 shadow-lg">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl">⚠️</span>
+                        <div>
+                            <strong class="text-red-100 font-bold block">ALERTA CRÍTICA: Antigravity CIO Desconectado</strong>
+                            <span>Se ha interrumpido el enlace con el motor de fondo. Los fondos están a salvo en reposo táctico en las bóvedas.</span>
+                        </div>
+                    </div>
+                    <button onclick="window.reconnectCio()" class="bg-red-700 hover:bg-red-600 text-white font-bold px-3 py-1.5 rounded text-xs transition shadow cursor-pointer">
+                        Reconectar ahora ⚡
+                    </button>
+                </div>
+
+                <!-- Grid de Telemetría Cuantitativa ("Qué estoy haciendo y estado actual") -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+                    <!-- Card 1: Estado del Motor -->
+                    <div class="bg-gray-900/90 p-3 rounded-md border border-gray-700/60">
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-semibold">Estado Operativo</span>
+                        <div class="flex items-center justify-between mt-1">
+                            <strong id="cioEngineState" class="text-sm font-bold text-white">Vigilancia Activa</strong>
+                            <span id="cioCyclePill" class="text-[10px] bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.5 rounded font-mono">Ciclo #1</span>
+                        </div>
+                        <small id="cioSessionName" class="text-[11px] text-yellow-400 block mt-1 truncate">Blackout de Apertura (10:30 - 11:00)</small>
+                    </div>
+
+                    <!-- Card 2: Bóvedas Líquidas -->
+                    <div class="bg-gray-900/90 p-3 rounded-md border border-gray-700/60">
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-semibold">Bóvedas & Slots</span>
+                        <div class="flex items-center justify-between mt-1">
+                            <strong id="cioVaultsDisplay" class="text-sm font-bold text-emerald-400">500.26 USDT</strong>
+                            <span id="cioSlotsDisplay" class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-1.5 py-0.5 rounded font-mono">0/4 Slots</span>
+                        </div>
+                        <small class="text-[11px] text-gray-400 block mt-1">100% Líquido · Cero Pérdidas</small>
+                    </div>
+
+                    <!-- Card 3: Estrategia & Riesgo -->
+                    <div class="bg-gray-900/90 p-3 rounded-md border border-gray-700/60">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-semibold">Estrategia Activa</span>
+                            <span id="cioBrainBadge" class="text-[9px] bg-amber-950 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded font-mono font-bold truncate">⚡ Operador Nube</span>
+                        </div>
+                        <div class="flex items-center justify-between mt-1">
+                            <strong id="cioStrategyDisplay" class="text-xs font-bold text-cyan-300 truncate">donchian_breakout_1h</strong>
+                        </div>
+                        <small class="text-[11px] text-gray-400 block mt-1">TP: +2.1% · SL: -0.6% · BE: +0.3%</small>
+                    </div>
+
+                    <!-- Card 4: Próximo Hito Clave -->
+                    <div class="bg-gray-900/90 p-3 rounded-md border border-gray-700/60">
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-semibold">Próximo Hito de Mercado</span>
+                        <div class="flex items-center justify-between mt-1">
+                            <strong id="cioNextMilestone" class="text-xs font-bold text-amber-300">11:15 ART · Ventana Dorada</strong>
+                        </div>
+                        <small class="text-[11px] text-gray-400 block mt-1">Apertura BYMA: 11:00 ART</small>
+                    </div>
+                </div>
+
+                <!-- Bitácora de Pensamiento en Tiempo Real (Qué estoy haciendo ahora) -->
+                <div class="mb-4 bg-gray-950/80 p-3 rounded-md border border-gray-700/80">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]"></span>
+                            Pensamiento en Vivo / Último Análisis de Microestructura:
+                        </span>
+                        <span id="cioLastEvalTime" class="text-[10px] text-gray-500 font-mono">En vivo</span>
+                    </div>
+                    <div id="cioLiveActionLog" class="text-xs font-mono text-cyan-200 leading-relaxed bg-black/40 p-2.5 rounded border border-gray-800">
+                        Filtro determinista: Evaluando microestructura BTC en 15m (RSI 28.4 sobreventa). Precio bajo EMA200 institucional. Blackout de apertura de Wall Street activo hasta 11:00 ART para no pagar spreads artificiales. BABA y KWEB en radar para la Ventana Dorada (11:15 ART).
+                    </div>
+                </div>
+
+                <!-- Consola de Telemetría y Reporte Estratégico del CIO -->
+                <div class="border border-gray-700 rounded-md bg-gray-900/60 flex flex-col h-80">
+                    <!-- Mensajes del Panel CIO -->
+                    <div id="cioChatMessages" class="flex-1 overflow-y-auto p-3 space-y-3 font-sans text-xs">
+                        <div class="flex items-start space-x-2">
+                            <div class="w-6 h-6 rounded-full bg-cyan-600 flex items-center justify-center shrink-0 text-white font-bold text-[10px]">CIO</div>
+                            <div class="bg-gray-800 text-gray-200 p-2.5 rounded-lg border border-gray-700 max-w-[85%] leading-relaxed shadow">
+                                <p class="font-semibold text-cyan-400 text-[11px] mb-1">CIO · Asesor Estratégico y Macro</p>
+                                Panel de Asesoría Macro. Audito los candidatos del Monitor del Mercado, vigilo noticias de alta volatilidad y gobierno la asignación de capital. Presiona <strong>📋 Generar Reporte CIO</strong> para obtener un informe instantáneo.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botonera de Acción y Generación de Reporte CIO -->
+                    <div class="p-2.5 bg-gray-950 border-t border-gray-800 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <button id="cioChatSendBtn" onclick="window.sendQuickPrompt('Generar Reporte CIO')" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-cyan-950/40 cursor-pointer">
+                                <span>📋 Generar Reporte CIO</span>
+                            </button>
+                            <button onclick="window.sendQuickPrompt('Auditar Bóvedas y Asignación de Capital')" class="bg-gray-800 hover:bg-gray-700 text-cyan-300 border border-gray-700 px-3 py-2 rounded text-xs font-semibold transition cursor-pointer">
+                                🏛️ Bóvedas y Capital
+                            </button>
+                        </div>
+                        <span class="text-[10px] text-gray-500 font-mono hidden sm:inline">100% Determinista · Telemetría en Vivo</span>
+                    </div>
+                </div>
+            </div>
+
+<!-- Inteligencia de Mercado (Recomendaciones Horarias) (Marco Blanco Sólido Canónico) -->
+            <div class="ecosystem-window bg-gray-800 rounded-xl p-4 shadow-lg mt-6 mb-6" id="marketIntelWindow">
+                <div class="flex justify-between items-center border-b border-gray-700 pb-2 mb-3">
+                    <h2 class="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                        <span>🌍</span>
+                        <span>Inteligencia de Mercado (Recomendaciones)</span>
+                    </h2>
+                    <button type="button" id="btnToggleMarketIntel" onclick="window.toggleMarketIntelBody()" class="px-3 py-1 text-xs font-bold rounded-lg bg-gray-900 hover:bg-gray-700 text-gray-200 border border-gray-600 transition cursor-pointer">
+                        ✕ Ocultar
+                    </button>
+                </div>
+                <div id="marketIntelBody" class="text-sm text-gray-300">
+                    <p class="mb-3 text-gray-300">El rendimiento del Agente de IA y los modelos cuantitativos depende del volumen y horario de cada mercado. Conoce la clasificación de activos para elegir con precisión:</p>
+
+                    <!-- SECCIÓN 1: CRIPTO & FOREX (INTERNACIONAL) -->
+                    <div style="color: #38bdf8; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 18px; margin-bottom: 12px; padding-bottom: 4px; border-bottom: 1px solid rgba(56, 189, 248, 0.3);">
+                        ⚡ MERCADOS INTERNACIONALES: CRIPTOMONEDAS & FOREX
+                    </div>
+                    <ul style="list-style: none; padding: 0; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; font-size: 13.5px; color: #ffffff;">
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">⚡ Criptomonedas Spot (BTC Bitcoin, ETH Ethereum, SOL Solana):</strong> 
+                            Activos descentralizados con liquidación en USDT. Se recomienda operar en días hábiles para capturar volumen institucional y evitar la iliquidez del fin de semana. 
+                            <span style="color: #4ade80; font-weight: 600;">(24/7/365 continuo · Horario recomendado Lunes a Viernes de 09:00 a 17:00 ARG)</span>
+                        </li>
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">⚡ Derivados Cripto y Futuros Perpetuos (Futuros BTC/USDT, Funding Rates, Interés Abierto):</strong> 
+                            Mercado apalancado donde se detectan trampas de liquidez y liquidaciones masivas. 
+                            <span style="color: #4ade80; font-weight: 600;">(24/7 continuo · Picos de volatilidad en cierres de velas de 4H y 1D UTC)</span>
+                        </li>
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">💱 Mercado de Divisas y Forex (EUR/USD, GBP/USD, USD/JPY, DXY Índice Dólar, USD/BRL):</strong> 
+                            El mercado más líquido del mundo con flujo monetario continuo 24/5. 
+                            <span style="color: #4ade80; font-weight: 600;">(Domingo 18:00 a Viernes 18:00 ARG · Pico institucional de 09:30 a 13:30 ARG)</span>
+                        </li>
+                    </ul>
+
+                    <!-- SECCIÓN 2: ESTADOS UNIDOS (WALL STREET) -->
+                    <div style="color: #38bdf8; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 22px; margin-bottom: 12px; padding-bottom: 4px; border-bottom: 1px solid rgba(56, 189, 248, 0.3);">
+                        🇺🇸 MERCADO DE ESTADOS UNIDOS (WALL STREET)
+                    </div>
+                    <ul style="list-style: none; padding: 0; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; font-size: 13.5px; color: #ffffff;">
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">🏛️ Bonos e Índices Macro EE.UU. (^GSPC / SPY S&P 500, QQQ Nasdaq 100, TLT Bonos Tesoro EE.UU.):</strong> 
+                            Marcan el termómetro del dinero institucional y las tasas de interés globales. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 10:30 a 17:00 ARG · Horario clave de apertura de 10:30 a 12:00 ARG)</span>
+                        </li>
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">🏢 Empresas Globales y Tech (AAPL Apple, NVDA Nvidia, TSLA Tesla, BABA Alibaba, MSFT):</strong> 
+                            Alta volatilidad y sensibilidad a balances trimestrales y noticias corporativas. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 10:30 a 17:00 ARG en Wall Street)</span>
+                        </li>
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">📉 Opciones Financieras y Volatilidad (Índice VIX CBOE, Opciones 0DTE en EE.UU., Opciones GGAL):</strong> 
+                            Termómetro del miedo o cobertura institucional y apalancamiento puro en vencimientos de BYMA y Wall Street. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 10:30 a 17:00 ARG · Máxima volatilidad de 14:00 a 16:30 ARG)</span>
+                        </li>
+                    </ul>
+
+                    <!-- SECCIÓN 3: MERCADOS DE ASIA-PACÍFICO -->
+                    <div style="color: #38bdf8; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 22px; margin-bottom: 12px; padding-bottom: 4px; border-bottom: 1px solid rgba(56, 189, 248, 0.3);">
+                        🏯 MERCADOS DE ASIA-PACÍFICO
+                    </div>
+                    <ul style="list-style: none; padding: 0; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; font-size: 13.5px; color: #ffffff;">
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">🏯 Mercados de Asia-Pacífico (Nikkei 225 Japón, Hang Seng Hong Kong, CSI 300 China, ASX Australia):</strong> 
+                            Primera sesión global en abrir la semana bursátil; clave para exportaciones y materias primas. 
+                            <span style="color: #4ade80; font-weight: 600;">(Domingo a Viernes durante la noche de 21:00 a 04:00 ARG)</span>
+                        </li>
+                    </ul>
+
+                    <!-- SECCIÓN 4: MERCADOS DE EUROPA -->
+                    <div style="color: #38bdf8; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 22px; margin-bottom: 12px; padding-bottom: 4px; border-bottom: 1px solid rgba(56, 189, 248, 0.3);">
+                        🏰 MERCADOS DE EUROPA
+                    </div>
+                    <ul style="list-style: none; padding: 0; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; font-size: 13.5px; color: #ffffff;">
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">🏰 Mercados Europeos (DAX 40 Alemania, FTSE 100 Londres, EuroStoxx 50 Francia/UE):</strong> 
+                            Rueda previa a Wall Street que define el sentimiento temprano del dinero institucional. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 04:00 a 12:30 ARG · Pico de 05:00 a 08:30 ARG)</span>
+                        </li>
+                    </ul>
+
+                    <!-- SECCIÓN 5: EMERGENTES Y AMÉRICA LATINA -->
+                    <div style="color: #38bdf8; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 22px; margin-bottom: 12px; padding-bottom: 4px; border-bottom: 1px solid rgba(56, 189, 248, 0.3);">
+                        🌎 MERCADOS EMERGENTES Y AMÉRICA LATINA
+                    </div>
+                    <ul style="list-style: none; padding: 0; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; font-size: 13.5px; color: #ffffff;">
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">🌎 Mercados Emergentes y América Latina (Bovespa Brasil ^BVSP, IPC México, EEM ETF):</strong> 
+                            Activos de alta correlación regional con Argentina y recepción de flujo de capitales externos. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 10:00 a 17:00 ARG)</span>
+                        </li>
+                    </ul>
+
+                    <!-- SECCIÓN 6: COMMODITIES, MATERIAS PRIMAS Y AGRO -->
+                    <div style="color: #38bdf8; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 22px; margin-bottom: 12px; padding-bottom: 4px; border-bottom: 1px solid rgba(56, 189, 248, 0.3);">
+                        🛢️ COMMODITIES, MATERIAS PRIMAS Y AGRO (INTERNACIONAL)
+                    </div>
+                    <ul style="list-style: none; padding: 0; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; font-size: 13.5px; color: #ffffff;">
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">🛢️ Materias Primas y Energía (CL=F Petróleo WTI, GC=F Oro, SI=F Plata, NG=F Gas Natural):</strong> 
+                            Activos físicos y refugio macroeconómico operados en contratos de futuros. 
+                            <span style="color: #4ade80; font-weight: 600;">(Domingo 19:00 a Viernes 18:00 ARG · Volumen clave de 04:00 a 14:00 ARG en aperturas de Londres y NY)</span>
+                        </li>
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">🌾 Commodities Agrícolas y Granos (ZS=F Soja, ZC=F Maíz, ZW=F Trigo, Soja Rosario):</strong> 
+                            Vitales para el ingreso de divisas y liquidación de cosecha en Argentina vía Chicago CBOT y Matba Rofex. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 10:30 a 15:20 ARG)</span>
+                        </li>
+                    </ul>
+
+                    <!-- SECCIÓN 7: MERCADO DE ARGENTINA (BYMA, MAE Y MATBA ROFEX) -->
+                    <div style="color: #38bdf8; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 24px; margin-bottom: 12px; padding-bottom: 4px; border-bottom: 1px solid rgba(56, 189, 248, 0.3);">
+                        🇦🇷 MERCADO DE ARGENTINA (BYMA, MAE Y MATBA ROFEX)
+                    </div>
+                    <ul style="list-style: none; padding: 0; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; font-size: 13.5px; color: #ffffff;">
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">📦 CEDEARs de Acciones y ETFs (SPY, QQQ, AAPL, NVDA, TSLA, MELI):</strong> 
+                            Concentran más del 65% del volumen bursátil en BYMA con cobertura cambiaria en Dólar CCL. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 11:00 a 17:00 ARG · Mayor liquidez de 12:00 a 16:30 ARG)</span>
+                        </li>
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">🇦🇷 Mercado Local de Acciones (GGAL, YPFD, PAMP, BMA, ALUA, TXAR):</strong> 
+                            Renta variable doméstica en BYMA vinculada a la liquidez bancaria y coyuntura argentina. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 11:00 a 17:00 ARG · Volumen concentrado de 12:00 a 15:30 ARG)</span>
+                        </li>
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">📜 Bonos Soberanos en Dólares (AL30, GD30, AE38, GD35):</strong> 
+                            Definen el Riesgo País y marcan las cotizaciones implícitas del Dólar MEP y CCL en BYMA y MAE. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 11:00 a 17:00 ARG · Volumen rey de 12:30 a 16:00 ARG)</span>
+                        </li>
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">🏢 Deuda Corporativa y ONs en Dólares (Obligaciones Negociables YPF, Pampa, Vista, PAE):</strong> 
+                            Renta fija privada de bajo riesgo que paga cupones en dólares billete (Hard Dollar) en BYMA. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 11:00 a 17:00 ARG · Pico de órdenes de 12:00 a 15:00 ARG)</span>
+                        </li>
+                        <li style="margin-bottom: 18px;">
+                            <strong style="color: #fbbf24;">📊 Futuros de Dólar y Tasas de Interés (Dólar Futuro Matba Rofex, LECAPs, Tasa 10Y EE.UU. ^TNX):</strong> 
+                            Indicador adelantado de expectativas de devaluación y costo del dinero en pesos. 
+                            <span style="color: #4ade80; font-weight: 600;">(Lunes a Viernes de 10:00 a 17:00 ARG · Ajuste clave de 11:30 a 15:30 ARG)</span>
+                        </li>
+                    </ul>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha: Panel de Control del Agente -->
+        <div class="space-y-2.5">
+
+            <!-- Ajustes de Estrategia -->
+            <div class="bg-gray-800 rounded-lg p-2.5 sm:p-3 shadow-lg border border-gray-700">
+                <div class="flex justify-between items-center mb-2.5 border-b border-gray-700 pb-1.5">
+                    <h2 class="text-sm sm:text-base font-bold flex items-center gap-2 text-white">
+                        <img src="img/favicon_balam.png" alt="Balam Tigre" class="w-5 h-5 rounded object-cover inline-block shadow">
+                        <span>🐅 Balam CIO · Operador Táctico</span>
+                    </h2>
+                    <!-- Switch Maestro: Automático vs Manual -->
+                    <div class="flex items-center gap-1 bg-gray-900 p-1 rounded-lg border border-gray-700">
+                        <button type="button" id="btnMasterAutoMode" onclick="window.setMasterStrategyMode(true)" class="px-2.5 py-1 text-xs font-bold rounded bg-cyan-600 text-white transition shadow cursor-pointer">⚡ Automático</button>
+                        <button type="button" id="btnMasterManualMode" onclick="window.setMasterStrategyMode(false)" class="px-2.5 py-1 text-xs font-bold rounded text-gray-400 hover:text-white transition cursor-pointer">🛠️ Manual</button>
+                    </div>
+                </div>
+
+                <!-- VENTANA 1: TELEMETRÍA Y SESIÓN BURSÁTIL ACTIVA -->
+                <div id="upperAutoPilotBlock" class="strategy-composite-card space-y-3.5 mb-4">
+                    <div class="strategy-window-header flex justify-between items-center flex-wrap gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="strategy-window-title text-cyan-300 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                                🛰️ Radar en Vivo & Telemetría Global
+                            </span>
+                            <span class="text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-500/60 px-2 py-0.5 rounded font-mono font-bold">ENCARGADO: 🐅 BALAM CIO</span>
+                            <span id="radarLiveLiveEngineBadge" class="text-[9px] bg-amber-950 text-amber-300 border border-amber-600/60 px-2 py-0.5 rounded font-mono font-bold">MOTOR: ⚡ ANTIGRAVITY (PRIORIDAD 1)</span>
+                        </div>
+                        <span class="strategy-window-badge bg-cyan-950 text-cyan-300 border border-cyan-600/70 uppercase">Enlace CIO :8520 · Sesión y Horarios</span>
+                    </div>
+
+                    <!-- Subventana 1.1: Reloj de Mercado en Vivo -->
+                    <div id="upperTelemetryCard" class="strategy-function-card">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-cyan-300 flex items-center gap-2">
+                                <span>⏱️</span> Reloj y Telemetría en Vivo
+                            </span>
+                            <span id="autoSessionBadge" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-600/70 shadow-sm font-semibold">🟢 Sesión Activa</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2.5 text-[11px] text-gray-300 bg-black/60 p-2.5 rounded-lg border border-white/20 shadow-inner">
+                            <div>
+                                <span class="text-gray-400 block text-[9px] uppercase font-bold tracking-wider mb-0.5">Estrategia Activa:</span>
+                                <span id="autoActiveStrategyLabel" class="font-semibold text-emerald-400">🤖 Piloto Automático</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400 block text-[9px] uppercase font-bold tracking-wider mb-0.5">Gestión de Riesgo:</span>
+                                <span id="autoRiskRulesLabel" class="font-semibold text-yellow-400">SL 1.5×ATR · TP Neto ≥ 2.0</span>
+                            </div>
+                        </div>
+                    </div>
+
+
+
+                    <!-- Subventana 1.3: Módulo de Mercado Rápido (Colapsable) -->
+                    <details class="strategy-function-card group p-2.5">
+                        <summary class="cursor-pointer select-none list-none flex justify-between items-center text-[11px] font-bold text-gray-200">
+                            <span class="flex items-center gap-1.5">
+                                <span>📡</span> Escáner Rápido de Mercado:
+                                <span id="quickScanStatus" class="text-[9px] text-gray-400 font-mono font-normal">Listo</span>
+                            </span>
+                            <span class="text-[10px] text-cyan-400 group-open:rotate-180 transition-transform duration-200">▼</span>
+                        </summary>
+                        <div class="mt-2.5 space-y-2 pt-2 border-t border-gray-700/60">
+                            <div class="flex gap-2">
+                                <select id="quickMarketCategory" class="bg-gray-900 text-yellow-400 text-xs rounded-lg p-2 border border-gray-600 flex-1 font-semibold outline-none cursor-pointer">
+                                    <option value="" selected>🌐 Todas las Categorías</option>
+                                    <option value="global_tech_and_china">🚀 Global Tech, IA & China</option>
+                                    <option value="macro_and_markets">🏛️ Macroeconomía & Bonos (TLT/SPY)</option>
+                                    <option value="commodities_and_energy">🛢️ Materias Primas & Petróleo/Oro</option>
+                                    <option value="crypto_and_alternatives">⚡ Criptoactivos (BTC/ETH/SOL)</option>
+                                    <option value="argentina_and_latam">🇦🇷 Argentina & LatAm (BYMA)</option>
+                                </select>
+                                <button type="button" id="btnQuickMarketScan" onclick="window.triggerQuickMarketScan()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-2 text-xs font-bold rounded-lg shadow-md transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                                    <span id="quickScanSpinner" class="hidden animate-spin">◌</span>
+                                    <span>⚡ Inyectar</span>
+                                </button>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- BLOQUE INFERIOR: VENTANAS ESTRUCTURADAS CON BORDES BLANCOS Y TÍTULOS -->
+                <div id="lowerManualSettingsBlock" class="grid grid-cols-1 gap-4 relative transition-all duration-300">
+
+                    <!-- VENTANA 2: KULA CEREBRO (DIRECTOR OPERATIVO DE CARTERA) -->
+                    <div id="strategyAndRegimeBlock" class="strategy-composite-card space-y-4">
+                        <div class="strategy-window-header py-1.5 border-b border-gray-700/60 flex items-center justify-between flex-wrap gap-2">
+                            <span class="strategy-window-title text-yellow-400 flex items-center gap-1.5">
+                                <img src="img/favicon_kula.png" alt="Kula Velas" class="w-4 h-4 rounded object-cover inline-block">
+                                <span>🕯️ Kula Cerebro (Director Operativo de Cartera y Posiciones)</span>
+                            </span>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="window.copiarContenidoCerebro && window.copiarContenidoCerebro('todo', this)" class="text-[11px] bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 border border-emerald-500/60 px-2.5 py-0.5 rounded font-bold transition flex items-center gap-1 shadow cursor-pointer" title="Copiar al portapapeles el resumen completo de parámetros, estado y logs de Kula Cerebro">
+                                    <span>📋</span> Copiar Actividad del Cerebro
+                                </button>
+                                <span class="strategy-window-badge bg-yellow-950/80 text-yellow-300 border border-yellow-600/50 font-bold">CEREBRO KULA: EN CONTROL</span>
+                            </div>
+                        </div>
+
+                        <!-- BLOQUE 1: ⚙️ COPROCESADOR DE CÓMPUTO & MOTOR DE INFERENCIA (WORKER) -->
+                        <div id="strategyEngineFunctionBlock" class="strategy-function-card bg-gray-900/90 rounded-xl p-3.5 border border-purple-500/40 shadow-md space-y-2.5">
+                            <div class="flex justify-between items-center flex-wrap gap-2">
+                                <label for="engineSelect" class="strategy-input-label mb-0 flex flex-wrap items-center gap-1.5 text-xs font-bold text-purple-300 uppercase tracking-wider max-w-full">
+                                    <span>⚙️</span>
+                                    <span>Coprocesador de Cómputo / Worker (Al servicio de Kula):</span>
+                                </label>
+                                <!-- Tilde de Conmutación Automática (Desmarcada por defecto: Modo Manual Fijo) -->
+                                <label class="flex items-center gap-2 cursor-pointer bg-black/50 px-2.5 py-1 rounded-lg border border-purple-500/40 hover:border-purple-300 transition select-none shadow-sm" title="Desmarcado por defecto: Mantiene el motor elegido (Antigravity, Google Gemini, Qwen o Matemático) fijo y bloquea la conmutación automática forzada a Google Gemini. Si se marca, permite la cascada automática ante fallos.">
+                                    <input type="checkbox" id="chkAutoEngineSelect" class="w-3.5 h-3.5 rounded bg-gray-950 border-gray-700 text-purple-500 focus:ring-0 cursor-pointer">
+                                    <span id="lblAutoEngineStatus" class="text-[10px] font-mono font-bold text-amber-300">🔒 Manual Fijo (Sin Auto-Cambio)</span>
+                                </label>
+                            </div>
+                            <select id="engineSelect" class="w-full bg-gray-950 text-white text-sm rounded-lg p-2.5 border border-purple-500/50 cursor-pointer relative z-20 outline-none focus:border-purple-300 font-semibold shadow-inner">
+                                <optgroup label="⚡ Motor Supervisado Principal">
+                                    <option value="antigravity_operador" class="text-amber-300 font-bold" selected>⚡ Antigravity Operador (Coprocesador IA Supervisado · Prioridad 1)</option>
+                                    <option value="antigravity_cio" class="text-cyan-400 font-semibold">🛰️ Antigravity CIO (Sondeo Macro / Monitor)</option>
+                                </optgroup>
+                                <optgroup label="🛠️ Coprocesadores Alternativos">
+                                    <option value="ai" class="text-purple-400 font-semibold">✨ Google Gemini (IA Nube · Prioridad 2)</option>
+                                    <option value="ollama|trader-qwen" class="text-emerald-400 font-semibold">🤖 Qwen 2.5 (IA Local · trader-qwen · Prioridad 3)</option>
+                                    <option value="local" class="text-cyan-300 font-semibold">⚙️ Modelo Matemático Determinista (Sin IA · Prioridad 4)</option>
+                                </optgroup>
+                            </select>
+                            <input type="hidden" id="executionModeSelect" value="smart">
+
+                            <!-- Barra Visual de Cascada y Estado de Salud de Motores (Healthcheck) -->
+                            <div id="engineHealthBar" class="p-2.5 rounded-lg bg-black/60 border border-gray-800 text-[11px] font-mono space-y-1.5 shadow-inner">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-400 font-bold uppercase tracking-wider text-[9.5px]">Salud de Coprocesadores de Cómputo (1-2-3-4):</span>
+                                    <button type="button" onclick="window.checkEnginesHealth && window.checkEnginesHealth(true)" class="text-[9.5px] text-cyan-400 hover:text-white bg-gray-900 hover:bg-gray-800 border border-gray-700 px-2 py-0.5 rounded transition flex items-center gap-1 cursor-pointer" title="Comprobar salud y conectividad de Antigravity, Gemini, Qwen y Modelo Matemático">
+                                        <span id="healthcheckSpinner" class="hidden animate-spin">◌</span>
+                                        <span>🔄 Chequear</span>
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-4 gap-1.5 text-center text-[10px]">
+                                    <div id="healthBadgeAntigravity" class="p-1 rounded bg-amber-950/40 border border-amber-600/40 text-amber-300 font-bold" title="Prioridad 1: Coprocesador Antigravity">
+                                        ⚡ 1. Antigravity: <span class="text-emerald-400 font-mono">🟢 ACTIVO</span>
+                                    </div>
+                                    <div id="healthBadgeGemini" class="p-1 rounded bg-purple-950/40 border border-purple-600/40 text-purple-300 font-bold" title="Prioridad 2: Google Gemini">
+                                        ✨ 2. Google: <span class="text-slate-400 font-mono">LISTO</span>
+                                    </div>
+                                    <div id="healthBadgeQwen" class="p-1 rounded bg-emerald-950/40 border border-emerald-600/40 text-emerald-300 font-bold" title="Prioridad 3: Qwen 2.5">
+                                        🤖 3. Qwen: <span class="text-slate-400 font-mono">STANDBY</span>
+                                    </div>
+                                    <div id="healthBadgeMatematico" class="p-1 rounded bg-cyan-950/40 border border-cyan-600/40 text-cyan-300 font-bold" title="Prioridad 4: Modelo Matemático Determinista Local (Fallback Seguro)">
+                                        ⚙️ 4. Matemático: <span class="text-emerald-400 font-mono">🟢 BASE</span>
+                                    </div>
+                                </div>
+                                <div id="engineHealthDetailText" class="text-[9.5px] text-gray-400 truncate">
+                                    ⚡ Antigravity Operador Activo (0% CPU · Directivas Listas)
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BLOQUE 2: 🎯 FÓRMULA TÁCTICA CUANTITATIVA (REGLAS DE TRADING) -->
+                        <div class="strategy-function-card bg-gray-900/90 rounded-xl p-3.5 border-2 border-cyan-500/60 shadow-lg space-y-3">
+                            <div class="flex items-center justify-between border-b border-gray-700 pb-2">
+                                <span class="text-xs font-bold text-cyan-300 flex items-center gap-1.5 uppercase tracking-wider">
+                                    <span>📐</span> Estrategia Táctica Cuantitativa (Fórmula de Trading)
+                                </span>
+                                <span id="strategyTypeTag" class="text-[9px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-600 font-bold">Fórmula Táctica</span>
+                            </div>
+
+                            <!-- Cuadro de Contraste Categórico: Cerebro Kula, Portero Balam, Fórmula y Coprocesador -->
+                            <div class="p-2.5 rounded bg-black/60 border border-gray-700/80 text-[11px] font-mono space-y-1.5 shadow-inner">
+                                <div class="flex items-center justify-between flex-wrap gap-1">
+                                    <span class="text-gray-400">🧠 <strong>¿Quién decide (Cerebro)?</strong></span>
+                                    <span class="text-yellow-400 font-bold">🕯️ Kula Cerebro (Directivas de Cartera y Posiciones)</span>
+                                </div>
+                                <div class="flex items-center justify-between flex-wrap gap-1 border-t border-gray-800/80 pt-1">
+                                    <span class="text-gray-400">🐅 <strong>¿Quién filtra y veta (Portero)?</strong></span>
+                                    <span class="text-amber-400 font-bold">🐅 Balam (Tríada 1D-1H-5M · Veto Inmediato)</span>
+                                </div>
+                                <div class="flex items-center justify-between flex-wrap gap-1 border-t border-gray-800/80 pt-1">
+                                    <span class="text-gray-400">🎯 <strong>¿Qué fórmula táctica aplica?</strong></span>
+                                    <span id="strategySelectedFormulaLabel" class="text-cyan-300 font-bold">🐅 Kula Balam: Cava & Ruiz</span>
+                                </div>
+                                <div class="flex items-center justify-between flex-wrap gap-1 border-t border-gray-800/80 pt-1">
+                                    <span class="text-gray-400">⚙️ <strong>¿Qué worker computa?</strong></span>
+                                    <span id="strategyExecutingEngineLabel" class="text-purple-300 font-bold">⚡ Antigravity Operador (Coprocesador)</span>
+                                </div>
+                            </div>
+
+                            <!-- Selector Multi-Check de Fórmulas Cuantitativas -->
+                            <div id="strategyModeFunctionBlock">
+                                <label class="strategy-input-label flex items-center justify-between mb-1.5 text-xs text-white">
+                                    <span class="flex items-center gap-1.5">
+                                        <span>🎯</span> Fórmulas Tácticas Autorizadas para el Cerebro Kula:
+                                    </span>
+                                    <span id="strategyActiveCountBadge" class="text-[10px] bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-700 font-mono font-bold">2 activas</span>
+                                </label>
+
+                                <div class="relative">
+                                    <!-- Botón Principal Desplegable -->
+                                    <button type="button" id="strategyDropdownBtn" onclick="window.toggleStrategyChecklistDropdown()" class="w-full bg-gray-950 text-white rounded-lg p-2.5 text-xs border border-cyan-600/70 hover:border-cyan-400 flex items-center justify-between font-semibold shadow-inner transition cursor-pointer">
+                                        <span id="strategyDropdownSummary" class="truncate text-left text-cyan-200">
+                                            🐅 Kula Balam: Cava & Ruiz, 🕯️ Tres Velas Wyckoff VPA
+                                        </span>
+                                        <span id="strategyDropdownChevron" class="text-[10px] text-cyan-400 ml-2 transition-transform duration-200">▼</span>
+                                    </button>
+
+                                    <!-- Menú Flotante con Checkboxes -->
+                                    <div id="strategyDropdownMenu" class="hidden absolute left-0 right-0 top-full mt-1.5 w-full max-w-full bg-[#030712] backdrop-blur-2xl border-2 border-cyan-500 rounded-xl p-3 shadow-2xl z-50 max-h-80 overflow-y-auto overflow-x-hidden space-y-2 box-border" style="background-color: #030712 !important; opacity: 1 !important; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.95), 0 0 20px rgba(6, 182, 212, 0.25); width: 100% !important; max-width: 100% !important; box-sizing: border-box !important;">
+                                        <div class="flex items-center justify-between pb-1.5 border-b border-gray-800 text-[10.5px]">
+                                            <span class="text-gray-400 font-medium">Tilda las fórmulas permitidas:</span>
+                                            <div class="flex gap-2">
+                                                <button type="button" onclick="window.selectAllStrategies(true)" class="text-cyan-400 hover:text-cyan-300 font-mono text-[10px] cursor-pointer">Marcar Todas</button>
+                                                <span class="text-gray-600">|</span>
+                                                <button type="button" onclick="window.selectAllStrategies(false)" class="text-amber-400 hover:text-amber-300 font-mono text-[10px] cursor-pointer">Desmarcar</button>
+                                            </div>
+                                        </div>
+                                        <div id="strategyChecklistItems" class="space-y-1.5 text-xs">
+                                            <!-- Checkboxes de fórmulas poblados dinámicamente -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Elemento invisible para compatibilidad de scripts legados -->
+                                <input type="hidden" id="strategyModeSelect" value="auto">
+
+                                <!-- Toggle con Tilde para ver Explicación Detallada y Botón de Estrategias -->
+                                <div class="mt-2 flex items-center justify-between flex-wrap gap-2">
+                                    <label for="strategyDetailToggle" class="inline-flex items-center gap-1.5 cursor-pointer text-xs text-cyan-400 hover:text-cyan-300 select-none font-medium">
+                                        <input type="checkbox" id="strategyDetailToggle" onchange="window.toggleStrategyExplanation(this.checked)" class="rounded bg-gray-900 border-gray-600 text-cyan-500 focus:ring-0 w-3.5 h-3.5 cursor-pointer">
+                                        <span>✓ Ver qué hace esta fórmula</span>
+                                    </label>
+                                    <button type="button" onclick="window.openStrategyManagerModal()" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-600/70 hover:border-cyan-400 flex items-center gap-1.5 transition shadow cursor-pointer">
+                                        <span>🎛️</span> Gestor de Estrategias
+                                    </button>
+                                </div>
+
+                                <!-- Tarjeta Desplegable de Explicación -->
+                                <div id="strategyExplanationCard" class="hidden mt-2 p-3 bg-black/80 rounded-lg border border-cyan-500/40 text-xs text-gray-200 shadow-lg transition-all duration-200">
+                                    <div id="strategyExplanationContent">Cargando explicación...</div>
+                                </div>
+                            </div>
+
+                            <!-- Contexto Macro (Prompt del Trader) -->
+                            <div id="strategyMacroFunctionBlock" class="pt-2 border-t border-gray-800">
+                                <label for="macroContext" class="strategy-input-label flex items-center gap-1.5 text-xs text-gray-300 mb-1">
+                                    <span>📝</span> Contexto Macro (Prompt del Trader):
+                                </label>
+                                <textarea id="macroContext" class="w-full bg-gray-950 text-white text-xs rounded-lg p-2.5 border border-gray-700 focus:outline-none focus:border-cyan-400 shadow-inner leading-relaxed" rows="2" placeholder='Ej: "Guerra detectada. Ignorar sobrecompra, favorecer entradas largas."'></textarea>
+                                <p class="strategy-helper-text">Instrucciones o sesgo contextual que la IA considerará al evaluar las señales de la estrategia.</p>
+                            </div>
+                        </div>
+
+                        <!-- BLOQUE 3: 📊 PARÁMETROS ACTIVOS Y TELEMETRÍA DE LA FÓRMULA -->
+                        <div class="strategy-function-card bg-gray-900/90 rounded-xl p-3.5 border border-amber-600/50 shadow-md space-y-3">
+                            <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+                                <span class="text-xs font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
+                                    <span>📊</span> Parámetros Activos de la Fórmula
+                                </span>
+                                <span class="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-700/60 font-bold">DERIVADO POR ALGORITMO</span>
+                            </div>
+
+                            <!-- Chips Informativos Claros (Sin campos desenfocados confusos) -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
+                                <div class="p-2.5 rounded-lg bg-black/50 border border-gray-800">
+                                    <span class="text-gray-400 block text-[9.5px] uppercase font-bold mb-0.5">⏱️ Temporalidad:</span>
+                                    <span id="activeTimeframeSummary" class="text-emerald-400 font-bold">5M (Micro) · 1H / 1D (Contexto)</span>
+                                </div>
+                                <div class="p-2.5 rounded-lg bg-black/50 border border-gray-800">
+                                    <span class="text-gray-400 block text-[9.5px] uppercase font-bold mb-0.5">🛡️ Stop Loss:</span>
+                                    <span id="activeStopLossSummary" class="text-amber-400 font-bold">Invalidación + 2 Ticks (1.5×ATR)</span>
+                                </div>
+                                <div class="p-2.5 rounded-lg bg-black/50 border border-gray-800">
+                                    <span class="text-gray-400 block text-[9.5px] uppercase font-bold mb-0.5">🎯 Take Profit:</span>
+                                    <span id="activeTakeProfitSummary" class="text-cyan-400 font-bold">Peluqueo 50% TP1 (+1.5%) + Trailing</span>
+                                </div>
+                                <div class="p-2.5 rounded-lg bg-black/50 border border-gray-800">
+                                    <span class="text-gray-400 block text-[9.5px] uppercase font-bold mb-0.5">⚖️ Asimetría Mínima:</span>
+                                    <span class="text-purple-400 font-bold">R:R ≥ 1:2.0 (Obligatorio)</span>
+                                </div>
+                            </div>
+
+                            <!-- Temporalidad fija nativa (gobernada por la fórmula activa) -->
+                            <input type="hidden" id="timeframeSelect" value="5m">
+
+                            <!-- Beneficio neto mínimo para tomar ganancias (Filtro Anti-Desgaste) -->
+                            <div id="minProfitContainer" class="pt-2 border-t border-gray-800/80">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label for="minProfitPctInput" class="strategy-input-label mb-0 flex items-center gap-1.5 text-xs text-amber-300">
+                                        <span>⚖️</span> Beneficio neto mínimo (% PnL tras costos):
+                                    </label>
+                                    <span class="text-[9px] text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-700/50 font-bold">Filtro Anti-Desgaste</span>
+                                </div>
+                                <input type="number" id="minProfitPctInput" value="0.5" step="0.05" min="0" max="5" class="bg-gray-950 text-white w-full rounded-lg p-2 text-xs border border-gray-700 outline-none focus:border-cyan-400">
+                                <p id="minProfitNotice" class="strategy-helper-text">Umbral mínimo de ganancia neta tras comisiones y spread exigido para tomar ganancias por estrategia.</p>
+                            </div>
+                        </div>
+
+                        <!-- BLOQUE 4: 🕯️ KULA CEREBRO (LOGS DE DECISIONES Y TERMINAL) -->
+                        <div id="strategyLogsBlock" class="strategy-function-card bg-gray-900/90 rounded-xl p-3.5 border-2 border-green-500/60 shadow-md space-y-2.5 flex flex-col">
+                            <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+                                <span class="text-xs font-bold text-green-400 flex items-center gap-1.5 uppercase tracking-wider">
+                                    <img src="img/favicon_kula.png" class="w-4 h-4 rounded inline-block object-cover" alt="Kula Logs">
+                                    <span>🕯️ Kula Cerebro (Logs)</span>
+                                </span>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" id="btnCopyCerebroLogs" onclick="window.copiarContenidoCerebro && window.copiarContenidoCerebro('logs', this)" class="text-[11px] bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 border border-emerald-500/60 px-2.5 py-0.5 rounded font-bold transition flex items-center gap-1 shadow cursor-pointer" title="Copiar el contenido completo de Kula Cerebro (Logs) al portapapeles">
+                                        <span>📋</span> Copiar
+                                    </button>
+                                    <button type="button" onclick="window.purgarMemoriaIA()" class="text-[11px] bg-red-900/50 hover:bg-red-800 text-red-300 border border-red-700/50 px-2 py-0.5 rounded font-semibold transition flex items-center gap-1 shadow cursor-pointer" title="Desalojar modelos de Ollama de la RAM y cancelar tareas colgadas">
+                                        <span>🧹</span> Purgar RAM
+                                    </button>
+                                    <button type="button" id="clearLogs" class="text-xs text-gray-400 hover:text-white px-2 py-0.5 rounded hover:bg-gray-800 transition cursor-pointer">Limpiar</button>
+                                </div>
+                            </div>
+
+                            <!-- Contenedor de Consola + Barra de Scroll Fija al Costado Derecho (Sin rueda de ratón) -->
+                            <div id="terminalFrameWrapper" style="display: flex; align-items: stretch; height: 224px; min-height: 224px; max-height: 224px; border-radius: 8px; border: 2px solid #334155; background-color: #03060c; overflow: hidden;">
+                                <!-- Área de Texto de Logs -->
+                                <div id="terminal" class="font-mono text-xs text-green-400 space-y-1.5" style="flex: 1 1 0%; height: 100%; padding: 12px; overflow-y: hidden; overflow-x: hidden; user-select: text;">
+                                    <p class="text-gray-400">[BOOT] &gt; 🕯️ Kula Cerebro inicializado · Director Operativo de Cartera y Posiciones.</p>
+                                    <p class="text-emerald-400">[TRÍADA] &gt; 🐅 Portero Balam activo: Validación fractal 1D · 1H · 5M habilitada.</p>
+                                    <p class="text-cyan-400">[FÓRMULA] &gt; 🎯 Estrategia Kula Balam (Cava &amp; Ruiz) + Wyckoff VPA cargadas.</p>
+                                    <p class="text-amber-300">[RIESGO] &gt; 🛡️ Asimetría mínima R:R ≥ 1:2.0 · Stop Loss técnico + 2 ticks.</p>
+                                    <p class="text-purple-300">[MOTOR] &gt; ⚡ Coprocesador Supervisado (Prioridad 1) en línea.</p>
+                                    <p class="text-gray-400">[AUDITOR] &gt; 📊 Bulkowski 4.7M + VWAP Institucional + RSI(14) + ATR(14) listos.</p>
+                                    <p class="text-emerald-300">[CARTERA] &gt; 💰 Gestión Multi-Slot sincronizada con Bóveda SQLite.</p>
+                                    <p class="text-cyan-300">[SESIÓN] &gt; 🌐 Radar de sesiones horarias conectado con Monitor del Mercado.</p>
+                                    <p class="text-gray-500">&gt; Sistema iniciado. Esperando ciclo de telemetría del orquestador...</p>
+                                </div>
+
+                                <!-- BARRA DE SCROLL FÍSICA AL COSTADO DERECHO (▲ / Barra Deslizante / ▼) -->
+                                <div id="terminalSideScrollbar" style="width: 26px; min-width: 26px; background-color: #0f172a; border-left: 2px solid #475569; display: flex; flex-direction: column; justify-content: space-between; user-select: none;" title="Usa esta barra lateral (arrastrar o botones ▲/▼) para desplazar los logs">
+                                    <button type="button" id="terminalScrollUpBtn" style="height: 26px; width: 100%; background-color: #1e293b; color: #34d399; border: none; border-bottom: 1px solid #475569; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; cursor: pointer;" title="Subir logs (▲)">
+                                        ▲
+                                    </button>
+                                    <div id="terminalScrollTrack" style="flex: 1 1 0%; width: 100%; position: relative; background-color: #090d16; cursor: pointer;">
+                                        <div id="terminalScrollThumb" style="position: absolute; left: 2px; right: 2px; top: 0px; height: 48px; background: linear-gradient(180deg, #10b981 0%, #059669 100%); border: 1px solid #6ee7b7; border-radius: 4px; box-shadow: 0 0 8px rgba(16, 185, 129, 0.55); cursor: grab; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+                                            <span style="width: 12px; height: 1.5px; background-color: #022c22; border-radius: 1px; display: block;"></span>
+                                            <span style="width: 12px; height: 1.5px; background-color: #022c22; border-radius: 1px; display: block;"></span>
+                                            <span style="width: 12px; height: 1.5px; background-color: #022c22; border-radius: 1px; display: block;"></span>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="terminalScrollDownBtn" style="height: 26px; width: 100%; background-color: #1e293b; color: #34d399; border: none; border-top: 1px solid #475569; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; cursor: pointer;" title="Bajar logs (▼)">
+                                        ▼
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Elementos técnicos subyacentes para compatibilidad JS 100% (hidden) -->
+                        <div class="hidden">
+                            <div id="autoAdaptBannerCard">
+                                <span id="autoAdaptIcon">🤖</span>
+                                <h3 id="autoAdaptHeadingText">Piloto Inteligente</h3>
+                                <p id="autoAdaptSubText"></p>
+                                <button type="button" id="btnToggleAutoAdaptBanner"><span id="btnToggleAutoAdaptBannerText">ACTIVO</span></button>
+                                <div id="autoAdaptManualPicker"></div>
+                                <span id="marketRegimeBadge"></span>
+                                <span id="marketRegimeSuggestion"></span>
+                                <span id="marketRegimeSource"></span>
+                            </div>
+                            <input type="checkbox" id="chkAutoAdaptRegime" onchange="window.toggleAutoAdaptRegime(this.checked)" checked>
+                            <button type="button" id="btnApplyRegimeSuggestion" onclick="window.applyMarketRegimeSuggestion()"></button>
+                            <div id="strategyModeSelectWrapper"></div>
+                        </div>
+                    </div>
+
+                    <!-- VENTANA 3: GESTIÓN MONETARIA Y CONTROL DE RIESGO (CAPITAL) -->
+                    <div class="strategy-sector-card space-y-4">
+                        <div class="strategy-window-header">
+                            <span class="strategy-window-title text-emerald-400">
+                                <span>🛡️</span> Gestión Monetaria y Control de Riesgo
+                            </span>
+                            <span class="strategy-window-badge bg-emerald-950/80 text-emerald-300 border border-emerald-600/50">CAPITAL</span>
+                        </div>
+
+                        <!-- Subventana 3.1: Tamaño de Posición por Slot (Calibración de Capital) -->
+                        <div id="manualRiskSettings" class="strategy-function-card relative transition-all duration-200">
+                            <div class="flex justify-between items-center mb-2">
+                                <label for="riskSelect" class="strategy-input-label mb-0 flex items-center gap-1.5">
+                                    <span>💰</span> Tamaño de Posición por Slot (% sobre Dinero para Operar):
+                                </label>
+                                <span class="text-[9px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-700/50 font-bold">🟢 Siempre Libre</span>
+                            </div>
+                            <select id="riskSelect" onchange="window.updateRiskSlotPreview()" class="bg-gray-900 text-white w-full rounded-lg p-2 text-sm border border-gray-700 outline-none focus:border-white cursor-pointer">
+                                <option value="0.25" selected>25% por Slot (Multi-Posición hasta 4 slots)</option>
+                                <option value="0.50">50% por Slot (2 Posiciones simultáneas)</option>
+                                <option value="1.00">100% del Dinero para Operar (1 Posición total)</option>
+                            </select>
+
+                            <!-- Preview en Tiempo Real del Monto Calculado -->
+                            <div id="riskSlotPreviewBox" class="mt-2.5 p-2.5 rounded-lg bg-gray-950/90 border border-emerald-800/50 text-xs font-mono flex justify-between items-center shadow-inner">
+                                <span class="text-gray-400 text-[11px]">Importe por orden:</span>
+                                <span id="riskSlotAmountText" class="font-bold text-emerald-400">$125.00 USDT (Slot 1/4)</span>
+                            </div>
+                            <p class="strategy-helper-text">Calculado matemáticamente sobre el <b>Dinero para Operar</b>. El saldo en reserva del Broker permanece 100% intacto.</p>
+                        </div>
+
+                        <!-- SUBVENTANA: TERMÓMETRO VISUAL DE BÓVEDA & 4 RANURAS (MULTI-SLOT) -->
+                        <div id="vaultSlotsThermometer" class="strategy-function-card bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900 rounded-xl p-3.5 border border-emerald-500/60 shadow-lg space-y-3">
+                            <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-lg">🏛️</span>
+                                    <div>
+                                        <h3 class="text-xs font-bold text-white uppercase tracking-wider block">
+                                            Termómetro de Bóveda & Ranuras
+                                        </h3>
+                                        <p id="vaultThermometerSubtitle" class="text-[10px] text-gray-400">4 Slots de 25% c/u con riesgo acotado vs Reserva Protegida</p>
+                                    </div>
+                                </div>
+                                <span id="vaultThermometerOccupancy" class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/60 shadow-sm">
+                                    0/4 Ranuras
+                                </span>
+                            </div>
+
+                            <!-- Ranuras Visuales Dinámicas -->
+                            <div id="vaultSlotsGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono text-[11px]">
+                                <div id="slotPill1" class="p-2 rounded-lg bg-gray-950 border border-gray-800 text-gray-400 transition">
+                                    <span class="block text-[9px] uppercase font-bold text-gray-500">Ranura 1 (25%)</span>
+                                    <span class="slot-status font-bold text-emerald-400 block my-0.5">🟢 LIBRE</span>
+                                    <span class="slot-detail block text-[9.5px] text-gray-400">$125.00</span>
+                                </div>
+                                <div id="slotPill2" class="p-2 rounded-lg bg-gray-950 border border-gray-800 text-gray-400 transition">
+                                    <span class="block text-[9px] uppercase font-bold text-gray-500">Ranura 2 (25%)</span>
+                                    <span class="slot-status font-bold text-emerald-400 block my-0.5">🟢 LIBRE</span>
+                                    <span class="slot-detail block text-[9.5px] text-gray-400">$125.00</span>
+                                </div>
+                                <div id="slotPill3" class="p-2 rounded-lg bg-gray-950 border border-gray-800 text-gray-400 transition">
+                                    <span class="block text-[9px] uppercase font-bold text-gray-500">Ranura 3 (25%)</span>
+                                    <span class="slot-status font-bold text-emerald-400 block my-0.5">🟢 LIBRE</span>
+                                    <span class="slot-detail block text-[9.5px] text-gray-400">$125.00</span>
+                                </div>
+                                <div id="slotPill4" class="p-2 rounded-lg bg-gray-950 border border-gray-800 text-gray-400 transition">
+                                    <span class="block text-[9px] uppercase font-bold text-gray-500">Ranura 4 (25%)</span>
+                                    <span class="slot-status font-bold text-emerald-400 block my-0.5">🟢 LIBRE</span>
+                                    <span class="slot-detail block text-[9.5px] text-gray-400">$125.00</span>
+                                </div>
+                            </div>
+
+                            <!-- Barra de Proporción Bóveda vs Capital en Juego -->
+                            <div class="space-y-1">
+                                <div class="flex justify-between text-[10px] font-mono text-gray-400">
+                                    <span>Bóveda Líquida: <strong id="thermoVaultPctText" class="text-emerald-400">100%</strong></span>
+                                    <span>Capital en Juego: <strong id="thermoInPlayPctText" class="text-cyan-400">0%</strong></span>
+                                </div>
+                                <div class="w-full bg-gray-950 rounded-full h-2 overflow-hidden flex border border-gray-800">
+                                    <div id="thermoVaultBar" class="bg-emerald-500 h-full transition-all duration-300" style="width: 100%;"></div>
+                                    <div id="thermoInPlayBar" class="bg-cyan-500 h-full transition-all duration-300" style="width: 0%;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Métricas de Dinero -->
+                            <div class="grid grid-cols-2 gap-2 text-[10px] font-mono pt-1.5 border-t border-gray-800/80">
+                                <div class="text-left text-gray-400">
+                                    En Juego: <strong id="thermoInPlayDollars" class="text-cyan-300">$0.00 USDT</strong>
+                                </div>
+                                <div class="text-right text-gray-400">
+                                    Bóveda Líquida: <strong id="thermoVaultDollars" class="text-emerald-400">$0.00 USDT</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Subventana 3.2: DINERO TOTAL EN EL BROKER (Tesorería Central Real) -->
+                        <div class="strategy-function-card bg-gradient-to-br from-gray-900 via-gray-850 to-gray-900 rounded-xl p-4 shadow-xl border border-emerald-600/50 relative overflow-hidden">
+                            <div class="flex justify-between items-center mb-3 border-b border-gray-700/80 pb-2.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xl">🏛️</span>
+                                    <div>
+                                        <h2 class="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-1.5">
+                                            Dinero Total en el Broker
+                                        </h2>
+                                        <p class="text-[10px] text-gray-400">Patrimonio Real = Efectivo en Bóveda + Invertido en Activos</p>
+                                    </div>
+                                </div>
+                                <span id="brokerReconcileBadge" class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-500/50 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center gap-1 shadow-sm" title="Comparación informativa entre el Broker y el Libro de Inversores (no se mezclan automáticamente)">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    CONCILIADO
+                                </span>
+                            </div>
+
+                            <!-- Saldo Principal del Broker -->
+                            <div class="bg-black/40 border border-emerald-500/20 rounded-lg p-3.5 text-center my-3 shadow-inner">
+                                <span class="text-[10px] font-semibold tracking-wider uppercase text-emerald-400/90 block mb-1">Patrimonio Total en Broker (Efectivo + Activos)</span>
+                                <p id="brokerTotalBalanceDisplay" class="font-mono text-3xl font-black text-emerald-300 tracking-tight drop-shadow-md">$0.00 USDT</p>
+                                
+                                <!-- Desglose Real del Dinero en el Broker -->
+                                <div class="mt-2.5 pt-2.5 border-t border-gray-800 grid grid-cols-2 gap-2.5 text-[11px] font-mono">
+                                    <div class="bg-gray-900/80 rounded px-2.5 py-2 border border-gray-800 text-left">
+                                        <span class="text-gray-400 block text-[9px] uppercase">Efectivo en Bóveda</span>
+                                        <span id="brokerVaultCashDisplay" class="font-bold text-emerald-400">$0.00 USDT</span>
+                                    </div>
+                                    <div class="bg-gray-900/80 rounded px-2.5 py-2 border border-gray-800 text-left">
+                                        <span class="text-gray-400 block text-[9px] uppercase">En Activos Abiertos</span>
+                                        <span id="brokerInPositionsDisplay" class="font-bold text-cyan-400">$0.00 USDT</span>
+                                    </div>
+                                </div>
+
+                                <!-- Aviso Informativo de Inversores (Sin mezclar finanzas) -->
+                                <div class="mt-2.5 pt-2.5 border-t border-gray-800/80 flex justify-between items-center text-[10px] font-mono px-1">
+                                    <span class="text-gray-400">Libro Inversores (Independiente): <strong id="brokerInvestorsTotalDisplay" class="text-gray-200">$0.00</strong></span>
+                                    <span id="brokerInvestorsDiffDisplay" class="font-bold text-emerald-400">Dif: $0.00</span>
+                                </div>
+                            </div>
+
+                            <!-- Botones de Operación del Broker -->
+                            <div class="grid grid-cols-4 gap-2 pt-1.5">
+                                <button onclick="window.ingresarAlBrokerModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 px-1 rounded-lg transition shadow flex items-center justify-center gap-1 cursor-pointer border border-emerald-400/30" title="Ingresar fondos a la Bóveda del Broker (no altera el libro de inversores)">
+                                    <span>➕</span> Ingresar
+                                </button>
+                                <button onclick="window.retirarDelBrokerModal()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs py-2 px-1 rounded-lg transition shadow flex items-center justify-center gap-1 cursor-pointer border border-blue-400/30" title="Retirar fondos de la Bóveda del Broker (no altera el libro de inversores)">
+                                    <span>➖</span> Retirar
+                                </button>
+                                <button onclick="window.resetCircuitBreaker()" class="bg-amber-800/80 hover:bg-amber-700 text-amber-200 font-semibold text-xs py-2 px-1 rounded-lg transition flex items-center justify-center gap-1 cursor-pointer border border-amber-600/40 shadow" title="Reiniciar Disyuntor / Circuit Breaker">
+                                    <span>⚡</span> Disyuntor
+                                </button>
+                                <button onclick="window.limpiarCuentaModal()" class="bg-gray-800 hover:bg-red-900/80 text-gray-300 hover:text-white font-semibold text-xs py-2 px-1 rounded-lg transition flex items-center justify-center gap-1 cursor-pointer border border-gray-700" title="Reiniciar balance y vaciar historial contable">
+                                    <span>🗑️</span> Reset
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Subventana 3.3: DINERO PARA OPERAR (Capital Asignado a Trading Desk) -->
+                        <div class="strategy-function-card bg-gradient-to-br from-gray-900 via-gray-850 to-cyan-950/40 rounded-xl p-4 shadow-xl border border-cyan-500/60 relative overflow-hidden">
+                            <div class="flex justify-between items-center mb-3 border-b border-gray-700/80 pb-2.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xl">⚡</span>
+                                    <div>
+                                        <h2 class="text-sm font-bold text-cyan-300 tracking-wide uppercase flex items-center gap-1.5">
+                                            Dinero para Operar
+                                        </h2>
+                                        <p class="text-[10px] text-gray-400">Cupo Asignado al Bot (La Reserva Protegida jamás se toca)</p>
+                                    </div>
+                                </div>
+                                <span class="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-600/60 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center gap-1 shadow-sm">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                    TRADING ACTIVO
+                                </span>
+                            </div>
+
+                            <!-- Saldo de Dinero para Operar -->
+                            <div class="bg-black/40 border border-cyan-500/30 rounded-lg p-3.5 text-center my-3 shadow-inner">
+                                <span class="text-[10px] font-semibold tracking-wider uppercase text-cyan-400/90 block mb-1">Cupo Total Asignado para Operar</span>
+                                <p id="operatingCapitalDisplay" class="font-mono text-3xl font-black text-cyan-300 tracking-tight drop-shadow-md">$0.00 USDT</p>
+
+                                <!-- Desglose de Cupo Operativo: En Activos vs Libre para Comprar -->
+                                <div class="mt-2.5 pt-2.5 border-t border-gray-800 grid grid-cols-2 gap-2.5 text-[11px] font-mono">
+                                    <div class="bg-gray-900/80 rounded px-2.5 py-2 border border-gray-800 text-left">
+                                        <span class="text-gray-400 block text-[9px] uppercase">Usado en Activos</span>
+                                        <span id="operatingUsedDisplay" class="font-bold text-amber-300">$0.00 USDT</span>
+                                    </div>
+                                    <div class="bg-gray-900/80 rounded px-2.5 py-2 border border-gray-800 text-left">
+                                        <span class="text-gray-400 block text-[9px] uppercase">Libre para Comprar</span>
+                                        <span id="operatingAvailableDisplay" class="font-bold text-emerald-400">$0.00 USDT</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Métrica de Reserva Protegida en Broker -->
+                                <div class="mt-2.5 pt-2.5 border-t border-gray-800 flex justify-between items-center text-[11px] font-mono px-1">
+                                    <span class="text-gray-400">Reserva Protegida en Broker:</span>
+                                    <span id="brokerIdleDisplay" class="font-bold text-emerald-400">$0.00 USDT (Intocable)</span>
+                                </div>
+                            </div>
+
+                            <!-- Botones de Transferencia Interna (Broker <-> Operar) -->
+                            <div class="grid grid-cols-2 gap-2.5 pt-1.5">
+                                <button onclick="window.asignarCapitalOperarModal()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-bold text-xs py-2 px-2 rounded-lg transition shadow flex items-center justify-center gap-1.5 cursor-pointer border border-cyan-400/40" title="Aumentar el cupo de Dinero para Operar tomando de la Reserva del Broker">
+                                    <span>➕</span> Asignar para Operar
+                                </button>
+                                <button onclick="window.devolverAlBrokerModal()" class="bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs py-2 px-2 rounded-lg transition shadow flex items-center justify-center gap-1.5 cursor-pointer border border-indigo-400/40" title="Reducir el cupo de Dinero para Operar y proteger más dinero en la Reserva del Broker">
+                                    <span>➖</span> Devolver al Broker
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Subventana 3.4: BILLETERA DE USO POR GANANCIA SEGURA (Potenciación de Ganadoras) -->
+                        <div class="strategy-function-card bg-gradient-to-br from-gray-900 via-gray-850 to-emerald-950/40 rounded-xl p-4 shadow-xl border border-emerald-500/60 relative overflow-hidden">
+                            <div class="flex justify-between items-center mb-3 border-b border-gray-700/80 pb-2.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xl">🚀</span>
+                                    <div>
+                                        <h2 class="text-sm font-bold text-emerald-300 tracking-wide uppercase flex items-center gap-1.5">
+                                            Billetera de Uso por Ganancia Segura
+                                        </h2>
+                                        <p class="text-[10px] text-gray-400">Fondo dedicado para potenciar operaciones que vuelan (se carga desde Dinero para Operar)</p>
+                                    </div>
+                                </div>
+                                <span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-600/60 px-2.5 py-0.5 rounded-full font-mono font-bold flex items-center gap-1 shadow-sm">
+                                    🔒 RIESGO CERO
+                                </span>
+                            </div>
+
+                            <!-- Saldo de Billetera de Ganancia Segura -->
+                            <div class="bg-black/40 border border-emerald-500/30 rounded-lg p-3.5 text-center my-3 shadow-inner">
+                                <span class="text-[10px] font-semibold tracking-wider uppercase text-emerald-400/90 block mb-1">Disponible para Potenciar Ganadoras</span>
+                                <p id="safeProfitWalletDisplay" class="font-mono text-3xl font-black text-emerald-300 tracking-tight drop-shadow-md">$0.00 USDT</p>
+
+                                <div class="mt-2.5 pt-2.5 border-t border-gray-800 grid grid-cols-2 gap-2.5 text-[11px] font-mono">
+                                    <div class="bg-gray-900/80 rounded px-2.5 py-2 border border-gray-800 text-left">
+                                        <span class="text-gray-400 block text-[9px] uppercase">Inyectado en Ganadoras</span>
+                                        <span id="safeProfitInjectedDisplay" class="font-bold text-amber-300">$0.00 USDT</span>
+                                    </div>
+                                    <div class="bg-gray-900/80 rounded px-2.5 py-2 border border-gray-800 text-left">
+                                        <span class="text-gray-400 block text-[9px] uppercase">Libre en Dinero p/ Operar</span>
+                                        <span id="safeProfitOpAvailRef" class="font-bold text-cyan-300">$266.00 USDT</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Botones de Transferencia (Dinero para Operar <-> Billetera de Ganancia Segura) -->
+                            <div class="grid grid-cols-2 gap-2.5 pt-1.5">
+                                <button onclick="window.cargarBilleteraGananciaModal()" class="bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs py-2 px-2 rounded-lg transition shadow flex items-center justify-center gap-1.5 cursor-pointer border border-emerald-400/40" title="Separar dinero desde Dinero para Operar y guardarlo en esta Billetera de Ganancia Segura">
+                                    <span>➕</span> Ingresar desde Operar
+                                </button>
+                                <button onclick="window.devolverBilleteraGananciaModal()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-2 px-2 rounded-lg transition shadow flex items-center justify-center gap-1.5 cursor-pointer border border-slate-400/40" title="Devolver dinero de esta Billetera de Ganancia Segura al cupo de Dinero para Operar">
+                                    <span>➖</span> Devolver a Operar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VENTANA 5: RADAR DE OPORTUNIDADES MACRO (COLAPSABLE) -->
+                    <details class="strategy-sector-card group">
+                        <summary class="strategy-window-header cursor-pointer select-none list-none flex justify-between items-center flex-wrap gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="strategy-window-title text-yellow-500 flex items-center gap-2">
+                                    <span>🔭</span> Radar de Oportunidades Macro
+                                </span>
+                                <span class="text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-500/60 px-2 py-0.5 rounded font-mono font-bold">ENCARGADO: 🐅 BALAM CIO</span>
+                                <span id="radarMacroLiveEngineBadge" class="text-[9px] bg-amber-950 text-amber-300 border border-amber-600/60 px-2 py-0.5 rounded font-mono font-bold">MOTOR: ⚡ ANTIGRAVITY (PRIORIDAD 1)</span>
+                            </div>
+                            <span class="text-xs text-gray-400 group-open:rotate-180 transition-transform duration-200">▼</span>
+                        </summary>
+
+                        <div class="space-y-3 pt-2">
+                            <!-- Subventana 5.1: Radar Macro (Agente de Inversiones con borde interno) -->
+                            <div id="radarOpportunitiesFunctionBlock" class="strategy-function-card">
+                                <div class="mb-2.5 border-b border-white/20 pb-2 flex justify-between items-center">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-semibold text-yellow-400">Patrullaje Automático de Oportunidades</span>
+                                        <span id="radarLiveStatus" class="text-[10px] bg-gray-500/20 text-gray-400 px-2 py-0.5 rounded border border-gray-500/50 transition-colors">OFF</span>
+                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer" title="Encender / Apagar Radar">
+                                        <input type="checkbox" id="investmentToggle" class="sr-only peer">
+                                        <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-600"></div>
+                                    </label>
+                                </div>
+
+                                <!-- Estado de Transferencia a Macro -->
+                                <div class="mb-2.5 p-2 bg-gray-800/90 rounded border border-white/20 flex items-center justify-between">
+                                    <span class="text-[11px] text-gray-300 font-semibold flex items-center gap-1.5">
+                                        <span>🔄</span> Pase a Macro:
+                                    </span>
+                                    <span id="transferModeBadge" class="text-[11px] font-mono px-2 py-0.5 rounded font-bold bg-purple-900/50 text-purple-300 border border-purple-500/40">
+                                        ⚡ Integrado con Modo Activo
+                                    </span>
+                                </div>
+                                <!-- Selector de Fuente para Radar de Oportunidades -->
+                                <div class="mb-2.5 p-2 bg-gray-800/90 rounded border border-white/20 flex items-center justify-between text-[11px]">
+                                    <span class="text-gray-300 font-semibold flex items-center gap-1.5">
+                                        <span>Fuente del Radar:</span>
+                                        <a href="http://localhost:8520/" target="_blank" class="text-[9.5px] text-cyan-400 hover:text-cyan-300 hover:underline inline-flex items-center gap-0.5 ml-1 font-mono" title="Abrir Monitor del Mercado en puerto 8520">
+                                            (:8520 ↗)
+                                        </a>
+                                    </span>
+                                    <select id="investmentSourceSelect" class="bg-gray-800 text-yellow-400 font-semibold p-1.5 rounded border border-gray-600 text-xs outline-none cursor-pointer">
+                                        <option value="monitor" selected>🖥️ Monitor del Mercado (:8520)</option>
+                                        <option value="native">🌐 Nativo (LLM + Web)</option>
+                                        <option value="hybrid">⚡ Híbrido (Ambos)</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Subventana 5.2: Contenedor de Tarjetas de Oportunidad -->
+                                <div id="macroOpportunitiesContainer" class="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                                    <div class="bg-gray-800 p-2.5 rounded-lg border border-gray-600">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="text-xs font-bold text-white">GOLD (Oro)</span>
+                                            <span class="text-[10px] text-green-400 font-bold bg-green-400/10 px-1.5 py-0.5 rounded">85% Confianza</span>
+                                        </div>
+                                        <p class="text-[10px] text-gray-400 leading-relaxed">Oportunidad: Tensiones geopolíticas indican alza. Apertura recomendada Lunes 09:30.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- VENTANA 6: CONECTIVIDAD E INFRAESTRUCTURA DE API -->
+                    <div class="strategy-sector-card">
+                        <div class="strategy-window-header">
+                            <span class="strategy-window-title text-purple-400">
+                                <span>⚙️</span> Conectividad e Infraestructura de API
+                            </span>
+                            <span class="strategy-window-badge bg-purple-950/80 text-purple-300 border border-purple-600/50">SEGURIDAD</span>
+                        </div>
+
+                        <!-- Subventana 6.1: API Key de Google Gemini -->
+                        <div id="geminiKeyFunctionBlock" class="strategy-function-card">
+                            <label for="apiKeyInput" class="strategy-input-label flex items-center gap-1.5">
+                                <span>🔑</span> API Key de Google Gemini (Para Motor IA):
+                            </label>
+                            <div class="flex space-x-2">
+                                <input type="password" id="apiKeyInput" placeholder="Pega tu API Key de Gemini..." class="bg-gray-900 text-white w-full rounded-lg p-2 text-sm border border-gray-700 outline-none focus:border-white">
+                                <button id="saveApiKeyBtn" class="bg-green-600 hover:bg-green-700 px-3.5 py-2 text-sm rounded-lg font-bold transition whitespace-nowrap shadow cursor-pointer">Guardar Clave</button>
+                            </div>
+                            <p class="strategy-helper-text flex justify-between">
+                                <span>Totalmente gratuita, dura toda la sesión.</span>
+                                <span id="apiKeyStatus" class="text-green-400 font-bold hidden">¡Guardada!</span>
+                            </p>
+                        </div>
+
+                        <!-- Subventana 6.2: Token Local del Backend -->
+                        <div id="backendTokenFunctionBlock" class="strategy-function-card">
+                            <label for="appTokenInput" class="strategy-input-label flex items-center gap-1.5">
+                                <span>🛡️</span> Token local del backend (opcional):
+                            </label>
+                            <div class="flex space-x-2">
+                                <input type="password" id="appTokenInput" autocomplete="off" placeholder="APP_SECRET_TOKEN / APP_TOKEN" class="bg-gray-900 text-white w-full rounded-lg p-2 text-sm border border-gray-700 outline-none focus:border-white">
+                                <button id="saveAppTokenBtn" class="bg-gray-700 hover:bg-gray-600 px-3.5 py-2 text-sm rounded-lg font-bold transition whitespace-nowrap shadow cursor-pointer">Guardar Token</button>
+                            </div>
+                            <p class="strategy-helper-text">Se guarda solo en la sesión de esta pestaña. Déjalo vacío para borrarlo.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Radar de Sentimiento (NLP) (Marco Blanco Sólido Canónico) -->
+            <div class="ecosystem-window bg-gray-800 rounded-xl p-4 shadow-lg">
+                <div class="mb-3 border-b border-gray-700 pb-3 flex justify-between items-center flex-wrap gap-2">
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h2 class="text-sm font-semibold text-white flex items-center gap-1.5">
+                                <span>📰</span> Radar de Sentimiento Macro (NLP)
+                            </h2>
+                            <span class="text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-500/60 px-2 py-0.5 rounded font-mono font-bold">ENCARGADO: 🐅 BALAM CIO</span>
+                            <span class="text-[9px] bg-purple-950 text-purple-300 border border-purple-600/60 px-2 py-0.5 rounded font-mono font-bold">MOTOR: ⚙️ NLP MATEMÁTICO</span>
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-0.5">Analiza titulares en vivo y calcula puntuación de -1 (pánico) a +1 (euforia).</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer" title="Activar o detener consultas de sentimiento">
+                        <input type="checkbox" checked id="sentimentToggle" class="sr-only peer">
+                        <div class="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
+                    </label>
+                </div>
+                
+                <div class="flex flex-col space-y-2 mb-3">
+                    <select id="newsSourceSelect" class="w-full bg-gray-900 text-xs text-gray-300 rounded outline-none p-1.5 cursor-pointer border border-gray-700">
+                        <option value="auto">📡 Auto (Inteligente)</option>
+                        <option value="coindesk">🟠 CoinDesk (Cripto)</option>
+                        <option value="yahoo">🔵 Google News (Wall St)</option>
+                        <option value="twitter">🐦 Twitter/X (Pro)</option>
+                    </select>
+                    <span id="sentimentScoreBadge" class="text-xs bg-gray-900 text-gray-400 px-2 py-1.5 rounded font-bold border border-gray-700 text-center block w-full shadow-inner">ESPERANDO...</span>
+                </div>
+
+                <!-- Termómetro Visual de Sentimiento -->
+                <div class="mb-4">
+                    <div class="flex justify-between text-[10px] text-gray-500 mb-1 font-semibold">
+                        <span class="text-red-400">Pánico (-1)</span>
+                        <span class="text-gray-400">Neutral (0)</span>
+                        <span class="text-green-400">Euforia (+1)</span>
+                    </div>
+                    <div class="relative w-full h-2 bg-gray-700 rounded-full overflow-hidden flex">
+                        <div class="h-full bg-gradient-to-r from-red-600 to-red-400" style="width: 33%"></div>
+                        <div class="h-full bg-gradient-to-r from-gray-500 to-gray-400" style="width: 34%"></div>
+                        <div class="h-full bg-gradient-to-r from-green-400 to-green-600" style="width: 33%"></div>
+                        <!-- Aguja Indicadora -->
+                        <div id="sentimentNeedle" class="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_5px_white] transition-all duration-500" style="left: 50%;"></div>
+                    </div>
+                </div>
+                
+                <div id="sentimentNewsContainer" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                    <p class="text-xs text-gray-500 text-center">Iniciando lectura de noticias...</p>
+                </div>
+            </div>
+
+        </div>
+
+
+
+    </div>
+
+
+
+
+    <!-- Modal de Copiloto (Oculto por defecto) -->
+    <div id="copilotModal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-gray-800 border border-blue-500 rounded-lg p-6 max-w-sm w-full shadow-[0_0_20px_rgba(59,130,246,0.5)]">
+            <h2 class="text-xl font-bold text-white mb-2 flex items-center">
+                <span class="text-2xl mr-2">⚠️</span> Autorización Requerida
+            </h2>
+            <p id="copilotMessage" class="text-sm text-gray-300 mb-4">
+                El Agente recomienda COMPRAR BTC/USDT.
+            </p>
+            <div class="bg-gray-900 p-3 rounded mb-6 text-xs text-gray-400 font-mono" id="copilotReason">
+                Razonamiento: ...
+            </div>
+            <div class="flex space-x-3">
+                <button id="btnReject" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded font-bold transition">
+                    Rechazar
+                </button>
+                <button id="btnApprove" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-bold transition">
+                    Aprobar Operación
+                </button>
+            </div>
+        </div>
+    </div>
+
+    </div>
+    <!-- /tradingView -->
+
+    <!-- ==================== VISTA DE GESTIÓN DE INVERSORES ==================== -->
+    <div id="investorsView" class="hidden container mx-auto p-4 space-y-6 mt-2">
+        <!-- Banner de Encabezado -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-xl gap-4">
+            <div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-2xl">🏛️</span>
+                    <h2 class="text-xl font-bold text-white tracking-wide">Fondo de Inversores (Libro Contable Independiente)</h2>
+                    <span class="bg-blue-900/60 text-blue-300 border border-blue-600/40 text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase">Separado del Broker</span>
+                    <select id="investorCurrencySelect" class="bg-gray-900 text-emerald-400 font-mono font-bold text-xs px-2.5 py-1 rounded-lg border border-emerald-600/60 focus:border-emerald-400 outline-none cursor-pointer" onchange="fetchInvestorsData()">
+                        <option value="USDT" selected>Divisa: USDT (Cripto · $1,000)</option>
+                        <option value="USD">Divisa: USD (Wall Street · $500)</option>
+                        <option value="ARS">Divisa: ARS (Local · $500,000)</option>
+                    </select>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">El dinero que ingresan, retiran o tienen los inversores es 100% independiente de las finanzas reales del Broker. El sistema solo te informa si existe diferencia para que ajustes manualmente.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <button id="btnNewInvestor" type="button" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shadow-lg shadow-emerald-900/30 cursor-pointer">
+                    <span>+</span> Nuevo Inversor
+                </button>
+                <button id="btnRefreshInvestors" type="button" class="bg-gray-700 hover:bg-gray-600 text-gray-200 font-bold px-3 py-1.5 rounded-lg text-xs transition cursor-pointer">
+                    🔄 Actualizar
+                </button>
+            </div>
+        </div>
+
+        <!-- Tarjetas de Métricas Claras: Broker vs Inversores vs Gastos vs Retirable -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total en Inversores</span>
+                <div id="invTotalInvestorsDisplay" class="text-xl font-extrabold text-cyan-400 font-mono mt-1">$1,000.00 USDT</div>
+                <div class="text-[11px] text-gray-400 mt-1 flex justify-between">
+                    <span>Suma de inversores</span>
+                    <span>Aportado: <b id="invTotalSharesDisplay" class="text-gray-300 font-mono">$1,000.00</b></span>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-xl border border-rose-900/40 shadow-md bg-gradient-to-b from-gray-800 to-rose-950/20">
+                <span class="text-xs font-semibold text-rose-300 uppercase tracking-wider">Gastos a Descontar</span>
+                <div id="invExpensesDisplay" class="text-xl font-extrabold text-rose-400 font-mono mt-1">-$0.00 USD</div>
+                <div class="text-[11px] text-gray-400 mt-1">Único descuento al retirar</div>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-xl border border-emerald-900/40 shadow-md bg-gradient-to-b from-gray-800 to-emerald-950/20">
+                <span class="text-xs font-semibold text-emerald-300 uppercase tracking-wider">Total Disponible Retiro</span>
+                <div id="invNetDistributableDisplay" class="text-xl font-extrabold text-emerald-400 font-mono mt-1">$1,000.00 USDT</div>
+                <div class="text-[11px] text-gray-400 mt-1">Total Inversores - Gastos</div>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Patrimonio en Broker</span>
+                <div id="invAumDisplay" class="text-xl font-extrabold text-green-400 font-mono mt-1">$1,000.37 USDT</div>
+                <div id="invBrokerBreakdownDisplay" class="text-[10px] text-gray-400 mt-1 font-mono truncate">Bóveda: $657.37 | Activos: $343.00</div>
+                <span id="invNavDisplay" class="hidden">$1.0000</span>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Aviso de Diferencia</span>
+                <div id="invReconStatus" class="mt-1 flex items-center gap-2">
+                    <span id="invReconDot" class="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span id="invReconText" class="text-xs font-bold text-amber-300 font-mono">Verificando...</span>
+                </div>
+                <div id="invReconDiff" class="text-[10px] text-gray-400 mt-1 font-mono truncate">Diferencia: $0.00</div>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Comisión Operador</span>
+                    <button id="btnEditOperatorFee" type="button" class="text-[10px] text-blue-400 hover:text-blue-300 underline cursor-pointer">Editar</button>
+                </div>
+                <div id="invOperatorFeeDisplay" class="text-xl font-extrabold text-purple-400 font-mono mt-1">0.0%</div>
+                <div class="text-[11px] text-gray-400 mt-1">Retención sobre utilidades</div>
+            </div>
+        </div>
+
+        <!-- Tabla de Inversores -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-xl overflow-hidden">
+            <div class="p-4 border-b border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-900/60 gap-2">
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>👥</span> Nómina de Inversores (Libro Contable Independiente)
+                </h3>
+                <span class="text-xs text-gray-400">Cada inversor puede retirar el <b>100% del dinero que tiene actualmente</b>, descontando únicamente su parte de gastos operativos.</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-gray-900/80 text-gray-400 uppercase font-bold text-[11px] border-b border-gray-700">
+                        <tr>
+                            <th class="p-3">Inversor</th>
+                            <th class="p-3 text-right text-emerald-300 font-bold">Rendimiento (Ganancia / Pérdida)</th>
+                            <th class="p-3 text-center">Participación</th>
+                            <th class="p-3 text-right text-cyan-300 font-bold">Dinero Actual (Tiene Hoy)</th>
+                            <th class="p-3 text-right text-rose-400">Gastos a Descontar</th>
+                            <th class="p-3 text-right text-emerald-400 font-bold">Puede Retirar (100% - Gastos)</th>
+                            <th class="p-3 text-center">Acciones (Ingresar / Retirar / Fijar / Quitar)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="investorsTableBody" class="divide-y divide-gray-700 font-mono">
+                        <tr>
+                            <td colspan="7" class="p-6 text-center text-gray-500 font-sans">Cargando nómina de inversores...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Panel de Gastos Generales & Operativos -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-xl overflow-hidden">
+            <div class="p-4 border-b border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-900/60 gap-3">
+                <div>
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>💸</span> Gastos Generales & Operativos (IA, APIs, Conectividad)
+                    </h3>
+                    <p class="text-xs text-gray-400 mt-0.5">Se deducen proporcionalmente del dinero a retirar de los inversores. <b>El dinero para operar en el broker permanece intacto.</b></p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button id="btnSetExchangeRate" type="button" class="bg-gray-700 hover:bg-gray-600 text-gray-200 font-bold px-3 py-1.5 rounded-lg text-xs transition cursor-pointer border border-gray-600">
+                        ⚙️ Tasa: <span id="lblUsdtArsRate" class="text-white font-mono">1,250</span> ARS/USD
+                    </button>
+                    <button id="btnAddExpense" type="button" class="bg-rose-700 hover:bg-rose-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shadow-lg shadow-rose-950/40 cursor-pointer">
+                        <span>+</span> Registrar Gasto
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-gray-900/80 text-gray-400 uppercase font-bold text-[11px] border-b border-gray-700">
+                        <tr>
+                            <th class="p-3">Fecha</th>
+                            <th class="p-3">Concepto / Descripción</th>
+                            <th class="p-3 text-center">Categoría</th>
+                            <th class="p-3 text-right">Monto Original</th>
+                            <th class="p-3 text-right">Tasa Aplicada</th>
+                            <th class="p-3 text-right">Total Deducible (USD)</th>
+                            <th class="p-3 text-center">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expensesTableBody" class="divide-y divide-gray-700 font-mono">
+                        <tr>
+                            <td colspan="7" class="p-5 text-center text-gray-500 font-sans">No hay gastos operativos registrados.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Modal para Registrar Nuevo Gasto Operativo -->
+        <div id="modalAddExpense" class="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+            <div class="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+                <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">💸</span>
+                        <h3 class="text-base font-bold text-white">Registrar Gasto Operativo</h3>
+                    </div>
+                    <button id="btnCloseExpenseModal" type="button" class="text-gray-400 hover:text-white text-lg leading-none cursor-pointer">×</button>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-1">Concepto / Descripción *</label>
+                        <input id="inputExpenseDesc" type="text" placeholder="Ej: Suscripción IA Gemini / OpenAI, Internet Fibra, API Alpaca" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-700 text-white font-sans focus:border-rose-500 outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-gray-300 font-semibold mb-1">Categoría</label>
+                            <select id="selectExpenseCategory" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-700 text-white focus:border-rose-500 outline-none">
+                                <option value="IA">🤖 Inteligencia Artificial</option>
+                                <option value="INTERNET">🌐 Conectividad / Internet</option>
+                                <option value="API">🔌 APIs / Datos de Mercado</option>
+                                <option value="SERVIDOR">🖥️ VPS / Servidor</option>
+                                <option value="GENERAL" selected>📁 General / Otro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-300 font-semibold mb-1">Moneda del Gasto</label>
+                            <select id="selectExpenseCurrency" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-700 text-white font-bold focus:border-rose-500 outline-none">
+                                <option value="USD">Dólares (USD)</option>
+                                <option value="ARS">Pesos (ARS)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-gray-300 font-semibold mb-1">Monto Original *</label>
+                            <input id="inputExpenseAmount" type="number" step="any" placeholder="Ej: 5000 o 5.0" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-700 text-white font-mono focus:border-rose-500 outline-none">
+                        </div>
+                        <div id="containerExpenseRate">
+                            <label class="block text-gray-300 font-semibold mb-1">Tasa ARS/USD</label>
+                            <input id="inputExpenseRate" type="number" step="any" value="1250" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-700 text-white font-mono focus:border-rose-500 outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Vista previa del importe convertido a USD -->
+                    <div class="bg-gray-950 p-3 rounded-lg border border-gray-800 flex justify-between items-center">
+                        <span class="text-gray-400">Total deducible del fondo:</span>
+                        <span id="previewExpenseUsd" class="text-sm font-bold text-rose-400 font-mono">$0.00 USD</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-400 mb-1">Notas / Factura (Opcional)</label>
+                        <input id="inputExpenseNotes" type="text" placeholder="Observaciones adicionales" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-700 text-gray-300 font-sans focus:border-rose-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2.5 pt-2 border-t border-gray-800">
+                    <button id="btnCancelExpense" type="button" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-xs cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button id="btnSubmitExpense" type="button" class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-900/40 cursor-pointer">
+                        Guardar Gasto
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- /investorsView -->
+
+    <script src="js/trading_guards.js?v=5"></script>
+    <script src="js/ui_components.js?v=20261019_ui"></script>
+    <script src="js/app.js?v=20261110_sem"></script>
+    <script src="js/cio_cockpit.js?v=1"></script>
+    <script>
+        // Controlador interactivo ultra-estable para el menú desplegable de Terminales & Páginas del Ecosistema
+        (function initEcosystemDropdown() {
+            const btn = document.getElementById('navEcosystemBtn');
+            const menu = document.getElementById('navEcosystemMenu');
+            const arrow = document.getElementById('navEcosystemArrow');
+            const wrapper = document.getElementById('navEcosystemDropdownWrapper');
+            if (!btn || !menu) return;
+
+            let isOpen = false;
+            let isPinnedByClick = false;
+            let closeTimer = null;
+
+            function openMenu() {
+                if (closeTimer) {
+                    clearTimeout(closeTimer);
+                    closeTimer = null;
+                }
+                isOpen = true;
+                menu.classList.remove('hidden');
+                if (arrow) arrow.style.transform = 'rotate(180deg)';
+            }
+
+            function closeMenu(force = false) {
+                if (isPinnedByClick && !force) {
+                    return; // Si el usuario hizo clic, queda FIJADO firmemente (no se cierra por mover el ratón)
+                }
+                if (closeTimer) {
+                    clearTimeout(closeTimer);
+                    closeTimer = null;
+                }
+                isOpen = false;
+                isPinnedByClick = false;
+                menu.classList.add('hidden');
+                if (arrow) arrow.style.transform = 'rotate(0deg)';
+            }
+
+            // Al hacer clic en el botón: alterna y FIJA el menú
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isOpen && isPinnedByClick) {
+                    closeMenu(true);
+                } else {
+                    isPinnedByClick = true;
+                    openMenu();
+                }
+            });
+
+            // Al pasar el ratón (hover): abre con fluidez
+            wrapper.addEventListener('mouseenter', () => {
+                if (closeTimer) {
+                    clearTimeout(closeTimer);
+                    closeTimer = null;
+                }
+                openMenu();
+            });
+
+            // Al retirar el ratón: espera 400ms de gracia (solo si NO fue fijado por clic)
+            wrapper.addEventListener('mouseleave', () => {
+                if (isPinnedByClick) return; // Fijado por clic: NO se cierra por mover el ratón
+                closeTimer = setTimeout(() => {
+                    closeMenu(false);
+                }, 400);
+            });
+
+            // Al hacer clic en cualquier enlace interno: cierra el menú
+            menu.addEventListener('click', (e) => {
+                if (e.target.closest('a')) {
+                    closeMenu(true);
+                }
+            });
+
+            // Clic en cualquier otro lugar de la página: cierra
+            document.addEventListener('click', (e) => {
+                if (!wrapper.contains(e.target)) {
+                    closeMenu(true);
+                }
+            });
+
+            // Tecla Escape: cierra
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeMenu(true);
+                    if (window.toggleLaboratoryModal) window.toggleLaboratoryModal(false);
+                }
+            });
+        })();
+
+        // Controlador de Paneles Auxiliares (RSI, ATR, Guía Rápida)
+        window.toggleAuxiliaryPanel = function(panelId, isChecked) {
+            const panel = document.getElementById(panelId);
+            if (!panel) return;
+            if (isChecked) {
+                panel.classList.remove('hidden');
+                setTimeout(() => {
+                    window.dispatchEvent(new Event('resize'));
+                }, 50);
+            } else {
+                panel.classList.add('hidden');
+            }
+        };
+    </script>
+
+    <!-- ========================================================================= -->
+    <!-- 🎛️ MODAL: GESTOR DE ESTRATEGIAS Y SUBMÓDULOS (BLINDAJE DE POSICIONAMIENTO) -->
+    <!-- ========================================================================= -->
+    <div id="strategyManagerModal" onclick="if (event.target === this) window.closeStrategyManagerModal();" class="hidden fixed inset-0 z-[100000] p-3 sm:p-5 flex items-start justify-center overflow-y-auto" style="position: fixed; inset: 0; z-index: 100000; background-color: rgba(0, 0, 0, 0.88); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 20px 12px; align-items: flex-start; justify-content: center;">
+        <div class="bg-gray-950 border border-cyan-500/60 rounded-2xl w-full shadow-2xl flex flex-col" style="max-width: 960px; max-height: calc(100vh - 40px); height: calc(100vh - 40px); overflow: hidden; position: relative; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.9), 0 0 25px rgba(6,182,212,0.3);" onclick="event.stopPropagation()">
+            <!-- Header (Fijo al tope, siempre visible, nunca cortado) -->
+            <div class="p-4 bg-gray-900/95 border-b border-gray-800 flex items-center justify-between shrink-0" style="flex-shrink: 0;">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl">🎛️</span>
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            Gestor de Estrategias & Submódulos
+                            <span class="text-[10px] bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-700 font-mono">Kula · Balam</span>
+                        </h2>
+                        <p class="text-xs text-gray-400">Inspecciona y despliega cada fórmula: tilda o desmarca subestrategias (LONG, SHORT, Filtros), calibra parámetros o archiva.</p>
+                    </div>
+                </div>
+                <!-- Botón de Cierre "X" Prominente y de Alto Contraste -->
+                <button type="button" id="btnHeaderCloseStrategyModal" onclick="window.closeStrategyManagerModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-950/80 hover:bg-red-900 text-red-200 hover:text-white border border-red-700/80 hover:border-red-500 font-bold text-xs shadow-md transition cursor-pointer" title="Cerrar ventana">
+                    <span class="text-base font-extrabold leading-none">✕</span>
+                    <span class="font-mono">CERRAR</span>
+                </button>
+            </div>
+
+            <!-- Contenido Scrollable Interno -->
+            <div id="strategyManagerContainer" class="p-4 overflow-y-auto space-y-4 text-xs" style="flex: 1 1 auto; min-height: 0; overflow-y: auto;">
+                <div class="text-center py-8 text-gray-400">
+                    <span class="animate-spin inline-block mr-2">⚙️</span> Cargando configuración de estrategias...
+                </div>
+            </div>
+
+            <!-- Footer (Fijo a la base) -->
+            <div class="p-3 bg-gray-900/90 border-t border-gray-800 flex items-center justify-between text-xs text-gray-400 shrink-0" style="flex-shrink: 0;">
+                <span class="flex items-center gap-1.5 text-[11px]">
+                    <span class="text-emerald-400">●</span> Las conmutaciones operan en caliente sobre el motor sin necesidad de reiniciar el servidor.
+                </span>
+                <button type="button" onclick="window.closeStrategyManagerModal()" class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white font-bold rounded-lg border border-gray-700 shadow transition cursor-pointer">
+                    ✕ Cerrar Ventana
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menú Desplegable Universal del Ecosistema -->
+    <script src="universal-nav.js?v=20261031_52"></script>
+    <!-- Scripts y Cierre -->
+</body>
+</html>

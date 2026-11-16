@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Kula Balam (Bot Standalone)
+Name[es_ES]=Kula Balam (Bot Standalone)
+GenericName=Lanzador del Bot Kula Balam
+Comment=Inicia el bot y terminal de Kula Balam (:18767 / :18087)
+Exec=/home/raul/Escritorio/proyectos/kula_balam/lanzar_bot.sh
+Path=/home/raul/Escritorio/proyectos/kula_balam
+Icon=org.gnome.Settings-device-diagnostics-symbolic
+Terminal=true
+StartupNotify=true
+Categories=Finance;Utility;Development;

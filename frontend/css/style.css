@@ -1,0 +1,394 @@
+/* ==========================================================================
+   ESTILOS PROFESIONALES DE UI Y CONTROLES DE FORMULARIO (TRADING OLLAMA)
+   ========================================================================== */
+
+html {
+    overflow-y: scroll;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Scrollbars profesionales para todo el dashboard --- */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #0b1120;
+}
+::-webkit-scrollbar-thumb {
+    background: #27354a;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #38bdf8;
+}
+
+/* Custom scrollbar para la terminal */
+#terminal::-webkit-scrollbar {
+    width: 6px;
+}
+#terminal::-webkit-scrollbar-track {
+    background: #050810; 
+}
+#terminal::-webkit-scrollbar-thumb {
+    background: #1e293b; 
+    border-radius: 4px;
+}
+#terminal::-webkit-scrollbar-thumb:hover {
+    background: #22c55e; 
+}
+
+/* --- Estilizado consistente y profesional de Menús Desplegables (SELECT) --- */
+select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-color: #0f172a !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2394a3b8'%3e%3cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.75rem center !important;
+    background-size: 1.15em 1.15em !important;
+    padding-left: 0.75rem !important;
+    padding-right: 2.35rem !important;
+    border: 1px solid #334155 !important;
+    border-radius: 8px !important;
+    color: #f1f5f9 !important;
+    font-size: 0.85rem !important;
+    line-height: 1.35 !important;
+    cursor: pointer !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+select:hover {
+    border-color: #475569 !important;
+}
+
+select:focus {
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25) !important;
+    outline: none !important;
+}
+
+/* Opciones dentro de los menús (Evita que el navegador corte texto o pinte en blanco) */
+select option,
+select optgroup {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    padding: 9px 12px !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+}
+
+select optgroup {
+    font-weight: 700 !important;
+    color: #38bdf8 !important;
+    border-top: 1px solid #1e293b;
+    margin-top: 4px;
+    padding-top: 6px;
+}
+
+/* Selector del Activo en el Navbar */
+#symbolSelect {
+    max-width: 320px !important;
+    min-width: 200px !important;
+    font-weight: 600 !important;
+    background-color: #090d16 !important;
+    border-color: #1e293b !important;
+    padding-left: 0.75rem !important;
+    padding-right: 2.2rem !important;
+}
+
+/* Selectores del panel lateral de estrategias y ajustes */
+#strategyModeSelect,
+#tpSlSelect,
+#timeframeSelect,
+#riskSelect,
+#engineSelect,
+#brokerFeeSelect,
+#navAgentModeSelect {
+    min-height: 38px !important;
+}
+
+/* Inputs numéricos estilizados */
+input[type="number"],
+input[type="text"] {
+    background-color: #0f172a !important;
+    border: 1px solid #334155 !important;
+    border-radius: 7px !important;
+    color: #f8fafc !important;
+    padding: 0.45rem 0.65rem !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="number"]:focus,
+input[type="text"]:focus {
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2) !important;
+    outline: none !important;
+}
+
+/* ==========================================================================
+   COMPONENTES MODERNOS DE UI (CUSTOM SELECT, TOASTS Y MODALES)
+   ========================================================================== */
+
+/* Contenedor del Custom Select */
+.custom-select-wrapper {
+    position: relative;
+    user-select: none;
+}
+
+.custom-select-trigger {
+    cursor: pointer;
+    background-color: #0d1424;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    transition: all 0.18s ease;
+}
+
+.custom-select-trigger:hover {
+    border-color: #38bdf8;
+    background-color: #111a30;
+}
+
+.custom-select-dropdown {
+    box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(56, 189, 248, 0.15);
+    background: #090e1a;
+    border: 1px solid #1e293b;
+}
+
+.custom-select-option {
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.custom-select-option:hover {
+    background-color: rgba(56, 189, 248, 0.1);
+    color: #38bdf8;
+}
+
+/* Scrollbar personalizada */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #060911;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #38bdf8;
+}
+
+/* Toasts no bloqueantes */
+.ui-toast {
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ==========================================================================
+   DISEÑO PROFESIONAL DE ALTA CALIDAD: MARCOS BLANCOS SÓLIDOS Y ESPACIADO
+   ========================================================================== */
+
+/* Marco blanco sólido para cada función individual en la ventana de ajustes */
+.strategy-function-card {
+    background: rgba(15, 23, 42, 0.88);
+    border: 1.5px solid #ffffff !important;
+    border-radius: 0.75rem !important; /* 12px */
+    padding: 1.125rem !important; /* 18px */
+    margin-bottom: 1.125rem !important; /* 18px de separación entre subventanas */
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.strategy-function-card:last-child {
+    margin-bottom: 0 !important;
+}
+
+.strategy-function-card:hover {
+    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.18);
+}
+
+/* Tarjeta estándar de sector funcional (Marco blanco sólido) */
+.strategy-sector-card {
+    background: rgba(15, 23, 42, 0.70);
+    border: 1.5px solid #ffffff !important;
+    border-radius: 0.875rem !important; /* 14px */
+    padding: 1.25rem !important; /* 20px */
+    margin-bottom: 1.125rem !important; /* 18px */
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    transition: box-shadow 0.2s ease;
+}
+
+.strategy-sector-card:last-child {
+    margin-bottom: 0 !important;
+}
+
+.strategy-sector-card:hover {
+    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.14);
+}
+
+/* Tarjeta maestra destacada para el Bloque Complementario (Marco blanco sólido prominente) */
+.strategy-composite-card {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 41, 59, 0.88) 100%);
+    border: 2px solid #ffffff !important;
+    border-radius: 0.875rem; /* 14px */
+    padding: 1.25rem; /* 20px */
+    margin-bottom: 1.125rem; /* 18px */
+    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Separador blanco sólido de complementos (Estado de Mercado vs Estrategia) */
+.strategy-complement-divider {
+    height: 2px;
+    background: #ffffff !important;
+    margin: 1.25rem 0; /* 20px simétrico */
+    border: none;
+    opacity: 0.95;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
+}
+
+/* Divisor sutil blanco para sub-secciones */
+.strategy-sub-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.45) !important;
+    margin: 1rem 0; /* 16px arriba y abajo */
+    border: none;
+}
+
+/* Tipografía de etiquetas refinada */
+.strategy-input-label {
+    display: block;
+    font-size: 0.75rem; /* 12px */
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 0.375rem; /* 6px */
+    letter-spacing: 0.015em;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-break: normal;
+    white-space: normal !important;
+}
+
+/* Texto de ayuda debajo de controles */
+.strategy-helper-text {
+    font-size: 0.65rem; /* 10.4px */
+    color: #cbd5e1;
+    margin-top: 0.375rem;
+    line-height: 1.45;
+}
+
+/* Encabezados para cada Ventana / Sector principal */
+.strategy-window-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.625rem;
+    margin-bottom: 0.875rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.strategy-window-title {
+    font-size: 0.775rem; /* ~12.5px */
+    font-weight: 700;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.strategy-window-badge {
+    font-size: 0.625rem; /* 10px */
+    font-family: ui-monospace, monospace;
+    font-weight: 700;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    letter-spacing: 0.03em;
+}
+
+/* === SEMÁFORO OPERATIVO KULA BALAM (0 TOKENS) === */
+.kula-sem-strip {
+    max-width: 1720px;
+    margin: 8px auto 0 auto;
+    padding: 7px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(51, 65, 85, 0.75);
+    background: rgba(15, 23, 42, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 11px;
+}
+.kula-sem-pills {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.kula-sem-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-weight: 600;
+    border: 1px solid rgba(71, 85, 105, 0.65);
+    background: rgba(30, 41, 59, 0.85);
+    color: #cbd5e1;
+}
+.kula-sem-pill.sem-green { border-color: rgba(16, 185, 129, 0.55); color: #6ee7b7; background: rgba(6, 78, 59, 0.35); }
+.kula-sem-pill.sem-yellow { border-color: rgba(245, 158, 11, 0.55); color: #fcd34d; background: rgba(120, 53, 15, 0.35); }
+.kula-sem-pill.sem-red { border-color: rgba(239, 68, 68, 0.75); color: #fca5a5; background: rgba(127, 29, 29, 0.45); }
+.kula-sem-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.sem-green .kula-sem-dot { background: #10b981; box-shadow: 0 0 6px #10b981; }
+.sem-yellow .kula-sem-dot { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+.sem-red .kula-sem-dot { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+.kula-sem-btn {
+    background: rgba(30, 41, 59, 0.95);
+    border: 1px solid rgba(100, 116, 139, 0.65);
+    color: #e2e8f0;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.kula-sem-btn:hover { background: rgba(51, 65, 85, 0.95); }
+.kula-sem-alert {
+    max-width: 1720px;
+    margin: 4px auto 0 auto;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(239, 68, 68, 0.6);
+    background: rgba(127, 29, 29, 0.38);
+    color: #fecaca;
+    font-size: 11px;
+}
+

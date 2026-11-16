@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Kula Balam (Sistema Completo)
+Name[es_ES]=Kula Balam (Sistema Completo)
+GenericName=Lanzador Integrado Kula Balam + Monitor
+Comment=Inicia backend Kula Balam (:18767), frontend (:18087) y Monitor del Mercado (:8520)
+Exec=/home/raul/Escritorio/proyectos/kula_balam/lanzar_todo.sh
+Path=/home/raul/Escritorio/proyectos/kula_balam
+Icon=zenity
+Terminal=true
+StartupNotify=true
+Categories=Finance;Utility;Development;

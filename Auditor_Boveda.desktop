@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Auditor Bóveda SQLite
+Name[es_ES]=Auditor Bóveda SQLite
+GenericName=Auditor Forense de Kula Balam
+Comment=Inspecciona base de datos SQLite y copia el reporte para Gemini
+Exec=bash "/home/raul/Escritorio/proyectos/kula_balam/lanzar_auditor.sh"
+Path=/home/raul/Escritorio/proyectos/kula_balam
+Icon=utilities-system-monitor
+Terminal=true
+Categories=Finance;Utility;Development;
+StartupNotify=true

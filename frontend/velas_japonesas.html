@@ -1,0 +1,2117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estudio de Velas Japonesas · Atlas Cuantitativo</title>
+  <!-- Tailwind CSS -->
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <!-- Design System & Tokens Compartidos Kula Balam -->
+  <link rel="stylesheet" href="ecosystem-theme.css?v=20261031_1">
+  <style>
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="bg-[#06090e] text-slate-100 antialiased min-h-screen p-3 md:p-6 font-sans custom-scrollbar">
+
+  <div class="max-w-7xl mx-auto space-y-6">
+    <!-- Header -->
+    <header class="border-b border-slate-800 pb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
+          <span>◆</span> Trading Cuantitativo & Order Flow Institucional
+        </div>
+        <h1 class="text-2xl md:text-4xl font-extrabold tracking-tight text-white flex items-center gap-3">
+          Atlas Cuantitativo de Velas Japonesas
+          <span class="text-xs font-mono font-normal bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-lg">
+            v2.0 Gráficos Reales
+          </span>
+        </h1>
+        <p class="text-slate-400 text-xs md:text-sm mt-1">
+          Visualización de contexto real de mercado, psicología de subasta, detección en vivo, volumen VPA y métricas de Thomas Bulkowski.
+        </p>
+      </div>
+
+      <!-- Quick filters & Ecosystem Nav -->
+      <div class="flex flex-wrap items-center gap-2 mb-2 sm:mb-0">
+          <a href="terminal_velas_cio.html" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/40 text-xs font-bold transition flex items-center gap-1.5 shadow-lg">
+            <span>⚡</span> Terminal del CIO
+          </a>
+          <!-- Menú Desplegable Universal del Ecosistema -->
+          <div id="navEcosystemContainer"></div>
+        </div>
+        <div class="flex flex-wrap gap-2 text-xs">
+        <button onclick="filterCategory('all', event)" class="cat-btn px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-medium transition hover:bg-emerald-500">Todos</button>
+        <button onclick="filterCategory('reversion_alcista', event)" class="cat-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-medium transition hover:bg-slate-700">Reversión Alcista</button>
+        <button onclick="filterCategory('reversion_bajista', event)" class="cat-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-medium transition hover:bg-slate-700">Reversión Bajista</button>
+        <button onclick="filterCategory('continuacion', event)" class="cat-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-medium transition hover:bg-slate-700">Continuación</button>
+        <button onclick="filterCategory('indecision', event)" class="cat-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-medium transition hover:bg-slate-700">Indecisión / Doji</button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- Left: Interactive Pattern Selector -->
+      <div class="lg:col-span-4 space-y-3">
+        <div class="flex items-center justify-between px-1">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Catálogo de Formaciones</h3>
+          <span id="pattern-count" class="text-[11px] text-slate-500 font-mono">19 Patrones</span>
+        </div>
+        <div id="patterns-list" class="space-y-2 max-h-[720px] overflow-y-auto pr-2 custom-scrollbar">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Right: Main Terminal & Visualizer -->
+      <div class="lg:col-span-8 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-2xl relative space-y-5">
+        
+        <!-- Header Info & View Switcher -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2 id="view-title" class="text-xl md:text-2xl font-bold text-white tracking-wide">🔨 Martillo Alcista (Hammer)</h2>
+              <span id="view-badge" class="px-2.5 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Reversión Alcista</span>
+            </div>
+            <p id="view-subtitle" class="text-xs text-slate-400 mt-1">Patrón de 1 vela en suelo tendencial con absorción de oferta masiva.</p>
+          </div>
+
+          <!-- Mode Toggle: Real Chart vs Zoom Anatomy -->
+          <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
+            <button id="btn-mode-market" onclick="setChartMode('market')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white transition flex items-center gap-1.5 shadow-sm">
+              <span>📈</span> Gráfico de Mercado Real
+            </button>
+            <button id="btn-mode-anatomy" onclick="setChartMode('anatomy')" class="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5">
+              <span>🔬</span> Anatomía
+            </button>
+          </div>
+        </div>
+
+        <!-- Chart Screen: Realistic Market Candle Chart -->
+        <div class="bg-slate-950 rounded-xl border border-slate-800 p-3 md:p-4 relative">
+          <!-- Chart Top Toolbar -->
+          <div class="flex items-center justify-between text-xs pb-3 border-b border-slate-800/80 mb-2">
+            <div class="flex items-center gap-3">
+              <span id="chart-asset-ticker" class="font-mono font-bold text-emerald-400">NVDA / USD · 1D</span>
+              <span class="text-slate-500 hidden sm:inline">|</span>
+              <span id="chart-context-desc" class="text-slate-400 text-[11px] truncate max-w-[280px]">Tendencia bajista a soporte mayor</span>
+            </div>
+            <div class="flex items-center gap-2 text-[11px] font-mono">
+              <span class="flex items-center gap-1 text-amber-400"><span class="w-2 h-0.5 bg-amber-400 inline-block"></span> EMA 20</span>
+              <span class="flex items-center gap-1 text-emerald-400"><span class="w-2 h-0.5 bg-emerald-400 inline-block"></span> Soporte</span>
+              <span class="flex items-center gap-1 text-rose-400"><span class="w-2 h-0.5 bg-rose-400 inline-block"></span> Resistencia</span>
+            </div>
+          </div>
+
+          <!-- Main SVG Canvas for the realistic market chart -->
+          <div id="chart-render-area" class="w-full h-[360px] md:h-[400px] flex items-center justify-center">
+            <!-- Dynamically rendered by JS -->
+          </div>
+
+          <!-- Bottom Legend for Levels -->
+          <div class="mt-3 pt-2 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+            <div class="bg-slate-900/80 p-2 rounded border border-slate-800">
+              <span class="text-slate-500 text-[10px] block">NIVEL CLAVE</span>
+              <span id="stat-key-level" class="text-slate-200 font-bold">$135.00 Soporte</span>
+            </div>
+            <div class="bg-slate-900/80 p-2 rounded border border-slate-800">
+              <span class="text-slate-500 text-[10px] block">GATILLO ENTRADA</span>
+              <span id="stat-entry-price" class="text-emerald-400 font-bold">$143.60</span>
+            </div>
+            <div class="bg-slate-900/80 p-2 rounded border border-slate-800">
+              <span class="text-slate-500 text-[10px] block">STOP LOSS</span>
+              <span id="stat-sl-price" class="text-rose-400 font-bold">$134.20 (-1.5x ATR)</span>
+            </div>
+            <div class="bg-slate-900/80 p-2 rounded border border-slate-800">
+              <span class="text-slate-500 text-[10px] block">OBJETIVO T2 (R:R)</span>
+              <span id="stat-tp-price" class="text-indigo-400 font-bold">$162.00 (1:2.0)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Volume & Psychology Deep Dive -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+            <div class="font-bold text-amber-400 flex items-center gap-1.5 uppercase tracking-wide">
+              <span>⚡</span> Comportamiento del Volumen (VPA / Wyckoff)
+            </div>
+            <p id="view-vpa" class="text-slate-300 leading-relaxed text-xs">
+              Volumen muy superior a la media de 20 periodos (RVOL &gt; 1.8). Refleja que el dinero institucional colocó órdenes pasivas de compra y absorbió la capitulación minorista.
+            </p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+            <div class="font-bold text-indigo-400 flex items-center gap-1.5 uppercase tracking-wide">
+              <span>🧠</span> Psicología Institucional & Trampa de Liquidez
+            </div>
+            <p id="view-psychology" class="text-slate-300 leading-relaxed text-xs">
+              Los osos intentaron marcar nuevos mínimos para activar los Stop Loss de los compradores. El Smart Money utilizó esa liquidez para acumular a precio de descuento, expulsando a los vendedores antes del cierre.
+            </p>
+          </div>
+        </div>
+
+        <!-- Quantitative Specs & Bulkowski Performance Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-500 block text-[10px] uppercase font-semibold">Dirección Teórica</span>
+            <span id="view-bias" class="text-sm font-bold text-white mt-0.5 block">Alcista</span>
+          </div>
+          <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-500 block text-[10px] uppercase font-semibold">Tasa de Éxito (Bulkowski)</span>
+            <span id="view-reversal-rate" class="text-sm font-bold text-emerald-400 mt-0.5 block">60% de acierto</span>
+          </div>
+          <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-500 block text-[10px] uppercase font-semibold">Tasa de Falsa Ruptura</span>
+            <span id="view-failure" class="text-sm font-bold text-amber-400 mt-0.5 block">32% sin confirmación</span>
+          </div>
+          <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-500 block text-[10px] uppercase font-semibold">R:R Asimétrico Neto</span>
+            <span id="view-rr" class="text-sm font-bold text-indigo-400 mt-0.5 block">≥ 1:2.0 Neto</span>
+          </div>
+        </div>
+
+        <!-- Institutional 5-Step Validation Checklist -->
+        <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 space-y-2">
+          <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Protocolo de Confluencia Institucional (5 Factores)</h4>
+          <ul id="view-checklist" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-400">
+            <!-- Populated dynamically -->
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    
+    <!-- Sector Cuantitativo: Interpretación Institucional de RSI, ATR y VWAP -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-xl space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-2">
+        <div>
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20 mb-1">
+            <span>🔬</span> Motores Cuantitativos & Gestión de Riesgo Institucional
+          </div>
+          <h2 class="text-lg md:text-xl font-bold text-white">Interpretación Cuantitativa de RSI, ATR y VWAP</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Cómo auditan los algoritmos de Wall Street y el CIO de Antigravity el oscilador de momentum, el combustible del mercado y la línea de flotación de volumen.</p>
+        </div>
+        <a href="terminal_velas_cio.html" class="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 border border-indigo-500/50 text-xs font-bold transition flex items-center gap-1.5 shadow self-start sm:self-auto">
+          <span>⚡</span> Probar en Vivo en Terminal del CIO
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        <!-- Tarjeta 1: RSI 14 (Motor de Divergencias) -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="font-bold text-purple-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <span>📊</span> RSI 14 · Índice de Fuerza Relativa
+            </span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800 font-bold">MOMENTUM</span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Mide la velocidad del precio en una escala de 0 a 100. En el trading cuantitativo institucional, los niveles estáticos (<strong class="text-purple-300">&lt;30 Sobreventa</strong> o <strong class="text-purple-300">&gt;70 Sobrecompra</strong>) no son suficientes por sí solos.
+          </p>
+          <div class="space-y-2 text-xs">
+            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-purple-500/20">
+              <strong class="text-emerald-400 block mb-0.5 font-mono">⚡ Divergencia Regular Alcista (Gatillo A+):</strong>
+              <span class="text-slate-400">El precio marca un mínimo más bajo (Lower Low) pero el RSI marca un mínimo más alto (Higher Low). Demuestra agotamiento de la oferta y absorción pasiva. Confluencia indispensable para validar un Martillo.</span>
+            </div>
+            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-purple-500/20">
+              <strong class="text-rose-400 block mb-0.5 font-mono">⚠️ Divergencia Regular Bajista:</strong>
+              <span class="text-slate-400">El precio marca un nuevo máximo (Higher High) pero el RSI marca un máximo descendente (Lower High). Alerta trampa de toros y distribución institucional previa a una caída.</span>
+            </div>
+            <div class="bg-purple-950/40 p-2 rounded border border-purple-700/40 text-[11px] text-purple-200">
+              <strong>Penalización Cuantitativa:</strong> Si un patrón de giro alcista carece de divergencia RSI, se reduce su nivel de confianza en un <strong>15%</strong> y se exige confirmación de cierre estricto.
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjeta 2: ATR 14 (Volatilidad & Filtro Squeeze) -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="font-bold text-amber-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <span>📏</span> ATR 14 · Rango Verdadero Promedio
+            </span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-bold">COMBUSTIBLE</span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Mide el rango dinámico del mercado en dólares o pips. Establece la distancia matemática requerida para que el ruido intradía no barra la posición.
+          </p>
+          <div class="space-y-2 text-xs">
+            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-amber-500/20">
+              <strong class="text-rose-400 block mb-0.5 font-mono">🛡️ Stop Loss Dinámico a 1.5x ATR:</strong>
+              <span class="text-slate-400">El Stop Loss se sitúa exactamente a <span class="text-rose-300 font-bold">Mínimo - 1.5 &times; ATR</span>. Blindaje contra mechazos institucionales y barridas de liquidez en soporte.</span>
+            </div>
+            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-amber-500/20">
+              <strong class="text-cyan-400 block mb-0.5 font-mono">🧊 Filtro de Compresión (ATR Squeeze):</strong>
+              <span class="text-slate-400">Si el ATR cae un 30% por debajo de su media de 20 periodos (<span class="text-cyan-300 font-mono">ATR Ratio &lt; 0.70</span>), el mercado está comprimido. La probabilidad de falsa ruptura se dispara al 70%.</span>
+            </div>
+            <div class="bg-amber-950/40 p-2 rounded border border-amber-700/40 text-[11px] text-amber-200">
+              <strong>Directiva de Veto Inviolable:</strong> En compresión de volatilidad, <strong>IGNORAR</strong> todos los patrones de continuación (ej. Tres Soldados Blancos) hasta que el ATR expanda.
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjeta 3: VWAP (Precio Ponderado por Volumen & Wall Street) -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="font-bold text-yellow-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <span>🏛️</span> VWAP & Bandas de Desviación
+            </span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-yellow-950 text-yellow-300 border border-yellow-800 font-bold">INSTITUCIONAL</span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Representa el precio promedio ponderado por volumen transaccionado en la sesión. Es el benchmark que utilizan los fondos de inversión para calificar sus compras como "baratas" o "caras".
+          </p>
+          <div class="space-y-2 text-xs">
+            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-yellow-500/20">
+              <strong class="text-yellow-300 block mb-0.5 font-mono">📈 Centro de Gravedad y Sesgo:</strong>
+              <span class="text-slate-400">Cotizar sobre el VWAP confirma control de compradores. Cotizar por debajo advierte presión bajista dominante. Los pullbacks al VWAP actúan como soporte dinámico clave.</span>
+            </div>
+            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-yellow-500/20">
+              <strong class="text-indigo-400 block mb-0.5 font-mono">🎯 Estrategia Apertura Araujo (M15):</strong>
+              <span class="text-slate-400">Ruptura del rango de Londres + confirmación sobre VWAP en los primeros 45 min de Wall Street (10:25 a 11:15 ARG). Objetivo asimétrico a las Bandas Superiores.</span>
+            </div>
+            <div class="bg-yellow-950/40 p-2 rounded border border-yellow-700/40 text-[11px] text-yellow-200">
+              <strong>Bandas (&plusmn;1&sigma;, &plusmn;2&sigma;):</strong> Excursiones a la banda superior exterior se consideran sobreextensión extrema y zonas óptimas de toma de ganancia (TP).
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Comparative Table of Statistical Reliability (Bulkowski Framework) -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-xl">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-2 mb-4">
+        <div>
+          <h2 class="text-lg md:text-xl font-bold text-white">Matriz Estadística de Fiabilidad Cuantitativa (Thomas Bulkowski Benchmark)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Basado en el análisis empírico de más de 4.7 millones de velas en NYSE/NASDAQ y futuros regulados.</p>
+        </div>
+        <span class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-300 font-mono self-start sm:self-auto">Dataset Cuantitativo</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="border-b border-slate-800 text-slate-400 font-semibold bg-slate-950/40">
+              <th class="p-3">Patrón de Velas</th>
+              <th class="p-3">Categoría</th>
+              <th class="p-3">Frecuencia</th>
+              <th class="p-3">Tasa de Efectividad (%)</th>
+              <th class="p-3">Movimiento Promedio</th>
+              <th class="p-3">Confirmación Exigida</th>
+              <th class="p-3">Veredicto Operativo Institucional</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/60 text-slate-300">
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🌅 Morning Star (Estrella de la Mañana - 3 velas)</td>
+              <td class="p-3 text-emerald-400 font-medium">Reversión Alcista</td>
+              <td class="p-3">Rango 5 (Común)</td>
+              <td class="p-3 font-bold text-emerald-400">78% de éxito</td>
+              <td class="p-3 font-mono">+5.2% en 10 barras</td>
+              <td class="p-3 text-emerald-400">Moderada</td>
+              <td class="p-3 text-xs text-slate-400">Excelente R:R institucional. Señal A+ en soporte mayor.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🌆 Evening Star (Estrella del Atardecer - 3 velas)</td>
+              <td class="p-3 text-rose-400 font-medium">Reversión Bajista</td>
+              <td class="p-3">Rango 7 (Frecuente)</td>
+              <td class="p-3 font-bold text-emerald-400">72% de éxito</td>
+              <td class="p-3 font-mono">-4.8% en 10 barras</td>
+              <td class="p-3 text-emerald-400">Moderada</td>
+              <td class="p-3 text-xs text-slate-400">Alta probabilidad de cambio de tendencia en sobrecompra y techos.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">⚔️ Three White Soldiers (Soldiers)</td>
+              <td class="p-3 text-emerald-400 font-medium">Continuación / Giro Fuerte</td>
+              <td class="p-3">Rango 32 (Poco frecuente)</td>
+              <td class="p-3 font-bold text-emerald-400">82% de continuidad</td>
+              <td class="p-3 font-mono">+6.4% posterior</td>
+              <td class="p-3 text-emerald-400">Baja</td>
+              <td class="p-3 text-xs text-slate-400">Momentum institucional extremo. Buscar pullback breve si RSI &gt; 70.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🦅 Three Black Crows (Crows)</td>
+              <td class="p-3 text-rose-400 font-medium">Reversión / Desplome</td>
+              <td class="p-3">Rango 34 (Poco frecuente)</td>
+              <td class="p-3 font-bold text-emerald-400">79% de continuidad</td>
+              <td class="p-3 font-mono">-6.1% posterior</td>
+              <td class="p-3 text-emerald-400">Baja</td>
+              <td class="p-3 text-xs text-slate-400">Cascada bajista institucional con liquidación forzada de posiciones.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">📐 Rising Three Methods (3 Métodos)</td>
+              <td class="p-3 text-indigo-400 font-medium">Continuación Alcista</td>
+              <td class="p-3">Rango 45 (Raro)</td>
+              <td class="p-3 font-bold text-emerald-400">74% de continuidad</td>
+              <td class="p-3 font-mono">+4.9% posterior</td>
+              <td class="p-3 text-emerald-400">Baja</td>
+              <td class="p-3 text-xs text-slate-400">Descanso perfecto de la tendencia; bajo volumen en la corrección.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🌊 Bullish Engulfing (Envolvente Alcista)</td>
+              <td class="p-3 text-emerald-400 font-medium">Reversión Alcista</td>
+              <td class="p-3">Rango 2 (Muy Común)</td>
+              <td class="p-3 font-bold text-emerald-400">63% de éxito</td>
+              <td class="p-3 font-mono">+4.1%</td>
+              <td class="p-3 text-amber-400">Alta (esperar cierre)</td>
+              <td class="p-3 text-xs text-slate-400">Muy fiable solo si el volumen del 2º cuerpo duplica al 1º.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🌧️ Bearish Engulfing (Envolvente Bajista)</td>
+              <td class="p-3 text-rose-400 font-medium">Reversión Bajista</td>
+              <td class="p-3">Rango 3 (Muy Común)</td>
+              <td class="p-3 font-bold text-emerald-400">63% de éxito</td>
+              <td class="p-3 font-mono">-4.3%</td>
+              <td class="p-3 text-amber-400">Alta (esperar cierre)</td>
+              <td class="p-3 text-xs text-slate-400">Fuerte absorción de oferta institucional. Trampa de toros.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🔨 Hammer (Martillo Alcista)</td>
+              <td class="p-3 text-emerald-400 font-medium">Reversión Alcista</td>
+              <td class="p-3">Rango 1 (El más observado)</td>
+              <td class="p-3 font-bold text-emerald-400">60% de éxito</td>
+              <td class="p-3 font-mono">+3.8%</td>
+              <td class="p-3 text-rose-400">Obligatoria</td>
+              <td class="p-3 text-xs text-slate-400">Por sí solo suele fallar en rangos; en soporte y con volumen es letal.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🔨 Martillo Invertido (Suelo)</td>
+              <td class="p-3 text-emerald-400 font-medium">Reversión Alcista</td>
+              <td class="p-3">Rango 15 (Común)</td>
+              <td class="p-3 font-bold text-emerald-400">60% de éxito</td>
+              <td class="p-3 font-mono">+3.9%</td>
+              <td class="p-3 text-rose-400">Obligatoria</td>
+              <td class="p-3 text-xs text-slate-400">Presión compradora probando resistencia en soporte; requiere confirmación alcista.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🪢 Hombre Colgado (Hanging Man)</td>
+              <td class="p-3 text-rose-400 font-medium">Reversión Bajista</td>
+              <td class="p-3">Rango 11 (Común)</td>
+              <td class="p-3 font-bold text-emerald-400">59% de éxito</td>
+              <td class="p-3 font-mono">-3.7%</td>
+              <td class="p-3 text-rose-400">Obligatoria</td>
+              <td class="p-3 text-xs text-slate-400">Misma silueta de martillo pero en techo. Alerta trampa de compras y liquidación.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">⭐ Shooting Star (Estrella Fugaz)</td>
+              <td class="p-3 text-rose-400 font-medium">Reversión Bajista</td>
+              <td class="p-3">Rango 4 (Muy Común)</td>
+              <td class="p-3 font-bold text-emerald-400">59% de éxito</td>
+              <td class="p-3 font-mono">-3.9%</td>
+              <td class="p-3 text-rose-400">Obligatoria</td>
+              <td class="p-3 text-xs text-slate-400">Rechazo agresivo de liquidez en resistencias o nuevos máximos.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🚀 Marubozu Alcista (Control Comprador)</td>
+              <td class="p-3 text-emerald-400 font-medium">Continuación / Breakout</td>
+              <td class="p-3">Rango 12 (Común)</td>
+              <td class="p-3 font-bold text-emerald-400">74% de continuidad</td>
+              <td class="p-3 font-mono">+5.4% posterior</td>
+              <td class="p-3 text-emerald-400">Baja</td>
+              <td class="p-3 text-xs text-slate-400">Control absoluto de compradores sin mechas de rechazo.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">💥 Marubozu Bajista (Presión Vendedora)</td>
+              <td class="p-3 text-rose-400 font-medium">Continuación / Desplome</td>
+              <td class="p-3">Rango 14 (Común)</td>
+              <td class="p-3 font-bold text-emerald-400">70% de continuidad</td>
+              <td class="p-3 font-mono">-5.2% posterior</td>
+              <td class="p-3 text-emerald-400">Baja</td>
+              <td class="p-3 text-xs text-slate-400">Presión vendedora masiva sin mechas. Cascada bajista de campana a campana.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🦎 Doji Libélula (Dragonfly Doji)</td>
+              <td class="p-3 text-emerald-400 font-medium">Reversión en Suelo</td>
+              <td class="p-3">Rango 18 (Moderado)</td>
+              <td class="p-3 font-bold text-emerald-400">71% en soporte</td>
+              <td class="p-3 font-mono">+4.6%</td>
+              <td class="p-3 text-amber-400">Media</td>
+              <td class="p-3 text-xs text-slate-400">Absorción total de ventas en soporte con mecha inferior extrema.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🪦 Doji Lápida (Gravestone Doji)</td>
+              <td class="p-3 text-rose-400 font-medium">Reversión en Techo</td>
+              <td class="p-3">Rango 19 (Moderado)</td>
+              <td class="p-3 font-bold text-emerald-400">66% en techo</td>
+              <td class="p-3 font-mono">-4.5%</td>
+              <td class="p-3 text-amber-400">Media</td>
+              <td class="p-3 text-xs text-slate-400">Rechazo contundente de nuevos máximos; la oferta institucional devuelve el precio a la apertura.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">⚖️ Doji Clásico (Indecisión)</td>
+              <td class="p-3 text-slate-400 font-medium">Indecisión / Transición</td>
+              <td class="p-3">Rango 2 (Frecuente)</td>
+              <td class="p-3 font-bold text-amber-400">51% (Moneda al aire)</td>
+              <td class="p-3 font-mono">Neutral</td>
+              <td class="p-3 text-rose-400">Crítica y Excluyente</td>
+              <td class="p-3 text-xs text-slate-400">No operar por sí mismo. Solo indica equilibrio temporal o clímax.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">🌀 Peonza Indecisión (Spinning Top)</td>
+              <td class="p-3 text-slate-400 font-medium">Equilibrio / Alerta</td>
+              <td class="p-3">Rango 6 (Común)</td>
+              <td class="p-3 font-bold text-amber-400">54% de giro</td>
+              <td class="p-3 font-mono">Oscilación</td>
+              <td class="p-3 text-amber-400">Exigida</td>
+              <td class="p-3 text-xs text-slate-400">Cuerpo pequeño con sombras simétricas. Agotamiento de la fuerza previa.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">📈 Impulso Alcista (Rango Amplio)</td>
+              <td class="p-3 text-emerald-400 font-medium">Breakout / Expansión</td>
+              <td class="p-3">Rango 8 (Frecuente)</td>
+              <td class="p-3 font-bold text-emerald-400">66% de continuidad</td>
+              <td class="p-3 font-mono">+4.8% posterior</td>
+              <td class="p-3 text-emerald-400">Baja</td>
+              <td class="p-3 text-xs text-slate-400">Expansión de volatilidad rompiendo consolidación con volumen institucional.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-white">📉 Impulso Bajista (Rango Amplio)</td>
+              <td class="p-3 text-rose-400 font-medium">Breakdown / Expansión</td>
+              <td class="p-3">Rango 9 (Frecuente)</td>
+              <td class="p-3 font-bold text-emerald-400">64% de continuidad</td>
+              <td class="p-3 font-mono">-4.7% posterior</td>
+              <td class="p-3 text-emerald-400">Baja</td>
+              <td class="p-3 text-xs text-slate-400">Perforación de soporte con vela de amplio rango y ventas aceleradas.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Guía Rápida de Indicadores del Mercado -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-xl space-y-3">
+      <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-2">
+        <span>📚</span> Guía Rápida de Indicadores Cuantitativos del Mercado
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs text-slate-300">
+        
+        <div class="flex items-start gap-2.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          <span class="w-3.5 h-1 bg-blue-500 mt-1.5 shrink-0 rounded"></span>
+          <div>
+            <p class="font-bold text-blue-300">SMA 20 (Media Móvil Simple)</p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">Promedio de las últimas 20 velas. Marca la tendencia inmediata. Si el precio cotiza por encima, hay sesgo alcista; por debajo, bajista.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-2.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          <span class="w-3.5 h-1 bg-yellow-400 mt-1.5 shrink-0 rounded"></span>
+          <div>
+            <p class="font-bold text-yellow-300">VWAP Institucional</p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">Precio ponderado por volumen del día. Es el centro de masa de las instituciones de Wall Street; separa compras baratas de compras caras.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-2.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          <span class="w-3.5 h-1 bg-purple-400 mt-1.5 shrink-0 rounded"></span>
+          <div>
+            <p class="font-bold text-purple-300">RSI 14 & Divergencias</p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">Oscilador de velocidad (0-100). &lt;30 sobreventa, &gt;70 sobrecompra. Las divergencias entre precio y oscilador son la señal reina de reversión institucional.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-2.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          <span class="w-3.5 h-1 bg-amber-400 mt-1.5 shrink-0 rounded"></span>
+          <div>
+            <p class="font-bold text-amber-300">ATR 14 & Squeeze</p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">Rango verdadero promedio. El Stop Loss se ubica a 1.5 &times; ATR. Si el ATR cae un 30% bajo su promedio, se activa el filtro de mercado comprimido.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-2.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          <span class="w-3.5 h-0 border-t-2 border-dotted border-yellow-600 mt-1.5 shrink-0"></span>
+          <div>
+            <p class="font-bold text-yellow-500">Bandas VWAP (&plusmn;2&sigma;)</p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">Límites de desviación estándar del precio. Los toques en las bandas exteriores marcan sobreextensión extrema y zonas de rebote a la media.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-2.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          <div class="flex space-x-0.5 shrink-0 mt-0.5">
+            <span class="w-2 h-3 bg-emerald-500 rounded-sm"></span>
+            <span class="w-2 h-3 bg-rose-500 rounded-sm"></span>
+          </div>
+          <div>
+            <p class="font-bold text-slate-200">Velas Japonesas & VPA</p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">Muestran apertura, máximo, mínimo y cierre. Cruzadas con el volumen relativo (RVOL), revelan absorción, clímax y trampas de liquidez.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // Comprehensive Dataset of Candlestick Patterns with realistic 16-20 candle sequences
+    const PATTERNS = [
+      {
+        id: 'hammer',
+        name: '🔨 Martillo Alcista (Hammer)',
+        category: 'reversion_alcista',
+        badge: 'Reversión Alcista',
+        badgeColor: 'emerald',
+        ticker: 'AAPL · 1D (Diario)',
+        contextDesc: 'Tendencia bajista sostenida testeando soporte mayor institucional',
+        subtitle: '1 vela en soporte. Mecha inferior al menos 2x el cuerpo, mecha superior casi nula.',
+        bias: 'Alcista (Rechazo de Mínimos)',
+        winrate: '60% - 65%',
+        reversalRate: '60% en soporte',
+        failure: 'Medio (32% falso rebote)',
+        rr: '≥ 1:2.0',
+        entry: '$143.60 (Superación del Máximo)',
+        sl: '$134.20 (Bajo el mínimo - 1.5x ATR)',
+        tp: '$162.00 (Target 1:2.0 neto)',
+        keyLevel: '$135.00 Soporte Mayor',
+        vpa: 'Volumen climático muy superior a la media móvil (RVOL > 2.0). Las manos fuertes entraron con órdenes límite masivas absorbiendo las ventas de pánico.',
+        psychology: 'Los vendedores intentaron marcar nuevos mínimos para activar los Stop Loss de los compradores. Las instituciones aprovecharon esa liquidez para acumular a precio de descuento, expulsando a los osos.',
+        checklist: [
+          'Aparece tras una tendencia bajista clara comprobada por debajo de la EMA 20.',
+          'La sombra inferior mide al menos el doble (2x) de la longitud del cuerpo real.',
+          'La sombra superior es inexistente o menor al 10% del rango total de la vela.',
+          'El volumen relativo (RVOL) es superior a 1.8 respecto a la media de 20 sesiones.',
+          'Confirmación: la siguiente vela abre y cierra por encima del cuerpo del martillo.'
+        ],
+        // Realistic 16-candle market sequence
+        marketData: {
+          support: 135.0,
+          resistance: 165.0,
+          entryPrice: 143.6,
+          slPrice: 134.2,
+          tpPrice: 162.0,
+          patternIndices: [10], // index of the hammer
+          patternLabel: 'MARTILLO EN SOPORTE',
+          candles: [
+            { o: 162, h: 164, l: 161, c: 163.5, v: 45 },
+            { o: 163, h: 163.5, l: 158, c: 159, v: 55 },
+            { o: 159, h: 160, l: 155, c: 156, v: 50 },
+            { o: 156.5, h: 157, l: 152, c: 153, v: 62 },
+            { o: 153, h: 154, l: 149, c: 150, v: 70 },
+            { o: 149.5, h: 151, l: 148, c: 150.2, v: 40 },
+            { o: 150, h: 150.5, l: 144, c: 145, v: 78 },
+            { o: 145, h: 146, l: 141, c: 142, v: 85 },
+            { o: 142, h: 143, l: 138, c: 139, v: 92 },
+            { o: 139, h: 140, l: 136, c: 137.5, v: 98 },
+            // Candle 10: THE HAMMER (Open 137.5, High 143.2, Low 134.8, Close 142.8)
+            { o: 137.5, h: 143.2, l: 134.8, c: 142.8, v: 185, isPattern: true },
+            // Candle 11: Confirmation Green
+            { o: 143.0, h: 148.5, l: 142.5, c: 148.0, v: 130 },
+            { o: 148.0, h: 153.0, l: 147.0, c: 152.5, v: 115 },
+            { o: 152.5, h: 157.0, l: 151.8, c: 156.0, v: 105 },
+            { o: 156.0, h: 162.5, l: 155.0, c: 162.0, v: 120 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="20" y1="60" x2="220" y2="60" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"/>
+            <line x1="20" y1="120" x2="220" y2="120" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"/>
+            <line x1="20" y1="180" x2="220" y2="180" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"/>
+            <rect x="70" y="200" width="150" height="4" fill="#059669" opacity="0.4" rx="2"/>
+            <text x="110" y="215" fill="#10b981" font-size="9" font-family="monospace">ZONA DE SOPORTE</text>
+            <line x1="120" y1="78" x2="120" y2="82" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="120" y1="102" x2="120" y2="202" stroke="#10b981" stroke-width="3.5" stroke-linecap="round"/>
+            <rect x="110" y="82" width="20" height="20" fill="#10b981" stroke="#059669" rx="2"/>
+            <text x="135" y="95" fill="#f8fafc" font-size="10" font-weight="bold">Cuerpo pequeño (Alto)</text>
+            <text x="135" y="150" fill="#34d399" font-size="10">Rechazo institucional (Mecha ≥ 2x cuerpo)</text>
+          </svg>
+        `
+      },
+      {
+        id: 'shooting_star',
+        name: '⭐ Estrella Fugaz (Shooting Star)',
+        category: 'reversion_bajista',
+        badge: 'Reversión Bajista',
+        badgeColor: 'rose',
+        ticker: 'MSFT · 1D (Diario)',
+        contextDesc: 'Rally alcista chocando contra resistencia histórica mayor',
+        subtitle: '1 vela en resistencia tras subida. Mecha superior al menos 2x cuerpo, rechazo de máximos.',
+        bias: 'Bajista (Rechazo de Máximos)',
+        winrate: '59% - 64%',
+        reversalRate: '59% en techo',
+        failure: 'Medio (35%)',
+        rr: '≥ 1:2.0',
+        entry: '$428.50 (Perforación del Mínimo)',
+        sl: '$443.00 (Máximo de la Estrella + ATR)',
+        tp: '$400.00 (Soporte inferior R:R 1:2.1)',
+        keyLevel: '$440.00 Resistencia Mayor',
+        vpa: 'Volumen ultra alto en el intento de marcar nuevo máximo que termina con cierre en el tercio inferior (Esfuerzo vs Resultado de Wyckoff).',
+        psychology: 'Los compradores minoristas compran con euforia en la apertura. Las instituciones aprovechan esa contrapartida para volcar todo su inventario vendedor, aplastando las cotizaciones.',
+        checklist: [
+          'Precedida por un impulso alcista claro extendido por encima de la EMA 20.',
+          'La mecha superior mide 2 a 3 veces el cuerpo de la vela.',
+          'La mecha inferior es casi inexistente, cerrando cerca de los mínimos de la sesión.',
+          'El color del cuerpo es preferentemente rojo (mayor presión de venta institucional).',
+          'Confirmación requerida con vela bajista subsiguiente que perfore el mínimo.'
+        ],
+        marketData: {
+          support: 395.0,
+          resistance: 440.0,
+          entryPrice: 428.5,
+          slPrice: 443.0,
+          tpPrice: 400.0,
+          patternIndices: [10],
+          patternLabel: 'ESTRELLA FUGAZ EN RESISTENCIA',
+          candles: [
+            { o: 400, h: 403, l: 399, c: 402, v: 45 },
+            { o: 402, h: 407, l: 401, c: 406.5, v: 55 },
+            { o: 406, h: 412, l: 405, c: 411, v: 65 },
+            { o: 411, h: 416, l: 410, c: 415.5, v: 72 },
+            { o: 415, h: 418, l: 414, c: 417, v: 48 },
+            { o: 417, h: 424, l: 416, c: 423, v: 80 },
+            { o: 423, h: 429, l: 422, c: 428, v: 88 },
+            { o: 428, h: 433, l: 427, c: 432, v: 95 },
+            { o: 432, h: 437, l: 431, c: 436.5, v: 105 },
+            { o: 436.5, h: 439, l: 435, c: 438, v: 110 },
+            // Candle 10: SHOOTING STAR (O: 438, H: 442.8, L: 429.0, C: 430.0)
+            { o: 438, h: 442.8, l: 429.0, c: 430.0, v: 210, isPattern: true },
+            // Candle 11: Confirmation Red
+            { o: 429.5, h: 431.0, l: 422.0, c: 423.0, v: 145 },
+            { o: 423.0, h: 424.0, l: 415.0, c: 416.0, v: 125 },
+            { o: 416.0, h: 417.5, l: 408.0, c: 409.0, v: 115 },
+            { o: 409.0, h: 410.0, l: 399.5, c: 400.0, v: 130 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="20" y1="60" x2="220" y2="60" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"/>
+            <line x1="20" y1="120" x2="220" y2="120" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"/>
+            <line x1="20" y1="180" x2="220" y2="180" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"/>
+            <rect x="20" y="35" width="200" height="4" fill="#dc2626" opacity="0.4" rx="2"/>
+            <text x="30" y="30" fill="#ef4444" font-size="9" font-family="monospace">RESISTENCIA MAYOR</text>
+            <line x1="120" y1="40" x2="120" y2="150" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
+            <line x1="120" y1="170" x2="120" y2="175" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/>
+            <rect x="110" y="150" width="20" height="20" fill="#ef4444" stroke="#dc2626" rx="2"/>
+            <text x="135" y="65" fill="#f87171" font-size="10">Rechazo de oferta (Mecha ≥ 2x)</text>
+            <text x="135" y="165" fill="#f8fafc" font-size="10" font-weight="bold">Cierre cerca de mínimos</text>
+          </svg>
+        `
+      },
+      {
+        id: 'bullish_engulfing',
+        name: '🌊 Envolvente Alcista (Bullish Engulfing)',
+        category: 'reversion_alcista',
+        badge: 'Reversión Alcista Fuerte',
+        badgeColor: 'emerald',
+        ticker: 'TSLA · 1D (Diario)',
+        contextDesc: 'Final de corrección profunda hacia la media móvil de 200 y soporte Fibonacci',
+        subtitle: '2 velas. Una vela roja pequeña es completamente envuelta por una gran vela verde con fuerte volumen.',
+        bias: 'Alcista Fuerte',
+        winrate: '63% - 68%',
+        reversalRate: '63% confirmado',
+        failure: 'Bajo (28% si volumen duplica)',
+        rr: '≥ 1:2.5',
+        entry: '$215.50 (Cierre de la vela envolvente)',
+        sl: '$198.00 (Mínimo de la formación)',
+        tp: '$255.00 (Target R:R 1:2.3)',
+        keyLevel: '$200.00 Nivel Psicológico',
+        vpa: 'El volumen de la segunda vela duplica al de la primera, demostrando compra institucional agresiva a mercado.',
+        psychology: 'La primera vela parecía confirmar la inercia bajista. Al día siguiente los toros abren fuerte y devoran toda la oferta disponible, dejando a los vendedores en corto atrapados.',
+        checklist: [
+          'La tendencia previa debe ser bajista comprobable.',
+          'El cuerpo de la vela verde cubre por completo el cuerpo de la vela roja previa.',
+          'Volumen creciente y por encima de la media de 20 periodos.',
+          'Confluencia con soporte técnico clave o retroceso Fibonacci 61.8%.',
+          'La confirmación de la siguiente sesión añade un 15% extra de probabilidad.'
+        ],
+        marketData: {
+          support: 200.0,
+          resistance: 260.0,
+          entryPrice: 215.5,
+          slPrice: 198.0,
+          tpPrice: 255.0,
+          patternIndices: [9, 10], // Two candles
+          patternLabel: 'ENVOLVENTE ALCISTA',
+          candles: [
+            { o: 245, h: 247, l: 242, c: 243, v: 60 },
+            { o: 243, h: 244, l: 236, c: 237, v: 75 },
+            { o: 237, h: 238, l: 230, c: 231, v: 80 },
+            { o: 231, h: 233, l: 225, c: 226, v: 85 },
+            { o: 226, h: 228, l: 224, c: 227, v: 45 },
+            { o: 227, h: 227.5, l: 219, c: 220, v: 90 },
+            { o: 220, h: 221, l: 214, c: 215, v: 95 },
+            { o: 215, h: 216, l: 208, c: 209, v: 100 },
+            { o: 209, h: 210, l: 204, c: 205, v: 110 },
+            // Candle 9: Small Bear
+            { o: 205, h: 206, l: 200.5, c: 201.5, v: 70, isPattern: true },
+            // Candle 10: Huge Bull Engulfing
+            { o: 200.0, h: 216.0, l: 199.0, c: 215.5, v: 220, isPattern: true },
+            // Candle 11+: Trend reversal
+            { o: 215.5, h: 224.0, l: 214.0, c: 223.0, v: 150 },
+            { o: 223.0, h: 232.0, l: 222.0, c: 231.0, v: 140 },
+            { o: 231.0, h: 242.0, l: 230.0, c: 241.0, v: 135 },
+            { o: 241.0, h: 256.0, l: 240.0, c: 255.0, v: 145 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="70" y1="90" x2="70" y2="155" stroke="#ef4444" stroke-width="2.5"/>
+            <rect x="60" y="100" width="20" height="40" fill="#ef4444" stroke="#dc2626" rx="2"/>
+            <text x="50" y="85" fill="#94a3b8" font-size="9" font-mono>Día 1</text>
+            <line x1="120" y1="60" x2="120" y2="185" stroke="#10b981" stroke-width="3"/>
+            <rect x="105" y="70" width="30" height="105" fill="#10b981" stroke="#059669" rx="3"/>
+            <text x="110" y="55" fill="#94a3b8" font-size="9" font-mono>Día 2</text>
+            <path d="M 145,70 L 155,70 L 155,175 L 145,175" fill="none" stroke="#34d399" stroke-width="2"/>
+            <text x="160" y="125" fill="#34d399" font-size="10" font-weight="bold">Absorción total</text>
+          </svg>
+        `
+      },
+      {
+        id: 'morning_star',
+        name: '🌅 Estrella de la Mañana (Morning Star - 3 velas)',
+        category: 'reversion_alcista',
+        badge: 'Patrón Triple de Alta Fiabilidad',
+        badgeColor: 'emerald',
+        ticker: 'AMZN · 1D (Diario)',
+        contextDesc: 'Suelo de capitulación con secado de oferta y explosión compradora',
+        subtitle: '3 velas: Gran vela roja + vela de indecisión (estrella) + gran vela verde de confirmación.',
+        bias: 'Alcista Institucional',
+        winrate: '78% de efectividad',
+        reversalRate: '78% (Thomas Bulkowski)',
+        failure: 'Muy Bajo (18% en soportes probados)',
+        rr: '≥ 1:3.0',
+        entry: '$178.00 (Cierre de la 3ª vela)',
+        sl: '$167.50 (Mínimo de la estrella central)',
+        tp: '$205.00 (Target R:R 1:2.6)',
+        keyLevel: '$168.00 Suelo Mayor',
+        vpa: 'Secuencia clásica: Gran volumen vendedor en la 1ª vela -> Volumen seco en la 2ª -> Explosión de volumen institucional en la 3ª vela.',
+        psychology: 'Capitulación bajista en la primera sesión, agotamiento vendedor absoluto en la segunda, y entrada agresiva del Smart Money en la tercera.',
+        checklist: [
+          'La primera vela es de rango amplio bajista y confirma la caída.',
+          'La segunda vela tiene un cuerpo muy estrecho (Doji o peonza) con gap a la baja.',
+          'La tercera vela penetra al menos el 50% o más del cuerpo de la primera vela.',
+          'Patrón rey en los modelos cuantitativos de reversión a la media.',
+          'Excelente R:R por la cercanía del Stop Loss protegido bajo el suelo de la estrella.'
+        ],
+        marketData: {
+          support: 168.0,
+          resistance: 210.0,
+          entryPrice: 178.0,
+          slPrice: 167.5,
+          tpPrice: 205.0,
+          patternIndices: [8, 9, 10], // 3 candles
+          patternLabel: 'ESTRELLA DE LA MAÑANA',
+          candles: [
+            { o: 198, h: 200, l: 195, c: 196, v: 55 },
+            { o: 196, h: 197, l: 190, c: 191, v: 65 },
+            { o: 191, h: 192, l: 185, c: 186, v: 75 },
+            { o: 186, h: 187, l: 181, c: 182, v: 80 },
+            { o: 182, h: 183, l: 177, c: 178, v: 88 },
+            { o: 178, h: 179, l: 174, c: 175, v: 92 },
+            { o: 175, h: 176, l: 171, c: 172, v: 95 },
+            { o: 172, h: 173, l: 168, c: 169, v: 98 },
+            // Candle 8: Big Bearish
+            { o: 175, h: 176, l: 169, c: 170, v: 130, isPattern: true },
+            // Candle 9: Star / Doji at bottom
+            { o: 168.5, h: 169.5, l: 167.5, c: 168.8, v: 45, isPattern: true },
+            // Candle 10: Big Bullish (> 50% penetration)
+            { o: 169.0, h: 178.5, l: 168.5, c: 178.0, v: 190, isPattern: true },
+            // Candle 11+: Continuation
+            { o: 178.0, h: 185.0, l: 177.0, c: 184.0, v: 130 },
+            { o: 184.0, h: 192.0, l: 183.0, c: 191.0, v: 125 },
+            { o: 191.0, h: 199.0, l: 190.0, c: 198.5, v: 120 },
+            { o: 198.5, h: 206.0, l: 197.5, c: 205.0, v: 135 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="50" y1="50" x2="50" y2="160" stroke="#ef4444" stroke-width="2.5"/>
+            <rect x="38" y="60" width="24" height="85" fill="#ef4444" stroke="#dc2626" rx="2"/>
+            <line x1="100" y1="165" x2="100" y2="205" stroke="#94a3b8" stroke-width="2"/>
+            <rect x="92" y="175" width="16" height="15" fill="#64748b" rx="2"/>
+            <line x1="150" y1="65" x2="150" y2="175" stroke="#10b981" stroke-width="2.5"/>
+            <rect x="138" y="75" width="24" height="85" fill="#10b981" stroke="#059669" rx="2"/>
+            <line x1="38" y1="102" x2="170" y2="102" stroke="#fbbf24" stroke-dasharray="3,3" stroke-width="1.5"/>
+            <text x="175" y="105" fill="#fbbf24" font-size="8" font-mono>> 50% Retest</text>
+          </svg>
+        `
+      },
+      {
+        id: 'evening_star',
+        name: '🌆 Estrella del Atardecer (Evening Star - 3 velas)',
+        category: 'reversion_bajista',
+        badge: 'Patrón Triple de Alta Fiabilidad',
+        badgeColor: 'rose',
+        ticker: 'SPY · 1D (Diario)',
+        contextDesc: 'Fin de impulso parabólico en techo de canal alcista',
+        subtitle: '3 velas: Gran vela verde + estrella en máximos + gran vela roja penetrante.',
+        bias: 'Bajista Institucional',
+        winrate: '72% de efectividad',
+        reversalRate: '72% de reversión',
+        failure: 'Bajo (22%)',
+        rr: '≥ 1:2.5',
+        entry: '$568.00 (Cierre de la 3ª vela)',
+        sl: '$582.50 (Máximo de la estrella superior)',
+        tp: '$535.00 (Target R:R 1:2.3)',
+        keyLevel: '$580.00 Resistencia Techo',
+        vpa: 'Esfuerzo sin resultado en la 2ª vela (volumen alto sin avance) seguido de salida institucional en la 3ª con fuerte volumen vendedor.',
+        psychology: 'Euforia tardía minorista absorbida por distribución silenciosa de fondos. En la tercera vela, la venta a mercado hace saltar los stops de los compradores.',
+        checklist: [
+          'Precedida por una tendencia alcista sana y extendida.',
+          'La primera vela es fuertemente compradora.',
+          'La estrella central marca nuevos máximos pero su cuerpo no logra expandirse.',
+          'La tercera vela penetra profundamente el rango de la primera vela (mínimo el 50%).',
+          'Patrón óptimo para toma de beneficios en largos o apertura de cortos swing.'
+        ],
+        marketData: {
+          support: 535.0,
+          resistance: 580.0,
+          entryPrice: 568.0,
+          slPrice: 582.5,
+          tpPrice: 535.0,
+          patternIndices: [8, 9, 10],
+          patternLabel: 'ESTRELLA DEL ATARDECER',
+          candles: [
+            { o: 530, h: 535, l: 529, c: 534, v: 60 },
+            { o: 534, h: 541, l: 533, c: 540, v: 70 },
+            { o: 540, h: 547, l: 539, c: 546, v: 80 },
+            { o: 546, h: 554, l: 545, c: 553, v: 85 },
+            { o: 553, h: 559, l: 552, c: 558, v: 90 },
+            { o: 558, h: 565, l: 557, c: 564, v: 95 },
+            { o: 564, h: 571, l: 563, c: 570, v: 100 },
+            // Candle 8: Big Green
+            { o: 565, h: 577, l: 564, c: 576, v: 130, isPattern: true },
+            // Candle 9: Star at peak
+            { o: 578, h: 581.5, l: 577, c: 579.5, v: 140, isPattern: true },
+            // Candle 10: Big Red (> 50% penetration)
+            { o: 578, h: 579, l: 567, c: 568, v: 195, isPattern: true },
+            // Candle 11+: Breakdown
+            { o: 568, h: 569, l: 558, c: 559, v: 140 },
+            { o: 559, h: 560, l: 549, c: 550, v: 130 },
+            { o: 550, h: 551, l: 542, c: 543, v: 125 },
+            { o: 543, h: 544, l: 534, c: 535, v: 135 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="50" y1="80" x2="50" y2="190" stroke="#10b981" stroke-width="2.5"/>
+            <rect x="38" y="95" width="24" height="85" fill="#10b981" stroke="#059669" rx="2"/>
+            <line x1="100" y1="35" x2="100" y2="75" stroke="#94a3b8" stroke-width="2"/>
+            <rect x="92" y="45" width="16" height="15" fill="#64748b" rx="2"/>
+            <line x1="150" y1="65" x2="150" y2="175" stroke="#ef4444" stroke-width="2.5"/>
+            <rect x="138" y="80" width="24" height="85" fill="#ef4444" stroke="#dc2626" rx="2"/>
+            <line x1="38" y1="137" x2="170" y2="137" stroke="#fbbf24" stroke-dasharray="3,3" stroke-width="1.5"/>
+            <text x="175" y="140" fill="#fbbf24" font-size="8" font-mono>> 50% Retest</text>
+          </svg>
+        `
+      },
+      {
+        id: 'three_white_soldiers',
+        name: '⚔️ Tres Soldados Blancos (Soldiers)',
+        category: 'continuacion',
+        badge: 'Continuación Alcista Poderosa',
+        badgeColor: 'emerald',
+        ticker: 'META · 1D (Diario)',
+        contextDesc: 'Ruptura explosiva de acumulación con continuación sostenida',
+        subtitle: '3 velas verdes consecutivas de amplio rango, abriendo dentro del cuerpo previo y cerrando en máximos.',
+        bias: 'Alcista de Alto Momentum',
+        winrate: '82% de continuidad',
+        reversalRate: '82% (Bulkowski Benchmark)',
+        failure: 'Muy Bajo (14%)',
+        rr: '≥ 1:2.0',
+        entry: '$512.00 (Ruptura del 3er soldado)',
+        sl: '$484.00 (Mínimo del primer soldado)',
+        tp: '$565.00 (Target R:R 1:1.9)',
+        keyLevel: '$485.00 Resistencia Rota (Soporte)',
+        vpa: 'Volumen creciente y sostenidamente alto en las 3 barras consecutivas. Algoritmos institucionales TWAP/VWAP comprando sin pausa.',
+        psychology: 'Confianza institucional absoluta. Cada intento intradía de venta es rápidamente neutralizado. Los vendedores en corto capitulan.',
+        checklist: [
+          'Cada vela abre dentro del rango del cuerpo de la vela anterior.',
+          'Cada vela marca un nuevo máximo y un nuevo cierre más alto.',
+          'Las mechas superiores son muy cortas, evidenciando cierre en fuerza extrema.',
+          'Precaución si los cuerpos son desproporcionadamente gigantes (alerta de agotamiento por clímax).',
+          'Confirmación por volumen y ausencia de resistencias inmediatas.'
+        ],
+        marketData: {
+          support: 485.0,
+          resistance: 570.0,
+          entryPrice: 512.0,
+          slPrice: 484.0,
+          tpPrice: 565.0,
+          patternIndices: [6, 7, 8],
+          patternLabel: 'TRES SOLDADOS BLANCOS',
+          candles: [
+            { o: 480, h: 484, l: 478, c: 482, v: 50 },
+            { o: 482, h: 485, l: 479, c: 481, v: 45 },
+            { o: 481, h: 483, l: 477, c: 479, v: 40 },
+            { o: 479, h: 484, l: 478, c: 483, v: 55 },
+            { o: 483, h: 486, l: 482, c: 485, v: 60 },
+            // Soldier 1
+            { o: 485, h: 494, l: 484, c: 493, v: 140, isPattern: true },
+            // Soldier 2
+            { o: 492, h: 503, l: 491, c: 502, v: 160, isPattern: true },
+            // Soldier 3
+            { o: 501, h: 512.5, l: 500, c: 512, v: 175, isPattern: true },
+            // Continuation
+            { o: 512, h: 524, l: 510, c: 522, v: 130 },
+            { o: 522, h: 535, l: 520, c: 534, v: 125 },
+            { o: 534, h: 546, l: 532, c: 545, v: 120 },
+            { o: 545, h: 556, l: 544, c: 555, v: 115 },
+            { o: 555, h: 567, l: 554, c: 565, v: 130 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="45" y1="130" x2="45" y2="200" stroke="#10b981" stroke-width="2"/>
+            <rect x="35" y="140" width="20" height="50" fill="#10b981" stroke="#059669" rx="2"/>
+            <line x1="85" y1="85" x2="85" y2="160" stroke="#10b981" stroke-width="2"/>
+            <rect x="75" y="95" width="20" height="55" fill="#10b981" stroke="#059669" rx="2"/>
+            <line x1="125" y1="40" x2="125" y2="115" stroke="#10b981" stroke-width="2"/>
+            <rect x="115" y="50" width="20" height="55" fill="#10b981" stroke="#059669" rx="2"/>
+            <path d="M 45,210 L 85,170 L 125,125 L 160,80" fill="none" stroke="#34d399" stroke-width="2" stroke-dasharray="3,3"/>
+            <polygon points="160,80 150,83 155,90" fill="#34d399"/>
+            <text x="145" y="60" fill="#34d399" font-size="9" font-weight="bold">Momentum Puro</text>
+          </svg>
+        `
+      },
+      {
+        id: 'rising_three_methods',
+        name: '📐 Tres Métodos Alcistas (Rising Three Methods)',
+        category: 'continuacion',
+        badge: 'Patrón Complejo de Continuación',
+        badgeColor: 'indigo',
+        ticker: 'GOOGL · 1D (Diario)',
+        contextDesc: 'Pausa saludable con volumen decreciente dentro de una fuerte tendencia alcista',
+        subtitle: '5 velas. Gran vela alcista + 3 pequeñas velas bajistas contenidas + gran vela alcista de ruptura.',
+        bias: 'Continuación Alcista',
+        winrate: '74% de éxito',
+        reversalRate: '74% de continuación',
+        failure: 'Bajo (20%)',
+        rr: '≥ 1:2.5',
+        entry: '$182.50 (Ruptura del máximo de la 1ª vela)',
+        sl: '$171.00 (Mínimo de la formación)',
+        tp: '$208.00 (Target R:R 1:2.2)',
+        keyLevel: '$172.00 Soporte Dinámico',
+        vpa: 'Volumen expansivo en la 1ª y 5ª vela; volumen totalmente seco y descendente en las 3 velas intermedias.',
+        psychology: 'Toma de beneficios controlada. Los osos intentan presionar pero carecen de liquidez para empujar el precio por debajo del origen del impulso. Al secarse la oferta, los compradores atacan.',
+        checklist: [
+          'La primera vela es fuertemente alcista dentro de una tendencia al alza.',
+          'Las tres velas intermedias son de cuerpo pequeño y se mantienen dentro de los extremos de la primera.',
+          'El volumen durante las tres velas de descanso desciende progresivamente.',
+          'La quinta vela abre por encima del cierre previo y cierra marcando nuevo máximo.',
+          'Uno de los patrones favoritos de los sistemas de seguimiento de tendencia.'
+        ],
+        marketData: {
+          support: 171.0,
+          resistance: 210.0,
+          entryPrice: 182.5,
+          slPrice: 171.0,
+          tpPrice: 208.0,
+          patternIndices: [5, 6, 7, 8, 9], // 5 candles
+          patternLabel: 'TRES MÉTODOS ALCISTAS',
+          candles: [
+            { o: 165, h: 168, l: 164, c: 167, v: 60 },
+            { o: 167, h: 170, l: 166, c: 169.5, v: 70 },
+            { o: 169.5, h: 172, l: 168, c: 171, v: 65 },
+            { o: 171, h: 173, l: 170, c: 172.5, v: 75 },
+            // Candle 5: Big Impulse Bull
+            { o: 172, h: 182.5, l: 171.5, c: 182.0, v: 160, isPattern: true },
+            // Candle 6, 7, 8: 3 Small Bearish Pullback
+            { o: 181.5, h: 182.0, l: 177.5, c: 178.5, v: 55, isPattern: true },
+            { o: 178.5, h: 179.0, l: 175.0, c: 176.0, v: 45, isPattern: true },
+            { o: 176.0, h: 177.0, l: 173.0, c: 174.5, v: 35, isPattern: true },
+            // Candle 9: Big Bull Breakout
+            { o: 175.0, h: 186.0, l: 174.5, c: 185.5, v: 180, isPattern: true },
+            // Continuation
+            { o: 185.5, h: 192.0, l: 184.5, c: 191.0, v: 130 },
+            { o: 191.0, h: 199.0, l: 190.0, c: 198.0, v: 125 },
+            { o: 198.0, h: 209.0, l: 197.0, c: 208.0, v: 135 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="35" y1="70" x2="35" y2="190" stroke="#10b981" stroke-width="2.5"/>
+            <rect x="25" y="85" width="20" height="95" fill="#10b981" stroke="#059669" rx="2"/>
+            <rect x="20" y="80" width="160" height="105" fill="none" stroke="#64748b" stroke-dasharray="2,2"/>
+            <line x1="65" y1="80" x2="65" y2="115" stroke="#ef4444" stroke-width="2"/>
+            <rect x="58" y="85" width="14" height="20" fill="#ef4444" rx="1"/>
+            <line x1="90" y1="95" x2="90" y2="135" stroke="#ef4444" stroke-width="2"/>
+            <rect x="83" y="100" width="14" height="20" fill="#ef4444" rx="1"/>
+            <line x1="115" y1="110" x2="115" y2="155" stroke="#ef4444" stroke-width="2"/>
+            <rect x="108" y="115" width="14" height="20" fill="#ef4444" rx="1"/>
+            <line x1="150" y1="45" x2="150" y2="170" stroke="#10b981" stroke-width="2.5"/>
+            <rect x="140" y="55" width="20" height="105" fill="#10b981" stroke="#059669" rx="2"/>
+            <text x="50" y="175" fill="#94a3b8" font-size="8">Pullback de bajo volumen</text>
+            <text x="135" y="40" fill="#38bdf8" font-size="9" font-weight="bold">Ruptura</text>
+          </svg>
+        `
+      },
+      {
+        id: 'doji_types',
+        name: '🦎 Doji Libélula (Dragonfly Doji)',
+        category: 'indecision',
+        badge: 'Equilibrio / Rechazo',
+        badgeColor: 'amber',
+        ticker: 'BTC / USDT · 1D (Diario)',
+        contextDesc: 'Testeo de soporte institucional de 60,000 USD con absorción total',
+        subtitle: 'Apertura = Cierre en máximos absolutos con una sombra inferior muy extendida.',
+        bias: 'Alcista en Suelos (Rechazo Fuerte)',
+        winrate: '51% aislado (71% en soporte con volumen)',
+        reversalRate: '71% en soporte mayor',
+        failure: 'Alto si se opera sin nivel',
+        rr: '≥ 1:2.0',
+        entry: '$64,200 (Superación del Doji)',
+        sl: '$58,800 (Mínimo de la mecha inferior)',
+        tp: '$74,000 (Target R:R 1:1.8)',
+        keyLevel: '$60,000 Soporte Cripto',
+        vpa: 'Volumen descomunal en la absorción de los mínimos. Liquidación de posiciones largas y acumulación pasiva.',
+        psychology: 'Los bajistas intentaron perforar el soporte psicológico desatando pánico en derivados. Las ballenas colocaron muros de compra que devolvieron el precio al punto de apertura.',
+        checklist: [
+          'La condición formal matemática: |Open - Close| <= (High - Low) * 0.05.',
+          'La sombra inferior es extremadamente larga (≥ 3x del cuerpo).',
+          'Aparece en confluencia con un nivel de soporte mayor o suelo semanal.',
+          'Nunca se opera de forma ciega: requiere esperar la confirmación de la siguiente sesión.',
+          'Confirmación: vela siguiente alcista de rango medio con cierre firme.'
+        ],
+        marketData: {
+          support: 60000,
+          resistance: 74000,
+          entryPrice: 64200,
+          slPrice: 58800,
+          tpPrice: 74000,
+          patternIndices: [8],
+          patternLabel: 'DOJI LIBÉLULA EN SOPORTE',
+          candles: [
+            { o: 68000, h: 68500, l: 67200, c: 67400, v: 45 },
+            { o: 67400, h: 67600, l: 66000, c: 66200, v: 55 },
+            { o: 66200, h: 66400, l: 64800, c: 65100, v: 65 },
+            { o: 65100, h: 65300, l: 63500, c: 63800, v: 75 },
+            { o: 63800, h: 64100, l: 62200, c: 62500, v: 85 },
+            { o: 62500, h: 62800, l: 61400, c: 61800, v: 90 },
+            { o: 61800, h: 62200, l: 60500, c: 60900, v: 100 },
+            // Candle 8: DRAGONFLY DOJI (O: 63800, H: 64000, L: 59200, C: 63900)
+            { o: 63800, h: 64000, l: 59200, c: 63900, v: 240, isPattern: true },
+            // Candle 9: Confirmation
+            { o: 63900, h: 66800, l: 63500, c: 66500, v: 160 },
+            { o: 66500, h: 69200, l: 66200, c: 68800, v: 145 },
+            { o: 68800, h: 71500, l: 68500, c: 71200, v: 135 },
+            { o: 71200, h: 74200, l: 70900, c: 74000, v: 150 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="120" y1="45" x2="120" y2="195" stroke="#10b981" stroke-width="2.5"/>
+            <line x1="90" y1="45" x2="150" y2="45" stroke="#34d399" stroke-width="4"/>
+            <text x="80" y="215" fill="#34d399" font-size="10" font-mono font-bold>Doji Libélula (Rechazo)</text>
+          </svg>
+        `
+      },
+      {
+        id: 'bearish_engulfing',
+        name: '🌧️ Envolvente Bajista (Bearish Engulfing)',
+        category: 'reversion_bajista',
+        badge: 'Reversión Bajista',
+        badgeColor: 'rose',
+        ticker: 'TSLA · 1D (Diario)',
+        contextDesc: 'Tendencia alcista extendida chocando contra resistencia anual',
+        subtitle: '2 velas en techo. El cuerpo rojo envuelve totalmente el cuerpo verde anterior con volumen masivo.',
+        bias: 'Bajista (Absorción de Oferta)',
+        winrate: '63% de éxito',
+        reversalRate: '63% en techo institucional',
+        failure: 'Medio (31% si el volumen no acompaña)',
+        rr: '≥ 1:2.0',
+        entry: '$248.00 (Perforación del Mínimo)',
+        sl: '$263.50 (Máximo de la envolvente + 1.5x ATR)',
+        tp: '$217.00 (Soporte mayor R:R 1:2.0)',
+        keyLevel: '$260.00 Resistencia Anual',
+        vpa: 'El volumen del segundo cuerpo (rojo) duplica al primero (RVOL > 2.0). Demuestra vuelco agresivo de inventario vendedor de manos fuertes.',
+        psychology: 'La apertura con gap alcista atrapó a los compradores minoristas eufóricos. Las instituciones usaron esa liquidez de compra para descargar carteras y desplomar el precio por debajo del soporte de la sesión previa.',
+        checklist: [
+          'Precedida por un impulso alcista comprobado por encima de la EMA 20.',
+          'La primera vela es alcista (verde); la segunda es bajista (roja).',
+          'El cuerpo de la vela bajista cubre por completo el cuerpo de la vela anterior.',
+          'El volumen relativo (RVOL) de la segunda vela supera 1.8x la media de 20 sesiones.',
+          'Confirmación: perforación del mínimo del patrón en la vela subsiguiente.'
+        ],
+        marketData: {
+          support: 215.0,
+          resistance: 260.0,
+          entryPrice: 248.0,
+          slPrice: 263.5,
+          tpPrice: 217.0,
+          patternIndices: [10, 11],
+          patternLabel: 'ENVOLVENTE BAJISTA',
+          candles: [
+            { o: 220, h: 225, l: 219, c: 224, v: 50 },
+            { o: 224, h: 229, l: 223, c: 228, v: 55 },
+            { o: 228, h: 234, l: 227, c: 233, v: 62 },
+            { o: 233, h: 238, l: 232, c: 237, v: 58 },
+            { o: 237, h: 243, l: 236, c: 242, v: 70 },
+            { o: 242, h: 247, l: 241, c: 246, v: 68 },
+            { o: 246, h: 251, l: 245, c: 250, v: 75 },
+            { o: 250, h: 254, l: 249, c: 253, v: 80 },
+            { o: 253, h: 257, l: 252, c: 256, v: 85 },
+            { o: 255, h: 258, l: 254, c: 257.5, v: 75 },
+            { o: 256.0, h: 259.0, l: 255.5, c: 258.5, v: 80, isPattern: true },
+            { o: 260.0, h: 261.0, l: 249.0, c: 250.0, v: 195, isPattern: true },
+            { o: 249.5, h: 251.0, l: 241.0, c: 242.0, v: 140 },
+            { o: 241.5, h: 243.0, l: 232.0, c: 233.0, v: 125 },
+            { o: 233.0, h: 234.0, l: 224.0, c: 225.0, v: 110 },
+            { o: 224.0, h: 226.0, l: 216.0, c: 217.0, v: 120 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="20" y1="50" x2="220" y2="50" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3"/>
+            <text x="130" y="42" fill="#ef4444" font-size="9" font-family="monospace">RESISTENCIA</text>
+            <line x1="75" y1="90" x2="75" y2="155" stroke="#10b981" stroke-width="2"/>
+            <rect x="65" y="105" width="20" height="40" fill="#10b981" stroke="#059669" rx="2"/>
+            <line x1="135" y1="75" x2="135" y2="185" stroke="#ef4444" stroke-width="2.5"/>
+            <rect x="115" y="85" width="40" height="85" fill="#ef4444" stroke="#dc2626" rx="2"/>
+            <text x="50" y="210" fill="#f87171" font-size="10" font-weight="bold">Cuerpo rojo envuelve al verde</text>
+          </svg>
+        `
+      },
+      {
+        id: 'marubozu',
+        name: '🚀 Marubozu Alcista (Control Comprador)',
+        category: 'continuacion',
+        badge: 'Continuación Alcista',
+        badgeColor: 'emerald',
+        ticker: 'SPY · 1D (Diario)',
+        contextDesc: 'Rompimiento de resistencia con volumen masivo sin retrocesos',
+        subtitle: 'Vela de rango amplio sin mechas. Control comprador absoluto desde la apertura hasta el cierre.',
+        bias: 'Alcista Fuerte (Dominio Total)',
+        winrate: '74% de continuidad',
+        reversalRate: '74% continuación',
+        failure: 'Bajo (20% si hay sobreextensión RSI > 80)',
+        rr: '≥ 1:2.0',
+        entry: '$512.50 (Superación del Cierre)',
+        sl: '$503.00 (Bajo el 50% de la vela / ATR)',
+        tp: '$531.50 (Expansión de Rango)',
+        keyLevel: '$505.00 Nivel de Ruptura',
+        vpa: 'Volumen institucional extremo (RVOL > 2.5). Compras automáticas agresivas a mercado que no dan tregua a los vendedores.',
+        psychology: 'Fuerza compradora implacable. Los osos se ven forzados a cubrir sus cortos apresuradamente ante la falta de mecha superior.',
+        checklist: [
+          'El cuerpo representa más del 85% del rango total de la vela.',
+          'Las sombras superior e inferior son prácticamente nulas (menores al 5%).',
+          'Acompañada de volumen relativo destacado (RVOL >= 2.0).',
+          'Generalmente quiebra una consolidación o nivel de resistencia previo.',
+          'Confirmación: vela siguiente sostiene el tercio superior del Marubozu.'
+        ],
+        marketData: {
+          support: 498.0,
+          resistance: 535.0,
+          entryPrice: 512.5,
+          slPrice: 503.0,
+          tpPrice: 531.5,
+          patternIndices: [9],
+          patternLabel: 'MARUBOZU ALCISTA',
+          candles: [
+            { o: 495, h: 497, l: 494, c: 496, v: 60 },
+            { o: 496, h: 499, l: 495, c: 498, v: 65 },
+            { o: 498, h: 501, l: 497, c: 500, v: 70 },
+            { o: 500, h: 502, l: 498, c: 499, v: 55 },
+            { o: 499, h: 502, l: 498, c: 501, v: 58 },
+            { o: 501, h: 503, l: 500, c: 502, v: 60 },
+            { o: 502, h: 504, l: 501, c: 503, v: 62 },
+            { o: 503, h: 504, l: 501, c: 502.5, v: 50 },
+            { o: 502.5, h: 504.5, l: 502, c: 504, v: 75 },
+            { o: 504.0, h: 512.5, l: 503.8, c: 512.2, v: 230, isPattern: true },
+            { o: 512.5, h: 518.0, l: 511.5, c: 517.0, v: 140 },
+            { o: 517.0, h: 523.0, l: 516.0, c: 522.5, v: 130 },
+            { o: 522.5, h: 528.0, l: 521.8, c: 527.0, v: 120 },
+            { o: 527.0, h: 532.5, l: 526.0, c: 531.5, v: 115 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="120" y1="40" x2="120" y2="45" stroke="#10b981" stroke-width="2"/>
+            <line x1="120" y1="195" x2="120" y2="200" stroke="#10b981" stroke-width="2"/>
+            <rect x="90" y="45" width="60" height="150" fill="#10b981" stroke="#059669" stroke-width="2" rx="2"/>
+            <text x="50" y="225" fill="#34d399" font-size="10" font-weight="bold">Cuerpo gigante sin sombras (>85%)</text>
+          </svg>
+        `
+      },
+      {
+        id: 'inverted_hammer',
+        name: '🔨 Martillo Invertido (Suelo)',
+        category: 'reversion_alcista',
+        badge: 'Reversión Alcista',
+        badgeColor: 'emerald',
+        ticker: 'ETH / USDT · 1D (Diario)',
+        contextDesc: 'Suelo de corrección testeando soporte psicológico mayor',
+        subtitle: '1 vela en suelo tras caída. Mecha superior extendida (2x cuerpo) con cierre cerca de mínimos.',
+        bias: 'Alcista (Presión Compradora Emergente)',
+        winrate: '60% de éxito',
+        reversalRate: '60% en suelo con volumen',
+        failure: 'Alto si no se espera confirmación',
+        rr: '≥ 1:2.0',
+        entry: '$2,480 (Superación del Máximo)',
+        sl: '$2,310 (Bajo el mínimo - 1.5x ATR)',
+        tp: '$2,820 (Target R:R 1:2.0)',
+        keyLevel: '$2,350 Soporte Mayor',
+        vpa: 'Incremento notable de volumen durante el intento alcista intradía. Indica acumulación silenciosa.',
+        psychology: 'Los compradores empujaron fuerte el precio. Aunque los osos devolvieron parte del avance, la mecha demuestra que hay apetito institucional en esa zona.',
+        checklist: [
+          'Precedida por una clara tendencia bajista previa.',
+          'La mecha superior mide al menos el doble (2x) del cuerpo real.',
+          'La sombra inferior es casi inexistente o menor al 10%.',
+          'Requiere obligatoriamente confirmación con vela siguiente alcista de rango amplio.'
+        ],
+        marketData: {
+          support: 2350,
+          resistance: 2850,
+          entryPrice: 2480,
+          slPrice: 2310,
+          tpPrice: 2820,
+          patternIndices: [7],
+          patternLabel: 'MARTILLO INVERTIDO',
+          candles: [
+            { o: 2800, h: 2820, l: 2750, c: 2760, v: 45 },
+            { o: 2760, h: 2770, l: 2680, c: 2690, v: 55 },
+            { o: 2690, h: 2710, l: 2610, c: 2620, v: 65 },
+            { o: 2620, h: 2630, l: 2540, c: 2550, v: 75 },
+            { o: 2550, h: 2560, l: 2460, c: 2470, v: 85 },
+            { o: 2470, h: 2480, l: 2390, c: 2400, v: 90 },
+            { o: 2400, h: 2410, l: 2340, c: 2350, v: 95 },
+            { o: 2360, h: 2475, l: 2350, c: 2390, v: 175, isPattern: true },
+            { o: 2395, h: 2530, l: 2390, c: 2515, v: 150 },
+            { o: 2515, h: 2640, l: 2505, c: 2620, v: 135 },
+            { o: 2620, h: 2740, l: 2610, c: 2725, v: 125 },
+            { o: 2725, h: 2830, l: 2715, c: 2820, v: 130 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="120" y1="40" x2="120" y2="150" stroke="#10b981" stroke-width="2.5"/>
+            <line x1="120" y1="180" x2="120" y2="185" stroke="#10b981" stroke-width="2"/>
+            <rect x="105" y="150" width="30" height="30" fill="#10b981" stroke="#059669" rx="2"/>
+            <text x="50" y="215" fill="#34d399" font-size="10" font-weight="bold">Mecha superior larga (≥2x) en suelo</text>
+          </svg>
+        `
+      },
+      {
+        id: 'hanging_man',
+        name: '🪢 Hombre Colgado (Hanging Man)',
+        category: 'reversion_bajista',
+        badge: 'Reversión Bajista',
+        badgeColor: 'rose',
+        ticker: 'SOL / USDT · 1D (Diario)',
+        contextDesc: 'Tope de tendencia alcista con aumento repentino de oferta',
+        subtitle: 'Misma forma de martillo pero en el techo de una tendencia. Trampa de compra con salida de manos fuertes.',
+        bias: 'Bajista (Alerta de Distribución)',
+        winrate: '59% de éxito',
+        reversalRate: '59% en techos',
+        failure: 'Alto si se opera sin confirmación bajista',
+        rr: '≥ 1:2.0',
+        entry: '$152.00 (Perforación del Mínimo)',
+        sl: '$166.50 (Máximo del Hombre Colgado)',
+        tp: '$123.00 (Soporte inferior R:R 1:2.0)',
+        keyLevel: '$165.00 Techo de Rango',
+        vpa: 'Volumen inusualmente elevado en la caída intradía. Aunque el precio recuperó al cierre, refleja que aparecieron vendedores gigantes.',
+        psychology: 'Los compradores creen ver fuerza porque la vela cerró arriba, pero la mecha inferior revela que el soporte institucional se está quebrando.',
+        checklist: [
+          'Aparece en la cúspide de una tendencia alcista extendida.',
+          'La mecha inferior mide al menos el doble (2x) del cuerpo.',
+          'La mecha superior es mínima o ausente.',
+          'Confirmación obligatoria: la vela siguiente debe ser bajista y cerrar bajo el cuerpo del hombre colgado.'
+        ],
+        marketData: {
+          support: 120.0,
+          resistance: 165.0,
+          entryPrice: 152.0,
+          slPrice: 166.5,
+          tpPrice: 123.0,
+          patternIndices: [7],
+          patternLabel: 'HOMBRE COLGADO',
+          candles: [
+            { o: 125, h: 129, l: 124, c: 128, v: 45 },
+            { o: 128, h: 134, l: 127, c: 133, v: 52 },
+            { o: 133, h: 140, l: 132, c: 139, v: 60 },
+            { o: 139, h: 146, l: 138, c: 145, v: 65 },
+            { o: 145, h: 152, l: 144, c: 151, v: 70 },
+            { o: 151, h: 158, l: 150, c: 157, v: 78 },
+            { o: 157, h: 164, l: 156, c: 163, v: 85 },
+            { o: 162.0, h: 164.5, l: 151.0, c: 161.5, v: 180, isPattern: true },
+            { o: 160.0, h: 161.0, l: 148.0, c: 149.0, v: 145 },
+            { o: 148.5, h: 150.0, l: 138.0, c: 139.5, v: 130 },
+            { o: 139.5, h: 141.0, l: 129.0, c: 130.0, v: 120 },
+            { o: 130.0, h: 131.5, l: 122.0, c: 123.0, v: 115 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="20" y1="40" x2="220" y2="40" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3"/>
+            <text x="130" y="32" fill="#ef4444" font-size="9" font-family="monospace">RESISTENCIA / TECHO</text>
+            <line x1="120" y1="55" x2="120" y2="60" stroke="#ef4444" stroke-width="2"/>
+            <line x1="120" y1="85" x2="120" y2="195" stroke="#ef4444" stroke-width="2.5"/>
+            <rect x="105" y="60" width="30" height="25" fill="#ef4444" stroke="#dc2626" rx="2"/>
+            <text x="45" y="215" fill="#f87171" font-size="10" font-weight="bold">Misma forma de martillo en techo</text>
+          </svg>
+        `
+      },
+      {
+        id: 'gravestone_doji',
+        name: '🪦 Doji Lápida (Gravestone Doji)',
+        category: 'reversion_bajista',
+        badge: 'Reversión Bajista',
+        badgeColor: 'rose',
+        ticker: 'TSLA · 1D (Diario)',
+        contextDesc: 'Rally alcista chocando contra resistencia anual con mecha superior extrema y rechazo de oferta',
+        subtitle: '1 vela en techo. Apertura y cierre en el mínimo de la sesión con mecha superior muy larga.',
+        bias: 'Bajista (Rechazo Violento de Techo)',
+        winrate: '61% - 66%',
+        reversalRate: '61% en resistencia',
+        failure: 'Medio (34%)',
+        rr: '≥ 1:2.2',
+        entry: '$212.00 (Perforación de Mínimos)',
+        sl: '$228.50 (Sobre la mecha + ATR)',
+        tp: '$176.00 (Target R:R 1:2.2)',
+        keyLevel: '$225.00 Resistencia Clave',
+        vpa: 'RVOL > 2.0. Volumen masivo en máximos que termina con precio rechazado y absorción institucional de la demanda.',
+        psychology: 'Los compradores intentaron empujar el precio hacia nuevos máximos pero chocaron con un muro institucional que absorbió toda la compra y devolvió la cotización al punto de partida.',
+        checklist: [
+          'Aparece en la parte superior de una tendencia alcista extendida o resistencia clave.',
+          'El precio de apertura, mínimo y cierre son prácticamente idénticos (mecha inferior nula).',
+          'La sombra superior es extremadamente larga (al menos 3x el cuerpo diminuto).',
+          'El volumen relativo (RVOL) es elevado, indicando distribución activa.',
+          'Confirmación requerida con vela bajista subsiguiente que perfore el mínimo del Doji.'
+        ],
+        marketData: {
+          support: 175.0,
+          resistance: 225.0,
+          entryPrice: 212.0,
+          slPrice: 228.5,
+          tpPrice: 176.0,
+          patternIndices: [8],
+          patternLabel: 'DOJI LÁPIDA EN RESISTENCIA',
+          candles: [
+            { o: 185, h: 189, l: 184, c: 188, v: 45 },
+            { o: 188, h: 194, l: 187, c: 193, v: 52 },
+            { o: 193, h: 200, l: 192, c: 199, v: 60 },
+            { o: 199, h: 206, l: 198, c: 205, v: 68 },
+            { o: 205, h: 213, l: 204, c: 212, v: 75 },
+            { o: 212, h: 218, l: 211, c: 217, v: 80 },
+            { o: 217, h: 222, l: 216, c: 221, v: 90 },
+            { o: 221, h: 224, l: 220, c: 223, v: 85 },
+            { o: 223.0, h: 227.5, l: 222.8, c: 223.2, v: 215, isPattern: true },
+            { o: 222.5, h: 223.0, l: 211.5, c: 212.0, v: 160 },
+            { o: 211.5, h: 213.0, l: 198.0, c: 199.0, v: 140 },
+            { o: 198.5, h: 200.0, l: 187.0, c: 188.0, v: 130 },
+            { o: 188.0, h: 189.5, l: 175.5, c: 176.0, v: 135 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="20" y1="50" x2="220" y2="50" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3"/>
+            <text x="130" y="42" fill="#ef4444" font-size="9" font-family="monospace">RESISTENCIA CLAVE</text>
+            <line x1="120" y1="52" x2="120" y2="195" stroke="#ef4444" stroke-width="2.5"/>
+            <line x1="90" y1="195" x2="150" y2="195" stroke="#f87171" stroke-width="4"/>
+            <text x="65" y="215" fill="#f87171" font-size="10" font-mono font-bold>Doji Lápida (Rechazo de Máximos)</text>
+          </svg>
+        `
+      },
+      {
+        id: 'classic_doji',
+        name: '⚖️ Doji Clásico (Indecisión)',
+        category: 'indecision',
+        badge: 'Indecisión / Neutral',
+        badgeColor: 'indigo',
+        ticker: 'SPY · 1D (Diario)',
+        contextDesc: 'Pausa de mercado tras rally o caída prolongada con perfecto equilibrio de fuerzas',
+        subtitle: '1 vela. Apertura y cierre idénticos con mechas superior e inferior simétricas.',
+        bias: 'Neutral (Esperar Confirmación)',
+        winrate: '51% (Moneda al Aire)',
+        reversalRate: '51% giro / 49% continuación',
+        failure: 'Alto si se opera sin confirmación',
+        rr: '≥ 1:1.5',
+        entry: '$512.00 (Ruptura del Rango)',
+        sl: '$505.00 (Extremo opuesto del Doji)',
+        tp: '$525.00 (Expansión de Rango)',
+        keyLevel: '$508.00 Zona de Equilibrio',
+        vpa: 'Contracción de volumen o volumen neutro. Los algoritmos reducen exposición a la espera de nuevos catalizadores.',
+        psychology: 'Equilibrio transitorio donde ni compradores ni vendedores tienen la fuerza para imponer dirección. Representa duda o clímax momentáneo.',
+        checklist: [
+          'La condición formal matemática: |Open - Close| <= (High - Low) * 0.05.',
+          'Las sombras superior e inferior son de longitud moderada y similar.',
+          'Se prohíbe operar de forma anticipada sin confirmación de la siguiente barra.',
+          'Si aparece en sobrecompra extrema (RSI > 75), aumenta la probabilidad de giro bajista.',
+          'Si aparece en sobreventa extrema (RSI < 25), aumenta la probabilidad de rebote técnico.'
+        ],
+        marketData: {
+          support: 495.0,
+          resistance: 525.0,
+          entryPrice: 512.0,
+          slPrice: 505.0,
+          tpPrice: 525.0,
+          patternIndices: [7],
+          patternLabel: 'DOJI CLÁSICO DE INDECISIÓN',
+          candles: [
+            { o: 485, h: 489, l: 484, c: 488, v: 50 },
+            { o: 488, h: 494, l: 487, c: 493, v: 55 },
+            { o: 493, h: 499, l: 492, c: 498, v: 60 },
+            { o: 498, h: 503, l: 497, c: 502, v: 62 },
+            { o: 502, h: 506, l: 501, c: 505, v: 58 },
+            { o: 505, h: 509, l: 504, c: 508, v: 64 },
+            { o: 508, h: 511, l: 506, c: 507.5, v: 50 },
+            { o: 508.0, h: 511.5, l: 504.5, c: 508.1, v: 75, isPattern: true },
+            { o: 508.5, h: 515.0, l: 507.5, c: 514.5, v: 130 },
+            { o: 514.5, h: 519.0, l: 513.5, c: 518.5, v: 120 },
+            { o: 518.5, h: 524.0, l: 518.0, c: 523.5, v: 115 },
+            { o: 523.5, h: 526.5, l: 522.0, c: 525.0, v: 110 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="20" y1="120" x2="220" y2="120" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"/>
+            <line x1="120" y1="45" x2="120" y2="195" stroke="#818cf8" stroke-width="2.5"/>
+            <line x1="90" y1="120" x2="150" y2="120" stroke="#a5b4fc" stroke-width="4"/>
+            <text x="65" y="215" fill="#a5b4fc" font-size="10" font-mono font-bold>Doji Clásico (Equilibrio Simétrico)</text>
+          </svg>
+        `
+      },
+      {
+        id: 'bearish_marubozu',
+        name: '💥 Marubozu Bajista (Presión Vendedora)',
+        category: 'reversion_bajista',
+        badge: 'Presión Vendedora Extrema',
+        badgeColor: 'rose',
+        ticker: 'NVDA · 1D (Diario)',
+        contextDesc: 'Cascada vendedora institucional sin mechas (Open en High, Close en Low)',
+        subtitle: '1 vela de cuerpo rojo pleno sin sombras relevantes (cuerpo > 85% del rango).',
+        bias: 'Bajista Fuerte (Dominio Total de Oferta)',
+        winrate: '68% - 72%',
+        reversalRate: '70% de continuidad bajista',
+        failure: 'Bajo (24% falso breakdown)',
+        rr: '≥ 1:2.1',
+        entry: '$115.00 (Ruptura Bajista)',
+        sl: '$123.50 (Apertura del Marubozu + ATR)',
+        tp: '$96.00 (Target R:R 1:2.2)',
+        keyLevel: '$120.00 Quiebre de Soporte',
+        vpa: 'RVOL > 2.2. Ventas institucionales continuas durante toda la sesión sin dar respiro a los toros.',
+        psychology: 'Capitulación total de compradores. Ninguna orden pasiva de compra logra detener la caída; los vendedores empujan el precio de campana a campana.',
+        checklist: [
+          'El cuerpo rojo representa más del 85% del rango total de la vela.',
+          'Las sombras superior e inferior son inexistentes o menores al 5% del rango.',
+          'Acompañado de volumen relativo muy alto (RVOL >= 2.0).',
+          'Quiebra un nivel de soporte previo o promedio móvil relevante (EMA 20 / VWAP).',
+          'Confirmación: la siguiente vela abre y sostiene cotizaciones bajo el 50% del Marubozu.'
+        ],
+        marketData: {
+          support: 95.0,
+          resistance: 125.0,
+          entryPrice: 115.0,
+          slPrice: 123.5,
+          tpPrice: 96.0,
+          patternIndices: [8],
+          patternLabel: 'MARUBOZU BAJISTA',
+          candles: [
+            { o: 130, h: 132, l: 129, c: 131, v: 50 },
+            { o: 131, h: 132.5, l: 128, c: 129, v: 55 },
+            { o: 129, h: 130, l: 126, c: 127, v: 60 },
+            { o: 127, h: 128, l: 124, c: 125, v: 65 },
+            { o: 125, h: 126.5, l: 124, c: 126, v: 48 },
+            { o: 126, h: 127, l: 124.5, c: 125, v: 52 },
+            { o: 125, h: 125.5, l: 123, c: 123.5, v: 70 },
+            { o: 123.5, h: 124, l: 122, c: 122.5, v: 75 },
+            { o: 122.8, h: 123.0, l: 114.8, c: 115.0, v: 240, isPattern: true },
+            { o: 114.5, h: 115.0, l: 108.0, c: 109.0, v: 165 },
+            { o: 109.0, h: 110.0, l: 102.5, c: 103.0, v: 140 },
+            { o: 103.0, h: 104.0, l: 96.0, c: 96.5, v: 135 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="120" y1="40" x2="120" y2="45" stroke="#ef4444" stroke-width="2"/>
+            <line x1="120" y1="195" x2="120" y2="200" stroke="#ef4444" stroke-width="2"/>
+            <rect x="90" y="45" width="60" height="150" fill="#ef4444" stroke="#dc2626" stroke-width="2" rx="2"/>
+            <text x="45" y="225" fill="#f87171" font-size="10" font-weight="bold">Cuerpo rojo gigante sin sombras (>85%)</text>
+          </svg>
+        `
+      },
+      {
+        id: 'three_black_crows',
+        name: '🦅 Tres Cuervos Negros (Crows)',
+        category: 'reversion_bajista',
+        badge: 'Cascada Bajista Fuerte',
+        badgeColor: 'rose',
+        ticker: 'AMZN · 1D (Diario)',
+        contextDesc: 'Giro bajista violento tras distribución en máximos con 3 velas rojas consecutivas de gran cuerpo',
+        subtitle: '3 velas rojas consecutivas de rango amplio abriendo dentro del cuerpo previo y cerrando en mínimos.',
+        bias: 'Bajista (Presión Vendedora Sostenida)',
+        winrate: '78% - 82%',
+        reversalRate: '79% de continuidad bajista',
+        failure: 'Bajo (21% rebote técnico por sobreventa)',
+        rr: '≥ 1:2.1',
+        entry: '$168.00 (Cierre de la 3ª vela)',
+        sl: '$180.50 (Máximo del 1er Cuervo + ATR)',
+        tp: '$142.00 (Soporte mayor R:R 1:2.1)',
+        keyLevel: '$178.00 Resistencia Quebrada',
+        vpa: 'Volumen expansivo y creciente en las 3 velas sucesivas. Liquidación institucional acelerada.',
+        psychology: 'Capitulación masiva de compradores atrapados en máximos. Los toros abandonan toda esperanza y la cascada de Stop Loss retroalimenta la caída.',
+        checklist: [
+          'Precedida por una clara tendencia alcista previa o testeo fallido de resistencia mayor.',
+          'Consiste en tres velas bajistas (rojas) consecutivas de cuerpo amplio y similar.',
+          'Cada vela abre dentro del rango del cuerpo de la sesión precedente.',
+          'Cada vela cierra marcando un nuevo mínimo respecto a la vela anterior.',
+          'Sombras inferiores cortas o nulas, demostrando que los vendedores mantuvieron control hasta el cierre.'
+        ],
+        marketData: {
+          support: 140.0,
+          resistance: 182.0,
+          entryPrice: 168.0,
+          slPrice: 180.5,
+          tpPrice: 142.0,
+          patternIndices: [7, 8, 9],
+          patternLabel: 'TRES CUERVOS NEGROS',
+          candles: [
+            { o: 165, h: 168, l: 164, c: 167.5, v: 50 },
+            { o: 167.5, h: 172, l: 166.5, c: 171, v: 55 },
+            { o: 171, h: 176, l: 170, c: 175.5, v: 62 },
+            { o: 175.5, h: 180, l: 174.5, c: 179, v: 68 },
+            { o: 179, h: 182, l: 178, c: 181, v: 72 },
+            { o: 181, h: 182.5, l: 179, c: 180, v: 60 },
+            { o: 180, h: 181, l: 177, c: 177.5, v: 65 },
+            { o: 178.5, h: 179.0, l: 173.0, c: 173.5, v: 160, isPattern: true },
+            { o: 174.0, h: 174.5, l: 168.0, c: 168.5, v: 175, isPattern: true },
+            { o: 169.0, h: 169.2, l: 162.5, c: 163.0, v: 190, isPattern: true },
+            { o: 162.5, h: 163.5, l: 153.0, c: 154.0, v: 145 },
+            { o: 154.0, h: 155.0, l: 144.5, c: 145.0, v: 135 },
+            { o: 145.0, h: 146.0, l: 140.0, c: 141.0, v: 120 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="20" y1="45" x2="220" y2="45" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3"/>
+            <text x="130" y="38" fill="#ef4444" font-size="9" font-family="monospace">RESISTENCIA</text>
+            <line x1="60" y1="55" x2="60" y2="105" stroke="#ef4444" stroke-width="2"/>
+            <rect x="50" y="60" width="20" height="40" fill="#ef4444" stroke="#dc2626" rx="2"/>
+            <line x1="110" y1="90" x2="110" y2="145" stroke="#ef4444" stroke-width="2"/>
+            <rect x="100" y="95" width="20" height="45" fill="#ef4444" stroke="#dc2626" rx="2"/>
+            <line x1="160" y1="130" x2="160" y2="190" stroke="#ef4444" stroke-width="2"/>
+            <rect x="150" y="135" width="20" height="50" fill="#ef4444" stroke="#dc2626" rx="2"/>
+            <text x="35" y="215" fill="#f87171" font-size="10" font-weight="bold">3 velas rojas consecutivas abriendo dentro del cuerpo previo</text>
+          </svg>
+        `
+      },
+      {
+        id: 'spinning_top',
+        name: '🌀 Peonza Indecisión (Spinning Top)',
+        category: 'indecision',
+        badge: 'Equilibrio / Alerta',
+        badgeColor: 'indigo',
+        ticker: 'QQQ · 1D (Diario)',
+        contextDesc: 'Cuerpo pequeño en zona intermedia con mechas equilibradas indicando pérdida de convicción',
+        subtitle: '1 vela. Cuerpo pequeño (10-30% del rango) con sombras superior e inferior simétricas.',
+        bias: 'Neutral / Alerta de Agotamiento',
+        winrate: '54%',
+        reversalRate: '54% de giro tras impulso',
+        failure: 'Alto (46% continuación directa)',
+        rr: '≥ 1:1.5',
+        entry: '$432.00 (Confirmación con vela directriz)',
+        sl: '$424.00 (Extremo opuesto de la peonza)',
+        tp: '$446.00 (Expansión de Rango)',
+        keyLevel: '$428.00 Zona de Choque',
+        vpa: 'Volumen moderado o en contracción. Lucha simétrica de oferta y demanda con resultado neutro.',
+        psychology: 'Los toros intentaron llevar el precio arriba y los osos abajo, pero ninguno logró sostener la ventaja. Preanuncia agotamiento tendencial.',
+        checklist: [
+          'El cuerpo real representa entre el 10% y el 30% del rango total de la vela.',
+          'Las sombras superior e inferior son evidentes y de tamaño relativamente parejo.',
+          'No es una señal operativa autónoma: requiere verificar la tendencia previa y confluencia.',
+          'En techos extendidos con RSI > 70 advierte distribución pasiva.',
+          'En suelos extendidos con RSI < 30 advierte absorción institucional emergente.'
+        ],
+        marketData: {
+          support: 415.0,
+          resistance: 448.0,
+          entryPrice: 432.0,
+          slPrice: 424.0,
+          tpPrice: 446.0,
+          patternIndices: [7],
+          patternLabel: 'PEONZA DE INDECISIÓN',
+          candles: [
+            { o: 412, h: 415, l: 411, c: 414.5, v: 45 },
+            { o: 414.5, h: 419, l: 413.5, c: 418, v: 50 },
+            { o: 418, h: 423, l: 417, c: 422, v: 55 },
+            { o: 422, h: 426, l: 421, c: 425.5, v: 58 },
+            { o: 425.5, h: 428, l: 424.5, c: 427, v: 52 },
+            { o: 427, h: 429.5, l: 426, c: 428.5, v: 56 },
+            { o: 428.5, h: 430, l: 427, c: 428, v: 48 },
+            { o: 427.5, h: 431.5, l: 424.5, c: 428.2, v: 70, isPattern: true },
+            { o: 428.5, h: 435.0, l: 427.8, c: 434.5, v: 120 },
+            { o: 434.5, h: 440.0, l: 433.8, c: 439.5, v: 110 },
+            { o: 439.5, h: 445.0, l: 438.5, c: 444.0, v: 105 },
+            { o: 444.0, h: 448.5, l: 443.0, c: 447.5, v: 115 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="20" y1="120" x2="220" y2="120" stroke="#334155" stroke-dasharray="3,3" stroke-width="1"/>
+            <line x1="120" y1="45" x2="120" y2="195" stroke="#818cf8" stroke-width="2"/>
+            <rect x="105" y="105" width="30" height="30" fill="#6366f1" stroke="#4f46e5" rx="2"/>
+            <text x="45" y="215" fill="#a5b4fc" font-size="10" font-weight="bold">Cuerpo pequeño (10-30%) con mechas simétricas</text>
+          </svg>
+        `
+      },
+      {
+        id: 'bullish_impulse',
+        name: '📈 Impulso Alcista (Rango Amplio)',
+        category: 'continuacion',
+        badge: 'Breakout Alcista',
+        badgeColor: 'emerald',
+        ticker: 'META · 1D (Diario)',
+        contextDesc: 'Expansión de volatilidad alcista que supera zona de compresión previa con cuerpo amplio',
+        subtitle: '1 vela de gran expansión alcista (cuerpo > 60% del rango) que rompe resistencia con RVOL > 1.8.',
+        bias: 'Alcista (Expansión Direccional)',
+        winrate: '65% - 69%',
+        reversalRate: '66% de continuidad',
+        failure: 'Medio (31% si el ATR estaba en Squeeze)',
+        rr: '≥ 1:2.0',
+        entry: '$485.00 (Superación de Resistencia)',
+        sl: '$465.00 (Bajo el mínimo del impulso - 1.5x ATR)',
+        tp: '$525.00 (Target R:R 1:2.0)',
+        keyLevel: '$480.00 Resistencia Quebrada a Soporte',
+        vpa: 'RVOL > 1.8 con expansión notable de ATR. Entrada agresiva de órdenes de mercado compradoras.',
+        psychology: 'Ruptura institucional de rango. Los vendedores que mantenían órdenes limitadas en el techo son barridos y sus stops alimentan la aceleración.',
+        checklist: [
+          'El cuerpo de la vela representa al menos el 60% del rango total.',
+          'La vela quiebra con claridad un nivel de soporte/resistencia previo o EMA 20.',
+          'El volumen relativo (RVOL) supera 1.8 respecto a su promedio de 20 periodos.',
+          'El filtro de volatilidad ATR confirma expansión (sin squeeze de compresión).',
+          'Confirmación: el cierre se produce en el tercio superior de la barra.'
+        ],
+        marketData: {
+          support: 450.0,
+          resistance: 480.0,
+          entryPrice: 485.0,
+          slPrice: 465.0,
+          tpPrice: 525.0,
+          patternIndices: [8],
+          patternLabel: 'IMPULSO ALCISTA DE RANGO AMPLIO',
+          candles: [
+            { o: 455, h: 458, l: 454, c: 457, v: 45 },
+            { o: 457, h: 461, l: 456, c: 460, v: 48 },
+            { o: 460, h: 463, l: 458, c: 461.5, v: 52 },
+            { o: 461.5, h: 465, l: 460, c: 464, v: 55 },
+            { o: 464, h: 467, l: 462, c: 465, v: 50 },
+            { o: 465, h: 469, l: 464, c: 468, v: 54 },
+            { o: 468, h: 472, l: 467, c: 471, v: 60 },
+            { o: 471, h: 474, l: 470, c: 472.5, v: 62 },
+            { o: 473.0, h: 486.0, l: 471.5, c: 484.5, v: 220, isPattern: true },
+            { o: 485.0, h: 496.0, l: 483.5, c: 494.0, v: 160 },
+            { o: 494.0, h: 508.0, l: 492.5, c: 505.0, v: 145 },
+            { o: 505.0, h: 518.0, l: 503.5, c: 516.0, v: 130 },
+            { o: 516.0, h: 527.0, l: 514.5, c: 525.0, v: 125 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="20" y1="90" x2="220" y2="90" stroke="#10b981" stroke-dasharray="3,3" stroke-width="1.5"/>
+            <text x="125" y="82" fill="#10b981" font-size="9" font-family="monospace">RUPTURA DE RESISTENCIA</text>
+            <line x1="120" y1="50" x2="120" y2="65" stroke="#10b981" stroke-width="2"/>
+            <line x1="120" y1="175" x2="120" y2="190" stroke="#10b981" stroke-width="2"/>
+            <rect x="95" y="65" width="50" height="110" fill="#10b981" stroke="#059669" rx="2"/>
+            <text x="45" y="215" fill="#34d399" font-size="10" font-weight="bold">Cuerpo alcista amplio (>60%) rompiendo rango</text>
+          </svg>
+        `
+      },
+      {
+        id: 'bearish_impulse',
+        name: '📉 Impulso Bajista (Rango Amplio)',
+        category: 'reversion_bajista',
+        badge: 'Breakdown Bajista',
+        badgeColor: 'rose',
+        ticker: 'GOOGL · 1D (Diario)',
+        contextDesc: 'Expansión de volatilidad bajista que perfora soporte clave con cuerpo rojo dominante',
+        subtitle: '1 vela de fuerte rango bajista (cuerpo > 60%) perforando soporte con cierre cerca de mínimos.',
+        bias: 'Bajista (Presión Vendedora Continuada)',
+        winrate: '63% - 67%',
+        reversalRate: '64% de continuidad bajista',
+        failure: 'Medio (35% falso breakdown si no hay volumen)',
+        rr: '≥ 1:1.8',
+        entry: '$152.00 (Quiebre de Soporte)',
+        sl: '$161.00 (Sobre el máximo del impulso + 1.5x ATR)',
+        tp: '$135.00 (Target R:R 1:1.8)',
+        keyLevel: '$155.00 Soporte Perforado',
+        vpa: 'RVOL elevado en la ruptura bajista. Ventas masivas institucionales liquidando inventario.',
+        psychology: 'Pánico vendedor y activación en cadena de Stop Loss bajo soportes conocidos. Dominio total de la oferta.',
+        checklist: [
+          'El cuerpo rojo representa al menos el 60% del rango total de la barra.',
+          'Perfora con decisión un soporte consolidado o nivel clave institucional.',
+          'El volumen relativo (RVOL) es superior a 1.8x la media de 20 sesiones.',
+          'El cierre se produce dentro del tercio inferior del rango total.',
+          'Confirmación: la siguiente vela abre sin recuperar el soporte quebrado.'
+        ],
+        marketData: {
+          support: 135.0,
+          resistance: 165.0,
+          entryPrice: 152.0,
+          slPrice: 161.0,
+          tpPrice: 135.0,
+          patternIndices: [8],
+          patternLabel: 'IMPULSO BAJISTA DE RANGO AMPLIO',
+          candles: [
+            { o: 164, h: 166, l: 163, c: 165, v: 45 },
+            { o: 165, h: 167, l: 164, c: 164.5, v: 48 },
+            { o: 164.5, h: 165.5, l: 162, c: 163, v: 52 },
+            { o: 163, h: 164, l: 160.5, c: 161, v: 58 },
+            { o: 161, h: 162.5, l: 159, c: 160, v: 62 },
+            { o: 160, h: 161, l: 157.5, c: 158, v: 65 },
+            { o: 158, h: 159, l: 156, c: 157, v: 68 },
+            { o: 157, h: 157.5, l: 155, c: 155.5, v: 72 },
+            { o: 155.5, h: 156.0, l: 147.0, c: 147.5, v: 215, isPattern: true },
+            { o: 147.0, h: 148.0, l: 141.5, c: 142.0, v: 155 },
+            { o: 142.0, h: 143.0, l: 137.0, c: 137.5, v: 140 },
+            { o: 137.5, h: 138.5, l: 134.5, c: 135.0, v: 130 }
+          ]
+        },
+        anatomySvg: `
+          <svg viewBox="0 0 240 240" class="w-full h-full">
+            <line x1="20" y1="100" x2="220" y2="100" stroke="#ef4444" stroke-dasharray="3,3" stroke-width="1.5"/>
+            <text x="125" y="92" fill="#ef4444" font-size="9" font-family="monospace">SOPORTE QUEBRADO</text>
+            <line x1="120" y1="50" x2="120" y2="65" stroke="#ef4444" stroke-width="2"/>
+            <line x1="120" y1="175" x2="120" y2="190" stroke="#ef4444" stroke-width="2"/>
+            <rect x="95" y="65" width="50" height="110" fill="#ef4444" stroke="#dc2626" rx="2"/>
+            <text x="45" y="215" fill="#f87171" font-size="10" font-weight="bold">Cuerpo bajista amplio (>60%) quebrando soporte</text>
+          </svg>
+        `
+      },
+    ];
+
+    let currentPattern = PATTERNS[0];
+    let currentFilter = 'all';
+    let chartMode = 'market'; // 'market' or 'anatomy'
+
+    function renderList() {
+      const container = document.getElementById('patterns-list');
+      container.innerHTML = '';
+
+      const filtered = PATTERNS.filter(p => currentFilter === 'all' || p.category === currentFilter);
+      document.getElementById('pattern-count').innerText = `${filtered.length} Patrones`;
+
+      filtered.forEach(p => {
+        const isSelected = p.id === currentPattern.id;
+        const btn = document.createElement('button');
+        btn.className = `w-full text-left p-3 rounded-xl border transition flex items-center justify-between ${
+          isSelected 
+            ? 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-lg' 
+            : 'bg-slate-900/60 border-slate-800 hover:bg-slate-800 text-slate-300'
+        }`;
+        btn.onclick = () => selectPattern(p.id);
+
+        const badgeBg = p.badgeColor === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' : (p.badgeColor === 'rose' ? 'bg-rose-500/20 text-rose-400' : 'bg-indigo-500/20 text-indigo-400');
+
+        btn.innerHTML = `
+          <div>
+            <div class="font-bold text-xs tracking-wide">${p.name}</div>
+            <div class="text-[11px] text-slate-400 mt-0.5 truncate max-w-[200px]">${p.subtitle}</div>
+          </div>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded ${badgeBg}">
+            ${p.winrate.split(' ')[0]}
+          </span>
+        `;
+        container.appendChild(btn);
+      });
+    }
+
+    function selectPattern(id) {
+      currentPattern = PATTERNS.find(p => p.id === id) || PATTERNS[0];
+      renderList();
+      renderDetail();
+    }
+
+    function filterCategory(cat, ev) {
+      currentFilter = cat;
+      document.querySelectorAll('.cat-btn').forEach(btn => {
+        btn.classList.remove('bg-emerald-600', 'text-white');
+        btn.classList.add('bg-slate-800', 'text-slate-300');
+      });
+      if (ev) {
+        ev.target.classList.add('bg-emerald-600', 'text-white');
+        ev.target.classList.remove('bg-slate-800', 'text-slate-300');
+      }
+      renderList();
+    }
+
+    function setChartMode(mode) {
+      chartMode = mode;
+      const btnMarket = document.getElementById('btn-mode-market');
+      const btnAnatomy = document.getElementById('btn-mode-anatomy');
+
+      if (mode === 'market') {
+        btnMarket.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white transition flex items-center gap-1.5 shadow-sm";
+        btnAnatomy.className = "px-3 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5";
+      } else {
+        btnAnatomy.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white transition flex items-center gap-1.5 shadow-sm";
+        btnMarket.className = "px-3 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5";
+      }
+      renderChartArea();
+    }
+
+    // Professional Realistic Candlestick Chart Engine (SVG)
+    function generateMarketChartSVG(data, patternName) {
+      const candles = data.candles;
+      const n = candles.length;
+      const width = 760;
+      const height = 370;
+      const padLeft = 20;
+      const padRight = 65;
+      const padTop = 30;
+      const priceBottom = 270;
+      const volTop = 290;
+      const volBottom = 355;
+
+      // Min and Max prices with margin
+      const allPrices = candles.flatMap(c => [c.h, c.l]);
+      if (data.support) allPrices.push(data.support);
+      if (data.resistance) allPrices.push(data.resistance);
+      const minP = Math.min(...allPrices) * 0.992;
+      const maxP = Math.max(...allPrices) * 1.008;
+
+      const scaleY = (p) => priceBottom - ((p - minP) / (maxP - minP)) * (priceBottom - padTop);
+
+      // Max volume
+      const maxV = Math.max(...candles.map(c => c.v)) * 1.15;
+      const scaleVol = (v) => volBottom - (v / maxV) * (volBottom - volTop);
+
+      // Candle X spacing
+      const candleSlot = (width - padLeft - padRight) / n;
+      const candleWidth = Math.max(8, candleSlot * 0.65);
+
+      // Calculate EMA 20 approximation
+      let ema = [];
+      let k = 2 / (candles.length + 1);
+      let currEma = candles[0].c;
+      candles.forEach((c, idx) => {
+        currEma = c.c * k + currEma * (1 - k);
+        ema.push({ x: padLeft + idx * candleSlot + candleSlot / 2, y: scaleY(currEma) });
+      });
+
+      let emaPath = "M " + ema.map(pt => `${pt.x},${pt.y}`).join(" L ");
+
+      // Grid lines
+      const gridSteps = 5;
+      let gridSvg = "";
+      for (let i = 0; i <= gridSteps; i++) {
+        const p = minP + (i / gridSteps) * (maxP - minP);
+        const y = scaleY(p);
+        gridSvg += `
+          <line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="#1e293b" stroke-dasharray="3,3" stroke-width="1"/>
+          <text x="${width - padRight + 8}" y="${y + 4}" fill="#64748b" font-size="10" font-family="monospace">$${p.toFixed(p > 1000 ? 0 : 1)}</text>
+        `;
+      }
+
+      // Horizontal Key Support / Resistance Lines
+      let keyLinesSvg = "";
+      if (data.support) {
+        const ySup = scaleY(data.support);
+        keyLinesSvg += `
+          <line x1="${padLeft}" y1="${ySup}" x2="${width - padRight}" y2="${ySup}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,2"/>
+          <rect x="${width - padRight - 85}" y="${ySup - 11}" width="80" height="15" fill="#064e3b" rx="3"/>
+          <text x="${width - padRight - 78}" y="${ySup}" fill="#34d399" font-size="9" font-family="monospace">SOPORTE</text>
+        `;
+      }
+      if (data.resistance) {
+        const yRes = scaleY(data.resistance);
+        keyLinesSvg += `
+          <line x1="${padLeft}" y1="${yRes}" x2="${width - padRight}" y2="${yRes}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,2"/>
+          <rect x="${width - padRight - 95}" y="${yRes - 11}" width="90" height="15" fill="#7f1d1d" rx="3"/>
+          <text x="${width - padRight - 90}" y="${yRes}" fill="#f87171" font-size="9" font-family="monospace">RESISTENCIA</text>
+        `;
+      }
+
+      // Render Candles & Volumes
+      let candlesSvg = "";
+      let patternHighlightSvg = "";
+      let patternIndices = data.patternIndices || [];
+
+      // Bounding box for pattern
+      let pMinX = 999, pMaxX = 0, pMinY = 999, pMaxY = 0;
+
+      candles.forEach((c, idx) => {
+        const xCenter = padLeft + idx * candleSlot + candleSlot / 2;
+        const xLeft = xCenter - candleWidth / 2;
+        const yOpen = scaleY(c.o);
+        const yClose = scaleY(c.c);
+        const yHigh = scaleY(c.h);
+        const yLow = scaleY(c.l);
+
+        const isBull = c.c >= c.o;
+        const candleColor = isBull ? "#10b981" : "#ef4444";
+        const strokeColor = isBull ? "#059669" : "#dc2626";
+
+        const bodyY = Math.min(yOpen, yClose);
+        const bodyHeight = Math.max(3, Math.abs(yOpen - yClose));
+
+        // Volume Bar
+        const volY = scaleVol(c.v);
+        const volHeight = volBottom - volY;
+        const isPatternCandle = patternIndices.includes(idx);
+        const volColor = isPatternCandle ? "#f59e0b" : (isBull ? "#10b981" : "#ef4444");
+
+        candlesSvg += `
+          <!-- Volume Bar -->
+          <rect x="${xLeft + 1}" y="${volY}" width="${candleWidth - 2}" height="${volHeight}" fill="${volColor}" opacity="${isPatternCandle ? '0.9' : '0.4'}" rx="1"/>
+          
+          <!-- Wick -->
+          <line x1="${xCenter}" y1="${yHigh}" x2="${xCenter}" y2="${yLow}" stroke="${candleColor}" stroke-width="${isPatternCandle ? '2.5' : '1.5'}" stroke-linecap="round"/>
+          
+          <!-- Body -->
+          <rect x="${xLeft}" y="${bodyY}" width="${candleWidth}" height="${bodyHeight}" fill="${candleColor}" stroke="${strokeColor}" stroke-width="1.5" rx="1.5"/>
+        `;
+
+        if (isPatternCandle) {
+          pMinX = Math.min(pMinX, xLeft - 6);
+          pMaxX = Math.max(pMaxX, xLeft + candleWidth + 6);
+          pMinY = Math.min(pMinY, yHigh - 12);
+          pMaxY = Math.max(pMaxY, yLow + 12);
+        }
+      });
+
+      // Highlight Box and Callout for the pattern
+      if (patternIndices.length > 0 && pMinX < 999) {
+        const pMidX = (pMinX + pMaxX) / 2;
+        const isUpperPlacement = pMinY > 80;
+        const labelY = isUpperPlacement ? pMinY - 26 : pMaxY + 28;
+
+        patternHighlightSvg = `
+          <!-- Glowing Pattern Box -->
+          <rect x="${pMinX}" y="${pMinY}" width="${pMaxX - pMinX}" height="${pMaxY - pMinY}" fill="#3b82f6" fill-opacity="0.12" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4,3" rx="6"/>
+          
+          <!-- Callout Pin & Badge -->
+          <g>
+            <rect x="${pMidX - 95}" y="${labelY - 14}" width="190" height="24" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" rx="12" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.5))"/>
+            <circle cx="${pMidX - 78}" cy="${labelY - 2}" r="4" fill="#38bdf8"/>
+            <text x="${pMidX - 68}" y="${labelY + 2}" fill="#f8fafc" font-size="9" font-weight="bold" font-family="sans-serif">${data.patternLabel || 'PATRÓN DETECTADO'}</text>
+            <path d="${isUpperPlacement ? `M ${pMidX},${pMinY} L ${pMidX - 5},${labelY + 10} L ${pMidX + 5},${labelY + 10} Z` : `M ${pMidX},${pMaxY} L ${pMidX - 5},${labelY - 14} L ${pMidX + 5},${labelY - 14} Z`}" fill="#38bdf8"/>
+          </g>
+        `;
+      }
+
+      // Trade Execution Lines (Entry, SL, TP)
+      let tradeLevelsSvg = "";
+      if (data.entryPrice && data.slPrice) {
+        const yEntry = scaleY(data.entryPrice);
+        const ySl = scaleY(data.slPrice);
+        const yTp = data.tpPrice ? scaleY(data.tpPrice) : null;
+
+        tradeLevelsSvg += `
+          <!-- Entry Level -->
+          <line x1="${pMaxX}" y1="${yEntry}" x2="${width - padRight}" y2="${yEntry}" stroke="#34d399" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <text x="${pMaxX + 8}" y="${yEntry - 4}" fill="#34d399" font-size="9" font-weight="bold" font-mono>▲ GATILLO: $${data.entryPrice}</text>
+
+          <!-- Stop Loss Level -->
+          <line x1="${pMaxX}" y1="${ySl}" x2="${width - padRight}" y2="${ySl}" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <text x="${pMaxX + 8}" y="${ySl + 11}" fill="#f43f5e" font-size="9" font-weight="bold" font-mono>✖ STOP LOSS: $${data.slPrice}</text>
+        `;
+
+        if (yTp) {
+          tradeLevelsSvg += `
+            <!-- Take Profit Level -->
+            <line x1="${pMaxX}" y1="${yTp}" x2="${width - padRight}" y2="${yTp}" stroke="#818cf8" stroke-width="1.5" stroke-dasharray="3,2"/>
+            <text x="${pMaxX + 8}" y="${yTp - 4}" fill="#818cf8" font-size="9" font-weight="bold" font-mono>★ TARGET TP: $${data.tpPrice}</text>
+          `;
+        }
+      }
+
+      return `
+        <svg viewBox="0 0 ${width} ${height}" class="w-full h-full select-none">
+          <!-- Background -->
+          <rect width="${width}" height="${height}" fill="#06090e" rx="8"/>
+
+          <!-- Volume separator line -->
+          <line x1="${padLeft}" y1="${volTop - 8}" x2="${width - padRight}" y2="${volTop - 8}" stroke="#1e293b" stroke-width="1"/>
+          <text x="${padLeft + 4}" y="${volTop + 4}" fill="#64748b" font-size="9" font-family="monospace">VOLUMEN (VPA)</text>
+
+          <!-- Grid and Price Levels -->
+          ${gridSvg}
+          ${keyLinesSvg}
+
+          <!-- EMA 20 Curve -->
+          <path d="${emaPath}" fill="none" stroke="#f59e0b" stroke-width="1.8" opacity="0.85"/>
+
+          <!-- Candles and Volumes -->
+          ${candlesSvg}
+
+          <!-- Trade execution guides -->
+          ${tradeLevelsSvg}
+
+          <!-- Highlighting box -->
+          ${patternHighlightSvg}
+        </svg>
+      `;
+    }
+
+    function renderChartArea() {
+      const container = document.getElementById('chart-render-area');
+      const p = currentPattern;
+
+      if (chartMode === 'market') {
+        container.innerHTML = generateMarketChartSVG(p.marketData, p.name);
+      } else {
+        container.innerHTML = `
+          <div class="flex flex-col items-center justify-center w-full h-full p-4">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Desglose de Anatomía y Ratios</span>
+            <div class="w-full max-w-[280px] h-[280px] flex items-center justify-center">
+              ${p.anatomySvg}
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function renderDetail() {
+      const p = currentPattern;
+      document.getElementById('view-title').innerText = p.name;
+      document.getElementById('view-badge').innerText = p.badge;
+      document.getElementById('view-badge').className = `px-2.5 py-0.5 rounded text-xs font-semibold ${
+        p.badgeColor === 'emerald' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 
+        (p.badgeColor === 'rose' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30')
+      }`;
+      document.getElementById('view-subtitle').innerText = p.subtitle;
+
+      document.getElementById('chart-asset-ticker').innerText = p.ticker;
+      document.getElementById('chart-context-desc').innerText = p.contextDesc;
+
+      document.getElementById('stat-key-level').innerText = p.keyLevel;
+      document.getElementById('stat-entry-price').innerText = p.entry;
+      document.getElementById('stat-sl-price').innerText = p.sl;
+      document.getElementById('stat-tp-price').innerText = p.tp;
+
+      document.getElementById('view-vpa').innerText = p.vpa;
+      document.getElementById('view-psychology').innerText = p.psychology;
+
+      document.getElementById('view-bias').innerText = p.bias;
+      document.getElementById('view-reversal-rate').innerText = p.reversalRate;
+      document.getElementById('view-failure').innerText = p.failure;
+      document.getElementById('view-rr').innerText = p.rr;
+
+      renderChartArea();
+
+      const checklistContainer = document.getElementById('view-checklist');
+      checklistContainer.innerHTML = '';
+      p.checklist.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'flex items-start gap-2 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80';
+        li.innerHTML = `<span class="text-emerald-400 font-bold">✓</span> <span>${item}</span>`;
+        checklistContainer.appendChild(li);
+      });
+    }
+
+    // Initialization
+    window.onload = () => {
+      renderList();
+      renderDetail();
+    };
+  </script>
+  <!-- Menú Desplegable Universal del Ecosistema -->
+  <script src="universal-nav.js?v=20261031_52"></script>
+</body>
+</html>
