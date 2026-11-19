@@ -446,6 +446,141 @@ class HealthWatchdog:
                 except Exception as exc:
                     logger.warning("No se pudo enviar alerta Watchdog a Telegram (%s): %s", key, exc)
 
+    @staticmethod
+    def _worst_status(*statuses: str) -> str:
+        rank = {"GREEN": 0, "YELLOW": 1, "RED": 2}
+        worst = "GREEN"
+        for st in statuses:
+            st_u = str(st or "YELLOW").upper()
+            if rank.get(st_u, 1) > rank[worst]:
+                worst = st_u if st_u in rank else "YELLOW"
+        return worst
+
+    @staticmethod
+    def _clip(text: Any, limit: int) -> str:
+        flat = " ".join(str(text or "").split())
+        return flat if len(flat) <= limit else flat[: limit - 1] + "…"
+
+    def build_quick_check(self, snap: Dict[str, Any], lights: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Chequeo Rápido (3 s): ¿está despierto o dormido? Reutiliza las 4 luces ya evaluadas y la
+        telemetría de cobertura del daemon. Determinista, 0 tokens, sin I/O adicional.
+        """
+        scalp = snap.get("scalping") or {}
+        presencial = bool(scalp.get("active") or scalp.get("draining"))
+        if presencial:
+            mode = "PRESENCIAL"
+            formulas = [scalp["strategy"]] if scalp.get("strategy") else []
+            tf = str(scalp.get("timeframe") or snap.get("timeframe") or "")
+            symbol = str(scalp.get("symbol") or snap.get("active_symbol") or "")
+            objective = f"Presencial {symbol} [{tf}]"
+        else:
+            mode = "AUTO/FONDO"
+            strategy_lbl = str(snap.get("strategy") or "auto")
+            formulas = list(snap.get("allowed_strategies") or ([strategy_lbl] if strategy_lbl else []))
+            tf = str(snap.get("timeframe") or "")
+            symbol = str(snap.get("active_symbol") or snap.get("symbol") or "")
+            objective = f"Fondo {strategy_lbl} · {symbol}"
+
+        forced = [str(w) for w in (snap.get("forced_tf_warnings") or [])]
+        tf_alert = bool(forced)
+        formulas_txt = ", ".join(formulas) if formulas else "sin fórmulas"
+        mode_text = f"{mode} · {objective} · Fórmulas: {formulas_txt} · TF real: {tf or 'n/d'}"
+        if tf_alert:
+            mode_text += " · ⚠️ TF forzada: " + "; ".join(forced[:3])
+
+        cov = snap.get("patrol_coverage") or {}
+        cov_known = bool(cov.get("expected_symbols"))
+        expected = [str(s) for s in (cov.get("expected_symbols") or [])]
+        reviewed_set = (
+            set(cov.get("evaluated_symbols") or [])
+            | set(cov.get("cached_symbols") or [])
+            | set(cov.get("market_closed_symbols") or [])
+            | set(cov.get("policy_skipped_symbols") or [])
+        )
+        err_map = dict(cov.get("missing_or_error_symbols") or {})
+        reviewed_n = len([s for s in expected if s in reviewed_set and s not in err_map])
+        missing = [f"{s} ({why})" for s, why in err_map.items()]
+        missing += [f"{s} (sin revisar)" for s in (cov.get("skipped_symbols") or [])]
+        closed = list(cov.get("market_closed_symbols") or [])
+        if cov_known:
+            cov_label = f"{reviewed_n}/{len(expected)} activos revisados"
+            if closed:
+                cov_label += f" ({len(closed)} con mercado cerrado)"
+            if missing:
+                cov_label += " · FALTÓ: " + ", ".join(missing[:3])
+        else:
+            cov_label = "Sin barrido completado aún"
+
+        motor = lights.get("kula_motor") or {}
+        guardian = lights.get("guardian_sl") or {}
+        balam = lights.get("balam_puente") or {}
+        engine = str(snap.get("engine") or "n/d")
+        if snap.get("last_error"):
+            cerebro_st = "RED"
+        elif not snap.get("is_running"):
+            cerebro_st = "YELLOW"
+        else:
+            cerebro_st = "GREEN"
+        kula_st = self._worst_status(motor.get("status"), guardian.get("status"))
+        triad = {
+            "cerebro": {"status": cerebro_st, "label": f"Cerebro: {engine}"},
+            "balam": {"status": str(balam.get("status") or "YELLOW"), "label": f"Balam: {balam.get('label') or 'n/d'}"},
+            "kula": {
+                "status": kula_st,
+                "label": f"Kula: {motor.get('label') or 'n/d'} / {guardian.get('label') or 'n/d'}",
+            },
+        }
+
+        alert_details: List[str] = []
+        for key, light in lights.items():
+            st_u = str(light.get("status") or "").upper()
+            if st_u == "GREEN":
+                continue
+            if (
+                key == "balam_puente"
+                and st_u == "YELLOW"
+                and bool(light.get("monitor_online"))
+                and int(light.get("feeds_failed") or 0) == 0
+                and int(light.get("feeds_ok") or 0) > 0
+            ):
+                continue
+            alert_details.append(f"{light.get('label') or key}: {light.get('detail') or 'sin detalle'}")
+        if cov_known and missing:
+            alert_details.append("Activos sin revisar: " + ", ".join(missing[:3]))
+        if tf_alert:
+            alert_details.append("Temporalidad forzada: " + "; ".join(forced[:2]))
+
+        is_ok = not alert_details
+        reason_full = " ".join(str(snap.get("last_reason") or "").split())
+        return {
+            "binary_status": "OK" if is_ok else "ALERT",
+            "binary_label": "✅ 100% OK" if is_ok else "⚠️ FALTA / ALERTA: " + self._clip("; ".join(alert_details), 240),
+            "alert_details": alert_details,
+            "active_mode_summary": {
+                "mode": mode,
+                "objective": objective,
+                "formulas": formulas,
+                "timeframe": tf,
+                "symbol": symbol,
+                "forced_tf_warnings": forced,
+                "tf_alert": tf_alert,
+                "text": mode_text,
+            },
+            "assets_coverage": {
+                "known": cov_known,
+                "reviewed": reviewed_n,
+                "expected": len(expected),
+                "missing": missing,
+                "market_closed": closed,
+                "label": cov_label,
+            },
+            "triad_state": triad,
+            "last_signal": str(snap.get("last_signal") or ""),
+            "last_no_trade_reason": self._clip(reason_full, 220),
+            "last_no_trade_reason_full": reason_full,
+        }
+
     def evaluate(
         self,
         daemon: Any,
@@ -486,6 +621,7 @@ class HealthWatchdog:
             "last_probe_ts": self._last_probe_ts,
             "lights": lights,
             "alerts": alerts,
+            "quick_check": self.build_quick_check(snap, lights),
         }
 
 

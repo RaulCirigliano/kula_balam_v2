@@ -1,0 +1,41 @@
+{
+  "BTC/USDT": {
+    "symbol": "BTC/USDT",
+    "bias": "ALCISTA",
+    "confidence": 90,
+    "thesis": "Acumulación masiva previa a apertura ETF",
+    "ttl_hours": 2.5,
+    "target_session": "IMMEDIATE",
+    "source": "Monitor del Mercado (CIO)",
+    "created_at": "2026-10-24T15:56:06.423312+00:00",
+    "expires_at": "2026-10-24T18:26:06.423312+00:00",
+    "status": "CONFIRMED_BUY",
+    "checked_verdict": "[CHEQUEADO: COMPRA FIRME · A++ (CONFLUENCIA MACRO + MICRO)]",
+    "validation_history": [
+      {
+        "timestamp": "2026-10-24T15:56:06.480501+00:00",
+        "verdict": "[CHEQUEADO: COMPRA FIRME · A++ (CONFLUENCIA MACRO + MICRO)]",
+        "details": {
+          "pattern": "HAMMER",
+          "rvol": 2.5,
+          "rsi_div": "BULLISH",
+          "rr_ratio": 2.23
+        }
+      }
+    ]
+  },
+  "SPY": {
+    "symbol": "SPY",
+    "bias": "POSITIVO",
+    "confidence": 88,
+    "thesis": "Tesis de prueba",
+    "ttl_hours": 2.5,
+    "target_session": "IMMEDIATE",
+    "source": "Monitor de Mercado",
+    "created_at": "2026-10-24T23:26:56.294874+00:00",
+    "expires_at": "2026-10-25T01:56:56.294874+00:00",
+    "status": "PENDING_VALIDATION",
+    "checked_verdict": null,
+    "validation_history": []
+  }
+}

@@ -46,14 +46,14 @@ def test_catalogo_listado_en_lab_y_kula():
 
 def test_catalogo_detalle_formula():
     client_lab = TestClient(lab_app)
-    res = client_lab.get("/api/catalogo_formulas/para_testear_heredadas/reversion_vwap_5m.py")
+    res = client_lab.get("/api/catalogo_formulas/operador_presente/kula_cava_eth_1h.py")
     assert res.status_code == 200
     data = res.json()
-    assert data["archivo"] == "reversion_vwap_5m.py"
-    assert "🎯 Reversión VWAP" in data["titulo"]
+    assert data["archivo"] == "kula_cava_eth_1h.py"
+    assert "Kula Cava" in data["titulo"]
     assert "formula_matematica" in data["code_math"]
     assert "arbitro_ia" in data["code_ia"]
-    assert data["dataset_sugerido"] == "binance_ETH_USDT_5m.parquet"
+    assert data["dataset_sugerido"] == "binance_ETH_USDT_1h.parquet"
 
 
 def test_catalogo_borrado_completo():

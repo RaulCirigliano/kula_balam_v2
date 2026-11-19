@@ -3,6 +3,9 @@
   "arbitro_donchian_breakout_1h.py": "🏆 [CEREBRO DONCHIAN 4H/1D] Veto Negativo Subfórmulas (RVOL 0.85x/1.25x | Mechas <= 32%/38% | Dist EMA50 <= 3.2/4.2 ATR | Fricción Proporcional)",
   "arbitro_squeeze_dual_4h.py": "🏆 [CEREBRO 4H ETH] Veto Negativo Squeeze Dual (RVOL >= 0.70x | Mechas <= 32% | Dist EMA50 <= 2.8 ATR | Sizing Dinámico)",
   "arbitro_cava_forex_1h.py": "🏆 [CEREBRO FOREX 1H] Veto Negativo Cava EUR/USD (Asimetría >= 1:2.0 | Mechas <= 32% | Dist EMA50 <= 3.5 ATR | RVOL spot)",
+  "arbitro_kula_cava_sol_1h.py": "🏦 [CEREBRO CAVA 1H SOL] Asimetría >= 1:2.0 + Sizing Fraccional 0.70% (MC DD 95% 5.51% · Sin veto RVOL)",
+  "arbitro_kula_cava_eth_1h.py": "🏦 [CEREBRO CAVA 1H ETH] Asimetría >= 1:2.0 + Sizing Fraccional 0.60% (MC DD 95% 6.32% · Meseta S46)",
+  "arbitro_mtf_presencial.py": "⚡ [CEREBRO MTF PRESENCIAL 15M/5M] ADX 1H >= 18 + Sobreextensión <= 2.6 ATR + RVOL >= 0.60 + Sizing 0.60%",
   "arbitro_mejorada cava_fallo_macd_eurusd_1h.py": {
     "comentario": "Árbitro de mejorada cava_fallo_macd_eurusd_1h.py"
   }

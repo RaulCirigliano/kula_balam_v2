@@ -2408,6 +2408,83 @@ class LedgerStore:
                 if self._memory_conn is None:
                     conn.close()
 
+    def record_signal_evaluation(
+        self,
+        symbol: str,
+        engine: str,
+        signal: str,
+        reason: str,
+        price: float,
+        timeframe: str,
+        signal_candle_ts: Optional[int] = None,
+        data_age_s: Optional[int] = None,
+        raw_response: Any = None,
+    ) -> Optional[str]:
+        """
+        Persiste en `signals` el veredicto de una vela evaluada (Embudo de Rechazos).
+        - Respeta el CHECK de la tabla: SHORT/LONG/BUY se guardan como COMPRAR y el original queda en raw_response.
+        - Retención liviana: borra filas con más de SIGNALS_RETENTION_DAYS (poda amortizada, no en cada insert).
+        - No toca saldos, trades ni cuentas.
+        """
+        from backend.rejection_funnel import (
+            SIGNALS_RETENTION_DAYS,
+            clip_reason,
+            dump_payload,
+            normalize_signal_for_ledger,
+            parse_payload,
+        )
+
+        ledger_signal, original = normalize_signal_for_ledger(signal)
+        payload = parse_payload(raw_response) if raw_response else {}
+        if original and original != ledger_signal:
+            payload["signal_original"] = original
+        raw_text = dump_payload(payload) if payload else None
+
+        try:
+            px = float(price)
+        except (TypeError, ValueError):
+            px = 0.0
+        if not math.isfinite(px):
+            px = 0.0
+        sig_id = str(uuid.uuid4())
+
+        with self._lock:
+            conn = self._connect()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO signals (
+                        id, symbol, engine, signal, reason, price, timeframe,
+                        signal_candle_ts, data_age_s, raw_response
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        sig_id,
+                        str(symbol),
+                        str(engine or "local"),
+                        ledger_signal,
+                        clip_reason(reason) or "(sin motivo)",
+                        px,
+                        str(timeframe or ""),
+                        int(signal_candle_ts or 0),
+                        int(data_age_s or 0),
+                        raw_text,
+                    ),
+                )
+                now_m = time.monotonic()
+                last_prune = float(getattr(self, "_signals_last_prune_mono", 0.0) or 0.0)
+                if last_prune <= 0.0 or (now_m - last_prune) >= 3600.0:
+                    conn.execute(
+                        "DELETE FROM signals WHERE created_at < datetime('now', ?)",
+                        (f"-{int(SIGNALS_RETENTION_DAYS)} days",),
+                    )
+                    self._signals_last_prune_mono = now_m
+                conn.commit()
+                return sig_id
+            finally:
+                if self._memory_conn is None:
+                    conn.close()
+
     def open_shadow_trade(
         self,
         symbol: str,
@@ -2422,10 +2499,12 @@ class LedgerStore:
         arbiter_verdict: str = "AHORA_NO",
         arbiter_reason: str = "",
         headlines: Optional[List[Dict[str, str]]] = None,
+        deduplicate: bool = True,
     ) -> str:
         """
         Registra una operación virtual vetada por el árbitro en la Tabla #19 shadow_trades.
         No descuenta saldos de ninguna bóveda real (USDT, USD, ARS) ni altera la tabla trades.
+        Si `deduplicate=True` y ya existe un shadow OPEN para `(symbol, strategy, side)`, retorna su id.
         """
         import uuid
         import json
@@ -2435,6 +2514,17 @@ class LedgerStore:
         with self._lock:
             conn = self._connect()
             try:
+                if deduplicate:
+                    existing = conn.execute(
+                        """
+                        SELECT id FROM shadow_trades
+                        WHERE status = 'OPEN' AND symbol = ? AND strategy = ? AND side = ?
+                        LIMIT 1
+                        """,
+                        (symbol, strategy, norm_side),
+                    ).fetchone()
+                    if existing:
+                        return str(existing["id"])
                 conn.execute(
                     """
                     INSERT INTO shadow_trades (
@@ -2496,15 +2586,19 @@ class LedgerStore:
         current_price: float,
         high_price: Optional[float] = None,
         low_price: Optional[float] = None,
+        expiry_hours: float = 24.0,
     ) -> List[Dict[str, Any]]:
         """
         Evalúa y liquida virtualmente operaciones en shadow_trades.
         - Si toca SL: outcome = 'SAVED_SL' (Drawdown Ahorrado).
         - Si toca TP: outcome = 'MISSED_TP' (Ganancia Perdida).
+        - Si supera `expiry_hours` (24h por defecto) sin tocar SL ni TP: outcome = 'EXPIRED'.
         """
         closed_trades: List[Dict[str, Any]] = []
+        cur_p = float(current_price)
         high_p = float(high_price if high_price is not None else current_price)
         low_p = float(low_price if low_price is not None else current_price)
+        now_utc = datetime.now(timezone.utc)
 
         with self._lock:
             conn = self._connect()
@@ -2550,6 +2644,24 @@ class LedgerStore:
                             v_pnl_pct = abs(tp_pct)
                             v_pnl_usd = (entry_px - tp_px) * qty
 
+                    if outcome is None and expiry_hours and float(expiry_hours) > 0 and row.get("opened_at"):
+                        try:
+                            raw_ts = str(row["opened_at"]).replace("Z", "+00:00").strip()
+                            dt_open = datetime.fromisoformat(raw_ts)
+                            if dt_open.tzinfo is None:
+                                dt_open = dt_open.replace(tzinfo=timezone.utc)
+                            if (now_utc - dt_open).total_seconds() >= float(expiry_hours) * 3600.0:
+                                outcome = "EXPIRED"
+                                exit_px = cur_p
+                                if side in ("LONG", "BUY"):
+                                    v_pnl_pct = ((cur_p - entry_px) / entry_px * 100.0) if entry_px > 0 else 0.0
+                                    v_pnl_usd = (cur_p - entry_px) * qty
+                                else:
+                                    v_pnl_pct = ((entry_px - cur_p) / entry_px * 100.0) if entry_px > 0 else 0.0
+                                    v_pnl_usd = (entry_px - cur_p) * qty
+                        except Exception:
+                            pass
+
                     if outcome is not None:
                         conn.execute(
                             """
@@ -2592,17 +2704,21 @@ class LedgerStore:
                         SUM(CASE WHEN status = 'CLOSED' THEN 1 ELSE 0 END) as closed_count,
                         SUM(CASE WHEN outcome = 'SAVED_SL' THEN 1 ELSE 0 END) as saved_sl_count,
                         SUM(CASE WHEN outcome = 'MISSED_TP' THEN 1 ELSE 0 END) as missed_tp_count,
+                        SUM(CASE WHEN outcome = 'EXPIRED' THEN 1 ELSE 0 END) as expired_count,
                         SUM(CASE WHEN outcome = 'SAVED_SL' THEN ABS(virtual_pnl_usd) ELSE 0.0 END) as saved_drawdown_usd,
-                        SUM(CASE WHEN outcome = 'MISSED_TP' THEN virtual_pnl_usd ELSE 0.0 END) as missed_profit_usd
+                        SUM(CASE WHEN outcome = 'MISSED_TP' THEN virtual_pnl_usd ELSE 0.0 END) as missed_profit_usd,
+                        SUM(CASE WHEN outcome = 'EXPIRED' THEN virtual_pnl_usd ELSE 0.0 END) as expired_pnl_usd
                     FROM shadow_trades
                     """
                 ).fetchone()
                 total = int(row["total_vetoed"] or 0)
                 saved_count = int(row["saved_sl_count"] or 0)
                 missed_count = int(row["missed_tp_count"] or 0)
+                expired_count = int(row["expired_count"] or 0)
                 closed_count = int(row["closed_count"] or 0)
                 saved_dd = float(row["saved_drawdown_usd"] or 0.0)
                 missed_prof = float(row["missed_profit_usd"] or 0.0)
+                expired_pnl = float(row["expired_pnl_usd"] or 0.0)
                 net_saved = saved_dd - missed_prof
                 accuracy = (saved_count / closed_count * 100.0) if closed_count > 0 else 0.0
 
@@ -2612,8 +2728,10 @@ class LedgerStore:
                     "closed_count": closed_count,
                     "saved_sl_count": saved_count,
                     "missed_tp_count": missed_count,
+                    "expired_count": expired_count,
                     "saved_drawdown_usd": round(saved_dd, 4),
                     "missed_profit_usd": round(missed_prof, 4),
+                    "expired_pnl_usd": round(expired_pnl, 4),
                     "net_saved_usd": round(net_saved, 4),
                     "arbiter_accuracy_pct": round(accuracy, 2),
                 }

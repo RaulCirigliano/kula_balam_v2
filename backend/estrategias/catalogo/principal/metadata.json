@@ -152,5 +152,27 @@
     "lote_sugerido": 0.1,
     "activo_default": "SOL/USDT",
     "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
+  },
+  "kula_cava_sol_1h.py": {
+    "id": "kula_cava_sol_1h",
+    "titulo": "🚀 kula_cava_sol_1h.py (SOL/USDT)",
+    "subtitulo": "Panel Principal (Cerebro Kula) · Slot 1 · Confianza 90%",
+    "descripcion": "Auditada Backtest Lab (SOL 1H): N=31 | PF=2.66 | WR=51.61% | OOS PF=3.11 | WFO 5/5 (WFE=1.32) | MC DD 95%=5.51%",
+    "dataset_sugerido": "binance_SOL_USDT_1h.parquet",
+    "timeframe": "1h",
+    "lote_sugerido": 0.1,
+    "activo_default": "SOL/USDT",
+    "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
+  },
+  "kula_cava_eth_1h.py": {
+    "id": "kula_cava_eth_1h",
+    "titulo": "🔷 kula_cava_eth_1h.py (ETH/USDT)",
+    "subtitulo": "Panel Principal (Cerebro Kula) · Slot 2 · Confianza 88%",
+    "descripcion": "Auditada Backtest Lab (ETH 1H · Meseta S46): N=30 | WR=46.67% | PF=1.76 | Ret=+7.91% | DD=3.88% | OOS PF=2.55 | WFO 3/5 (WFE=0.82) | MC DD 95%=6.32%",
+    "dataset_sugerido": "binance_ETH_USDT_1h.parquet",
+    "timeframe": "1h",
+    "lote_sugerido": 0.01,
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
   }
 }

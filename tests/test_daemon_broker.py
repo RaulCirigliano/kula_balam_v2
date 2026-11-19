@@ -1576,6 +1576,342 @@ def test_daemon_clockwork_wakeup_and_closed_candle_dedup(isolated_daemon):
         assert isolated_daemon.last_cycle_ts >= before_cycle
 
 
+def test_kula_cava_sol_1h_and_multitimeframe_buckets(isolated_daemon):
+    """
+    Camino B:
+    1. kula_cava_sol_1h está registrada en catálogo principal con native_timeframe='1h',
+       activo_default='SOL/USDT' y supera el HealthWatchdog sintético en GREEN.
+    2. En modo 'auto', TraderDaemon evalúa SOL/USDT en paralelo en '4h' (Donchian) y
+       '1h' (kula_cava_sol_1h), aislando fórmulas específicas de otros pares (ETH/EURUSD).
+    """
+    from backend.estrategias.registry import get_strategy
+    from backend.health_watchdog import HealthWatchdog
+
+    st = get_strategy("kula_cava_sol_1h")
+    assert st is not None
+    assert st.native_timeframe == "1h"
+    assert st.activo_default == "SOL/USDT"
+
+    wd = HealthWatchdog()
+    probe = wd.probe_active_strategies(["kula_cava_sol_1h"], force=True)
+    assert probe["status"] == "GREEN"
+    assert probe["passed"] == 1
+
+    allowed = [
+        "kula_cava_sol_1h",
+        "1_donchian_breakout_sol_4h",
+        "2_squeeze_dual_eth_4h",
+        "donchian_breakout_1h",
+        "cava_fallo_macd_eurusd_1h_slot1",
+    ]
+    sol_buckets = dict(isolated_daemon._resolve_auto_timeframe_buckets("SOL/USDT", allowed))
+    assert "1h" in sol_buckets and "4h" in sol_buckets
+    assert sol_buckets["1h"] == ["kula_cava_sol_1h"]
+    assert "1_donchian_breakout_sol_4h" in sol_buckets["4h"]
+    assert "2_squeeze_dual_eth_4h" not in sol_buckets["4h"]
+    assert "cava_fallo_macd_eurusd_1h_slot1" not in sol_buckets["1h"]
+
+    eth_buckets = dict(isolated_daemon._resolve_auto_timeframe_buckets("ETH/USDT", allowed))
+    assert "1h" not in eth_buckets
+    assert "2_squeeze_dual_eth_4h" in eth_buckets["4h"]
+    assert "kula_cava_sol_1h" not in eth_buckets.get("1h", []) and "kula_cava_sol_1h" not in eth_buckets["4h"]
+
+    # Verificar evaluación simultánea 4h + 1h sobre SOL/USDT en _execute_cycle
+    isolated_daemon.mode = "manual"
+    isolated_daemon.symbol = "SOL/USDT"
+    isolated_daemon.timeframe = "4h"
+    isolated_daemon.strategy = "auto"
+    isolated_daemon.allowed_strategies = ["kula_cava_sol_1h", "1_donchian_breakout_sol_4h"]
+
+    calls = []
+
+    def fake_analysis(**kwargs):
+        calls.append((kwargs.get("symbol"), kwargs.get("timeframe"), tuple(kwargs.get("allowed_strategies") or [])))
+        return {
+            "signal": "MANTENER",
+            "reason": "Evaluado",
+            "indicators": {},
+            "strategy_metrics": {},
+            "fee_info": {},
+        }
+
+    with patch("backend.main.get_analysis", side_effect=fake_analysis), \
+         patch("backend.main.get_price", return_value={"symbol": "SOL/USDT", "price": 73.0}), \
+         patch("backend.estrategias.registry.is_asset_market_open", return_value=True):
+        isolated_daemon._execute_cycle()
+
+    assert calls == [
+        ("SOL/USDT", "4h", ("1_donchian_breakout_sol_4h",)),
+        ("SOL/USDT", "1h", ("kula_cava_sol_1h",)),
+    ]
+
+
+def test_operador_presente_catalogo_registro_y_watchdog():
+    """Verifica el catálogo presencial 1H, registro dinámico y HealthWatchdog en verde."""
+    from backend.estrategias.registry import get_strategy
+    from backend.health_watchdog import HealthWatchdog
+
+    client = TestClient(main.app)
+    resp = client.get("/api/catalogo_formulas")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    operador = data.get("operador_presente") or []
+    operador_by_id = {item["id"]: item for item in operador}
+    expected_tfs = {
+        "kula_cava_sol_1h": "1h",
+        "kula_cava_eth_1h": "1h",
+        "cava_fallo_macd_eurusd_1h": "1h",
+        "mtf_presencial_15m": "15m",
+        "mtf_presencial_5m": "5m",
+    }
+    for sid, exp_tf in expected_tfs.items():
+        assert sid in operador_by_id, f"Falta {sid} en operador_presente"
+        assert operador_by_id[sid]["timeframe"] == exp_tf
+
+    # Verificar que no contaminan el panel autónomo principal
+    principal_ids = {item["id"] for item in (data.get("panel_principal") or [])}
+    assert "mtf_presencial_15m" not in principal_ids
+    assert "mtf_presencial_5m" not in principal_ids
+
+    eth_strat = get_strategy("kula_cava_eth_1h")
+    assert eth_strat is not None
+    assert getattr(eth_strat, "activo_default", "") == "ETH/USDT"
+    assert getattr(eth_strat, "native_timeframe", "") == "1h"
+
+    for mtf_id, exp_tf in (("mtf_presencial_15m", "15m"), ("mtf_presencial_5m", "5m")):
+        m_strat = get_strategy(mtf_id)
+        assert m_strat is not None
+        assert getattr(m_strat, "activo_default", "") == "ETH/USDT"
+        assert getattr(m_strat, "native_timeframe", "") == exp_tf
+
+    probe = HealthWatchdog().probe_active_strategies(list(expected_tfs.keys()), force=True)
+    assert probe["status"] == "GREEN", f"HealthWatchdog no devolvió GREEN: {probe}"
+
+
+def test_daemon_presencial_start_stop_preserva_allowed_strategies(isolated_daemon):
+    """start_scalping y stop_scalping deben respaldar y restaurar allowed_strategies y slot_alloc_pct."""
+    original_allowed = ["kula_cava_sol_1h", "1_donchian_breakout_sol_4h"]
+    isolated_daemon.symbol = "SOL/USDT"
+    isolated_daemon.timeframe = "4h"
+    isolated_daemon.strategy = "auto"
+    isolated_daemon.mode = "manual"
+    isolated_daemon.slot_alloc_pct = 25.0
+    isolated_daemon.allowed_strategies = list(original_allowed)
+
+    with patch.object(isolated_daemon, "_run_loop", return_value=None):
+        st_start = isolated_daemon.start_scalping(
+            symbol="ETH/USDT",
+            strategy="kula_cava_eth_1h",
+            timeframe="5m",
+            slot_alloc_pct=50.0,
+        )
+        assert st_start["active"] is True
+        assert st_start["timeframe"] == "1h"
+        assert st_start["slot_alloc_pct"] == 50.0
+        assert isolated_daemon.slot_alloc_pct == 50.0
+        assert isolated_daemon.allowed_strategies == ["kula_cava_eth_1h"]
+        assert isolated_daemon.symbol == "ETH/USDT"
+        assert isolated_daemon.timeframe == "1h"
+
+        st_stop = isolated_daemon.stop_scalping()
+        assert st_stop["status"] == "restored"
+        assert isolated_daemon.allowed_strategies == original_allowed
+        assert isolated_daemon.slot_alloc_pct == 25.0
+        assert isolated_daemon.symbol == "SOL/USDT"
+        assert isolated_daemon.timeframe == "4h"
+        assert isolated_daemon.strategy == "auto"
+
+    isolated_daemon.is_running = False
+
+
+def test_mtf_presencial_diagnostic_emite_telemetria_real_sin_alterar_reglas():
+    """mtf_presencial_15m y mtf_presencial_5m reportan Close, ADX1H, Cruces1H, Fibo y bloqueo real sin cambiar formula_matematica."""
+    import numpy as np
+    import pandas as pd
+    from pathlib import Path
+    from backend.estrategias.catalog_adapter import CatalogFormulaStrategy
+
+    # 800 velas de 5m (~66.6h -> >= 55 velas 1H) en rango lateral oscilante (ADX1H < 18)
+    idx = pd.date_range("2026-11-10 00:00:00+00:00", periods=800, freq="5min")
+    t = np.arange(800, dtype=float)
+    base_px = 1800.0 + 4.0 * np.sin(t / 12.0)
+    df_5m = pd.DataFrame({
+        "timestamp": (idx.as_unit("ns").asi8 // 1_000_000),
+        "open": base_px - 0.5,
+        "high": base_px + 2.5,
+        "low": base_px - 2.5,
+        "close": base_px + 0.5,
+        "volume": np.full(800, 1200.0),
+    })
+
+    cat_dir = Path(__file__).resolve().parent.parent / "backend" / "estrategias" / "catalogo" / "operador_presente"
+    for strat_id, fname, tf, fibo_lbl in [
+        ("mtf_presencial_15m", "mtf_presencial_15m.py", "15m", "0.48-0.75"),
+        ("mtf_presencial_5m", "mtf_presencial_5m.py", "5m", "0.50-0.75"),
+    ]:
+        df_sub = df_5m.copy()
+        if tf == "15m":
+            idx15 = pd.date_range("2026-11-05 00:00:00+00:00", periods=400, freq="15min")
+            t15 = np.arange(400, dtype=float)
+            px15 = 1800.0 + 5.0 * np.sin(t15 / 6.0)
+            df_sub = pd.DataFrame({
+                "timestamp": (idx15.as_unit("ns").asi8 // 1_000_000),
+                "open": px15 - 0.5,
+                "high": px15 + 3.0,
+                "low": px15 - 3.0,
+                "close": px15 + 0.5,
+                "volume": np.full(400, 2000.0),
+            })
+
+        strat = CatalogFormulaStrategy({"id": strat_id, "timeframe": tf, "activo_default": "ETH/USDT"}, cat_dir / fname)
+        mod = strat._load_module()
+        ok_before = mod.formula_matematica(df_sub.copy(), len(df_sub) - 1)
+
+        ind = {
+            "symbol": "ETH/USDT",
+            "timeframe": tf,
+            "latest": df_sub.iloc[-1].to_dict(),
+            "live_price": float(df_sub["close"].iloc[-1]),
+            "atr_14": 5.0,
+            "relative_volume": 1.0,
+        }
+        metrics, _, eligible, failures, _ = strat.evaluar(ind, 2.0, 1.0, 0.10, 0.05, 0.5, 0.3, 2.0, df=df_sub)
+        ok_after = mod.formula_matematica(df_sub.copy(), len(df_sub) - 1)
+
+        assert ok_after == ok_before
+        assert eligible is False
+        tele = metrics.get("presencial_telemetry", "")
+        assert tele == failures[0]
+        assert f"[ETH/USDT {tf}] Close $" in tele
+        assert "ADX1H:" in tele and "(<18)" in tele
+        assert "Cruces1H:" in tele
+        assert f"Fibo:" in tele and fibo_lbl in tele
+        assert "Bloqueo:" in tele and "ADX1H<18" in tele
+
+
+def test_daemon_presencial_actualiza_last_reason_y_limpia_cache_al_iniciar(isolated_daemon, caplog):
+    """Al iniciar sesión presencial limpia caché de vela y registra en last_reason y log la telemetría completa."""
+    import logging
+
+    isolated_daemon._evaluated_candles[("ETH/USDT", "5m")] = {
+        "signal_candle_ts": 123456,
+        "next_close_due_ts": 9999999999.0,
+        "config_sig": ("mtf_presencial_5m",),
+    }
+    with patch.object(isolated_daemon, "_run_loop", return_value=None):
+        isolated_daemon.start_scalping(
+            symbol="ETH/USDT",
+            strategy="mtf_presencial_5m",
+            timeframe="5m",
+            slot_alloc_pct=100.0,
+        )
+
+    assert ("ETH/USDT", "5m") not in isolated_daemon._evaluated_candles
+    assert isolated_daemon._wakeup_event.is_set() is True
+
+    tele_espera = (
+        "[ETH/USDT 5m] Close $1794.79 | ADX1H: 14.06 (<18) | Cruces1H: 4 (>3) | "
+        "Fibo: 0.455 (meta 0.50-0.75, SHORT) | Bloqueo: ADX1H<18, Cruces1H>3, Fibo<0.50 -> En espera"
+    )
+    fake_hold = {
+        "signal": "MANTENER",
+        "reason": "[Antigravity Operador]: wrapper genérico largo que debe reemplazarse en presencial.",
+        "signal_candle_ts": 1795009500,
+        "strategy_metrics": {
+            "atr_14": 4.2,
+            "presencial_telemetry": tele_espera,
+        },
+        "indicators": {"rsi": 48.0, "atr_14": 4.2},
+    }
+
+    with caplog.at_level(logging.INFO):
+        with patch("backend.main.get_analysis", return_value=fake_hold), \
+             patch("backend.main.get_price", return_value={"symbol": "ETH/USDT", "price": 1794.79}):
+            isolated_daemon._execute_cycle()
+
+    assert isolated_daemon.last_signal == "MANTENER"
+    assert isolated_daemon.last_reason == tele_espera
+    assert any(tele_espera in rec.message and "KULA CEREBRO" in rec.message for rec in caplog.records)
+
+    # Ahora probar candidata que pasa fórmula pero es vetada por compuerta de entrada
+    isolated_daemon._evaluated_candles.pop(("ETH/USDT", "5m"), None)
+    fake_buy = {
+        "signal": "COMPRAR",
+        "reason": "Candidata alcista",
+        "signal_candle_ts": 1795009800,
+        "strategy_metrics": {
+            "tp_gross_pct": 2.4,
+            "sl_gross_pct": 1.0,
+            "atr_14": 4.2,
+            "relative_volume": 0.40,
+            "presencial_telemetry": "[ETH/USDT 5m] Close $1810.00 | ADX1H: 24.50 (>=18) | Cruces1H: 1 (<=3) | Fibo: 0.610 (OK, LONG) | Confluencia OK -> Evaluando gatillo",
+        },
+        "indicators": {"rsi": 55.0, "atr_14": 4.2},
+    }
+    with patch("backend.main.get_analysis", return_value=fake_buy), \
+         patch("backend.main.get_price", return_value={"symbol": "ETH/USDT", "price": 1810.0}), \
+         patch("backend.entry_gate.entry_gate_failures", return_value=["RVOL insuficiente (0.40)"]):
+        isolated_daemon._execute_cycle()
+
+    assert isolated_daemon.last_signal == "MANTENER"
+    assert "ADX1H: 24.50 (>=18)" in isolated_daemon.last_reason
+    assert "Bloqueo: Compuerta de entrada: RVOL insuficiente (0.40)" in isolated_daemon.last_reason
+    isolated_daemon.is_running = False
+
+
+def test_daemon_presencial_multi_crypto_escanea_canasta_completa(isolated_daemon):
+    """Con MULTI_CRYPTO la sesión presencial evalúa ETH/USDT, SOL/USDT y BTC/USDT en paralelo y consolida telemetría."""
+    for s in ("ETH/USDT", "SOL/USDT", "BTC/USDT"):
+        isolated_daemon._evaluated_candles[(s, "5m")] = {"signal_candle_ts": 111, "next_close_due_ts": 9999999999.0, "config_sig": ("x",)}
+
+    with patch.object(isolated_daemon, "_run_loop", return_value=None):
+        st = isolated_daemon.start_scalping(
+            symbol="MULTI_CRYPTO",
+            strategy="mtf_presencial_5m",
+            timeframe="5m",
+            slot_alloc_pct=100.0,
+        )
+
+    assert st["active"] is True
+    assert st["symbol"] == "MULTI_CRYPTO"
+    assert st["symbols"] == ["ETH/USDT", "SOL/USDT", "BTC/USDT"]
+    for s in ("ETH/USDT", "SOL/USDT", "BTC/USDT"):
+        assert (s, "5m") not in isolated_daemon._evaluated_candles
+
+    evaluated_calls = []
+
+    def fake_get_analysis(**kwargs):
+        sym = kwargs["symbol"]
+        tf = kwargs["timeframe"]
+        strat = kwargs["strategy"]
+        evaluated_calls.append((sym, tf, strat))
+        tele = f"[{sym} {tf}] Close $100.00 | ADX1H: 15.00 (<18) | Cruces1H: 1 (<=3) | Fibo: 0.550 (OK 0.50-0.75, LONG) | Bloqueo: ADX1H<18 -> En espera"
+        return {
+            "signal": "MANTENER",
+            "reason": tele,
+            "signal_candle_ts": 1795010100,
+            "strategy_metrics": {"atr_14": 2.0, "presencial_telemetry": tele},
+            "indicators": {"rsi": 50.0, "atr_14": 2.0},
+        }
+
+    with patch("backend.main.get_analysis", side_effect=fake_get_analysis), \
+         patch("backend.main.get_price", return_value={"price": 100.0}):
+        isolated_daemon._execute_cycle()
+
+    assert evaluated_calls == [
+        ("ETH/USDT", "5m", "mtf_presencial_5m"),
+        ("SOL/USDT", "5m", "mtf_presencial_5m"),
+        ("BTC/USDT", "5m", "mtf_presencial_5m"),
+    ]
+    assert "Canasta [ETH:ADX1H<18 · SOL:ADX1H<18]" in isolated_daemon.last_reason
+    isolated_daemon.is_running = False
+
+
+
+
+
+
 
 
 

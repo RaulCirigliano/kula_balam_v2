@@ -3593,6 +3593,8 @@ window.updateStrategyExplanationCard = function() {
 // Lista blanca de producción autorizada (sin estrategias Forex ni fórmulas no autorizadas)
 const PRODUCTION_WHITELIST_DEFAULTS = new Set([
     'kula_balam_cava_ruiz',
+    'kula_cava_sol_1h',
+    'kula_cava_eth_1h',
     'donchian_breakout_1h',
     'squeeze_dual_eth_fondeo_strict_4h',
     'squeeze_dual_eth_4h_slot1',
@@ -3697,15 +3699,35 @@ window.loadDynamicTacticalStrategies = async function() {
                 }
             }
 
-            // 2. Con Operador Presente (Scalping 5M): Poblar selector de Trading con Presencia
+            // 2. Con Operador Presente: Poblar selector de Trading con Presencia
             const selScalping = document.getElementById('selScalpingStrategy');
             if (selScalping) {
                 if (operador.length > 0) {
                     const prevVal = selScalping.value;
                     selScalping.innerHTML = operador.map(op => `
-                        <option value="${op.id}" ${op.id === prevVal ? 'selected' : ''}>${op.titulo} (${op.subtitulo || op.rendimiento_lab})</option>
+                        <option value="${op.id}" data-timeframe="${op.timeframe || '1h'}" data-activo="${op.activo_default || ''}" ${op.id === prevVal ? 'selected' : ''}>${op.titulo} (${op.subtitulo || op.rendimiento_lab})</option>
                     `).join('');
                     selScalping.disabled = false;
+                    const syncPresencialSymbol = () => {
+                        const selSym = document.getElementById('selScalpingSymbol');
+                        const activeOpt = selScalping.selectedOptions?.[0];
+                        const stratId = String(selScalping.value || '');
+                        const activo = stratId.startsWith('mtf_presencial_') ? 'MULTI_CRYPTO' : activeOpt?.dataset?.activo;
+                        if (selSym && activo && [...selSym.options].some(o => o.value === activo)) {
+                            selSym.value = activo;
+                        }
+                        if (typeof window.updateRiskSlotPreview === 'function') {
+                            window.updateRiskSlotPreview();
+                        }
+                    };
+                    if (!selScalping.dataset.syncBound) {
+                        selScalping.addEventListener('change', syncPresencialSymbol);
+                        selScalping.dataset.syncBound = '1';
+                    }
+                    if ((!prevVal || !selScalping.dataset.initialSynced) && !window.scalpingSessionState?.active && !window.scalpingSessionState?.draining) {
+                        syncPresencialSymbol();
+                        selScalping.dataset.initialSynced = '1';
+                    }
                 } else {
                     selScalping.innerHTML = '<option value="" disabled selected>⚠️ Sin fórmulas autorizadas (en cuarentena)</option>';
                     selScalping.disabled = true;
@@ -4673,6 +4695,25 @@ window.updateRiskSlotPreview = function() {
         slotText.innerText = `$0.00 ${cur} (${Math.round(riskFrac * 100)}% · Sin capital para operar)`;
     } else {
         slotText.innerText = `$${slotAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur} (${Math.round(riskFrac * 100)}% · 1/${slotsCount} slots)`;
+    }
+
+    const selScalpingSlot = document.getElementById('selScalpingSlot');
+    const txtScalpingSlotUsd = document.getElementById('txtScalpingSlotUsd');
+    if (selScalpingSlot && !selScalpingSlot.disabled && [...selScalpingSlot.options].some(o => o.value === riskSelect.value)) {
+        selScalpingSlot.value = riskSelect.value;
+    }
+    if (txtScalpingSlotUsd) {
+        const rawScalpSym = document.getElementById('selScalpingSymbol')?.value || currentSymbol;
+        const scalpSym = rawScalpSym === 'MULTI_CRYPTO' ? 'ETH/USDT' : rawScalpSym;
+        const scalpCur = typeof getCurrency === 'function' ? getCurrency(scalpSym) : cur;
+        const scalpTotEq = Number(window.currentTotalEquity?.[scalpCur] ?? (Number(portfolio?.vault?.[scalpCur] || 0) + Number(portfolio?.balances?.[scalpCur] || 0)));
+        const scalpRawOp = window.currentOperatingCapital?.[scalpCur];
+        const scalpOpCap = Math.max(0.0, Math.min(scalpTotEq, (scalpRawOp !== undefined && Number.isFinite(Number(scalpRawOp))) ? Number(scalpRawOp) : scalpTotEq));
+        const effFrac = riskFrac >= 0.99 ? 0.95 : riskFrac;
+        const scalpAmt = scalpOpCap * effFrac;
+        txtScalpingSlotUsd.innerText = scalpOpCap <= 0
+            ? `$0 ${scalpCur}`
+            : `≤ $${scalpAmt.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${scalpCur}`;
     }
 
     if (typeof window.updateVaultSlotsThermometer === 'function') {
@@ -6539,6 +6580,7 @@ function stopAgent(reason = 'user', { copilotPause = false } = {}) {
 }
 
 let lastLoggedDaemonCycle = 0;
+let lastLoggedDaemonReason = '';
 let lastClosedBackendPosId = null;
 
 async function checkDaemonServerStatus() {
@@ -6547,6 +6589,12 @@ async function checkDaemonServerStatus() {
         if (!res.ok) return;
         const data = await res.json();
         if (data) {
+            window.lastDaemonReason = data.last_reason || '';
+            const qcReasonEl = document.getElementById('kula-qc-reason');
+            if (qcReasonEl && data.last_reason) {
+                qcReasonEl.textContent = `Último motivo: ${data.last_reason}`;
+                qcReasonEl.title = data.last_reason;
+            }
             window.serverDaemonConfig = {
                 symbol: data.symbol || currentSymbol,
                 timeframe: data.timeframe || '15m',
@@ -6561,17 +6609,26 @@ async function checkDaemonServerStatus() {
             }).catch(() => {});
             return;
         }
+        if (data && Number(data.cycle_count) < lastLoggedDaemonCycle) {
+            lastLoggedDaemonCycle = 0;
+            lastLoggedDaemonReason = '';
+        }
         if (data && data.is_running && !isAgentActive && !userExplicitlyStopped) {
             isAgentActive = true;
             updateAgentButtonState();
             lastLoggedDaemonCycle = Number(data.cycle_count) || 0;
+            lastLoggedDaemonReason = data.last_reason || '';
             const cycleSymbol = data.active_symbol || data.symbol;
             logToTerminal(`🟢 [SERVIDOR ACTIVO] Agente autónomo detectado operando en segundo plano en ${cycleSymbol} (Ciclo #${data.cycle_count}).`, 'action');
             if (data.last_signal) {
                 logToTerminal(`🤖 [CICLO #${data.cycle_count} · ${cycleSymbol} · ${data.timeframe}] [${data.last_signal}] ${data.last_reason || ''}`, 'info');
             }
-        } else if (data && data.is_running && Number(data.cycle_count) > lastLoggedDaemonCycle) {
-            lastLoggedDaemonCycle = Number(data.cycle_count);
+        } else if (data && data.is_running && (
+            Number(data.cycle_count) > lastLoggedDaemonCycle ||
+            (data.scalping && data.scalping.active && data.last_reason && data.last_reason !== lastLoggedDaemonReason)
+        )) {
+            lastLoggedDaemonCycle = Number(data.cycle_count) || lastLoggedDaemonCycle;
+            lastLoggedDaemonReason = data.last_reason || '';
             const cycleSymbol = data.active_symbol || data.symbol;
             if (data.last_signal) {
                 logToTerminal(`🤖 [CICLO #${data.cycle_count} · ${cycleSymbol} · ${data.timeframe}] [${data.last_signal}] ${data.last_reason || ''}`, 'info');
@@ -6678,7 +6735,7 @@ function updateScalpingUIState(scalp) {
     const txtTelemetry = document.getElementById('txtScalpingTelemetry');
     const selStrategy = document.getElementById('selScalpingStrategy');
     const selSymbol = document.getElementById('selScalpingSymbol');
-    const inputLot = document.getElementById('inputScalpingLot');
+    const selSlot = document.getElementById('selScalpingSlot');
 
     if (!badgeState || !btnToggle) return;
 
@@ -6695,7 +6752,7 @@ function updateScalpingUIState(scalp) {
         }
         if (selStrategy) selStrategy.disabled = true;
         if (selSymbol) selSymbol.disabled = true;
-        if (inputLot) inputLot.disabled = true;
+        if (selSlot) selSlot.disabled = true;
     } else if (scalp.active) {
         badgeState.className = 'text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-red-500/20 text-red-300 border border-red-500/40 animate-pulse';
         badgeState.innerText = '🔴 EN VIVO (PRESENCIAL)';
@@ -6705,8 +6762,9 @@ function updateScalpingUIState(scalp) {
         if (btnText) btnText.innerText = 'Terminar Sesión (Drenar y Volver a Auto)';
         if (txtTelemetry) {
             txtTelemetry.classList.remove('hidden');
-            const lotTxt = scalp.lot_size ? ` · Lote ${scalp.lot_size}` : '';
-            txtTelemetry.innerText = `[${scalp.symbol} · ${scalp.timeframe}${lotTxt} · ${scalp.elapsed_minutes} min]`;
+            const slotTxt = scalp.slot_alloc_pct ? ` · Slot ${Math.round(Number(scalp.slot_alloc_pct))}%` : '';
+            txtTelemetry.innerText = `[${scalp.symbol} · ${scalp.timeframe}${slotTxt} · ${scalp.elapsed_minutes} min]`;
+            txtTelemetry.title = window.lastDaemonReason || '';
         }
         if (selStrategy) {
             selStrategy.value = scalp.strategy;
@@ -6716,9 +6774,12 @@ function updateScalpingUIState(scalp) {
             selSymbol.value = scalp.symbol;
             selSymbol.disabled = true;
         }
-        if (inputLot) {
-            if (scalp.lot_size) inputLot.value = String(scalp.lot_size);
-            inputLot.disabled = true;
+        if (selSlot) {
+            if (scalp.slot_alloc_pct) {
+                const normVal = (Number(scalp.slot_alloc_pct) / 100).toFixed(2);
+                if ([...selSlot.options].some(o => o.value === normVal)) selSlot.value = normVal;
+            }
+            selSlot.disabled = true;
         }
     } else {
         badgeState.className = 'text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-400 border border-slate-700';
@@ -6726,13 +6787,13 @@ function updateScalpingUIState(scalp) {
         btnToggle.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30';
         btnToggle.disabled = false;
         if (btnIcon) btnIcon.innerText = '⚡';
-        if (btnText) btnText.innerText = 'Iniciar Scalping Presencial';
+        if (btnText) btnText.innerText = 'Iniciar Sesión Presencial';
         if (txtTelemetry) {
             txtTelemetry.classList.add('hidden');
         }
         if (selStrategy) selStrategy.disabled = false;
         if (selSymbol) selSymbol.disabled = false;
-        if (inputLot) inputLot.disabled = false;
+        if (selSlot) selSlot.disabled = false;
     }
 }
 
@@ -6740,8 +6801,10 @@ window.toggleScalpingSession = async function() {
     const isCurrentlyActive = window.scalpingSessionState && (window.scalpingSessionState.active || window.scalpingSessionState.draining);
     const selStrategy = document.getElementById('selScalpingStrategy')?.value || '';
     const selSymbol = document.getElementById('selScalpingSymbol')?.value || 'ETH/USDT';
-    const selLot = parseFloat(document.getElementById('inputScalpingLot')?.value || '0.01') || 0.01;
-    const tf = selStrategy === 'donchian_15m_atr_runner' ? '15m' : '5m';
+    const selSlotFrac = parseFloat(document.getElementById('selScalpingSlot')?.value || document.getElementById('riskSelect')?.value || '0.25') || 0.25;
+    const selSlotPct = Math.round(selSlotFrac * 100);
+    const selOpt = document.getElementById('selScalpingStrategy')?.selectedOptions?.[0];
+    const tf = selOpt?.dataset?.timeframe || (selStrategy.includes('15m') ? '15m' : (selStrategy.includes('1h') ? '1h' : '5m'));
 
     if (!isCurrentlyActive && (!selStrategy || selStrategy === '')) {
         logToTerminal(`⚠️ [SCALPING BLOQUEADO] Sin fórmulas en catalogo/operador_presente/. Las 5 estrategias están en cuarentena por fallar la auditoría temporal.`, 'warn');
@@ -6765,7 +6828,7 @@ window.toggleScalpingSession = async function() {
             logToTerminal(`❌ Error al detener scalping: ${err.message}`, 'error');
         }
     } else {
-        logToTerminal(`⚡ [SCALPING] Iniciando sesión presencial en ${selSymbol} [${tf}] con ${selStrategy} (Lote: ${selLot})...`, 'action');
+        logToTerminal(`⚡ [SCALPING] Iniciando sesión presencial en ${selSymbol} [${tf}] con ${selStrategy} (Slot: ${selSlotPct}%)...`, 'action');
         try {
             const res = await fetch(`${API_BASE_URL}/api/daemon/scalping/start`, {
                 method: 'POST',
@@ -6774,13 +6837,13 @@ window.toggleScalpingSession = async function() {
                     symbol: selSymbol,
                     strategy: selStrategy,
                     timeframe: tf,
-                    lot_size: selLot
+                    slot_alloc_pct: selSlotPct
                 })
             });
             const data = await res.json();
             if (data && data.active) {
                 updateScalpingUIState(data);
-                logToTerminal(`🟢 [SCALPING EN VIVO] Sesión presencial activa. Árbitro IA supervisando velas de ${tf} (Lote: ${selLot}).`, 'action');
+                logToTerminal(`🟢 [SCALPING EN VIVO] Sesión presencial activa. Árbitro IA supervisando velas de ${tf} (Slot: ${selSlotPct}%).`, 'action');
             }
         } catch (err) {
             logToTerminal(`❌ Error al iniciar scalping: ${err.message}`, 'error');
@@ -8600,15 +8663,78 @@ async function checkKulaSemaforo(forceProbe = false) {
         _applyKulaSemPill('kula-sem-formulas', lights.formulas_sintetico);
         _applyKulaSemPill('kula-sem-balam', lights.balam_puente);
 
+        const qc = data.quick_check || null;
+        if (qc) {
+            const isOk = qc.binary_status === 'OK';
+            _applyKulaSemPill('kula-qc-binary', {
+                status: isOk ? 'GREEN' : (data.status === 'RED' ? 'RED' : 'YELLOW'),
+                label: isOk ? '✅ 100% OK' : '⚠️ FALTA / ALERTA',
+                detail: qc.binary_label || '',
+            });
+
+            const cov = qc.assets_coverage || {};
+            const covMissing = Array.isArray(cov.missing) && cov.missing.length > 0;
+            const covStatus = !cov.known ? 'YELLOW' : (covMissing ? 'RED' : 'GREEN');
+            const covShort = cov.known ? `Activos: ${cov.reviewed}/${cov.expected}` : 'Activos: s/barrido';
+            _applyKulaSemPill('kula-qc-coverage', {
+                status: covStatus,
+                label: covShort,
+                detail: cov.label || '',
+            });
+
+            const modeEl = document.getElementById('kula-qc-mode');
+            const ams = qc.active_mode_summary || {};
+            if (modeEl) {
+                const fList = Array.isArray(ams.formulas) && ams.formulas.length > 0 ? ams.formulas.join(', ') : 's/fórmula';
+                modeEl.textContent = `[${ams.mode || 'MODO'}] ${ams.objective || ''} · Fórmula: ${fList} · TF real: ${ams.timeframe || 'n/d'}`;
+                modeEl.title = ams.text || '';
+            }
+
+            const tfAlertEl = document.getElementById('kula-qc-tf-alert');
+            if (tfAlertEl) {
+                if (ams.tf_alert && Array.isArray(ams.forced_tf_warnings) && ams.forced_tf_warnings.length > 0) {
+                    tfAlertEl.textContent = `⚠️ TF forzada (${ams.forced_tf_warnings[0]})`;
+                    tfAlertEl.title = ams.forced_tf_warnings.join(' | ');
+                    tfAlertEl.classList.remove('hidden');
+                } else {
+                    tfAlertEl.classList.add('hidden');
+                    tfAlertEl.textContent = '';
+                }
+            }
+
+            const triadEl = document.getElementById('kula-qc-triad');
+            const tr = qc.triad_state || {};
+            if (triadEl) {
+                const iconFor = (st) => (st === 'GREEN' ? '🟢' : (st === 'RED' ? '🔴' : '🟡'));
+                const c = tr.cerebro || {};
+                const b = tr.balam || {};
+                const k = tr.kula || {};
+                triadEl.textContent = `${iconFor(c.status)} ${c.label || 'Cerebro'} · ${iconFor(b.status)} ${b.label || 'Balam'} · ${iconFor(k.status)} ${k.label || 'Kula'}`;
+                triadEl.title = `${c.label || ''} | ${b.label || ''} | ${k.label || ''}`;
+            }
+
+            const reasonEl = document.getElementById('kula-qc-reason');
+            if (reasonEl) {
+                const rText = qc.last_no_trade_reason || window.lastDaemonReason || 'Sin evaluaciones aún';
+                reasonEl.textContent = `Último motivo: ${rText}`;
+                reasonEl.title = qc.last_no_trade_reason_full || rText;
+            }
+        }
+
         const alertBox = document.getElementById('kula-semaforo-alert');
         if (alertBox) {
-            const reds = Object.values(lights).filter(l => l && l.status === 'RED' && l.detail);
-            if (reds.length > 0) {
-                alertBox.textContent = `🚨 Alerta Watchdog (0 tokens): ${reds.map(r => `${r.label}: ${r.detail}`).join(' | ')}`;
+            if (qc && qc.binary_status !== 'OK' && qc.binary_label) {
+                alertBox.textContent = qc.binary_label;
                 alertBox.classList.remove('hidden');
             } else {
-                alertBox.classList.add('hidden');
-                alertBox.textContent = '';
+                const reds = Object.values(lights).filter(l => l && l.status === 'RED' && l.detail);
+                if (reds.length > 0) {
+                    alertBox.textContent = `🚨 Alerta Watchdog (0 tokens): ${reds.map(r => `${r.label}: ${r.detail}`).join(' | ')}`;
+                    alertBox.classList.remove('hidden');
+                } else {
+                    alertBox.classList.add('hidden');
+                    alertBox.textContent = '';
+                }
             }
         }
     } catch (err) {
@@ -8754,6 +8880,19 @@ document.getElementById('timeframeSelect')?.addEventListener('change', () => {
 document.getElementById('riskSelect')?.addEventListener('change', () => {
     logToTerminal(`Riesgo actualizado a: ${document.getElementById('riskSelect').options[document.getElementById('riskSelect').selectedIndex].text}`, 'info');
     if (typeof syncRunningDaemonConfig === 'function') syncRunningDaemonConfig();
+});
+
+document.getElementById('selScalpingSlot')?.addEventListener('change', (e) => {
+    const riskSel = document.getElementById('riskSelect');
+    if (riskSel && [...riskSel.options].some(o => o.value === e.target.value)) {
+        riskSel.value = e.target.value;
+        if (typeof window.updateRiskSlotPreview === 'function') window.updateRiskSlotPreview();
+        riskSel.dispatchEvent(new Event('change'));
+    }
+});
+
+document.getElementById('selScalpingSymbol')?.addEventListener('change', () => {
+    if (typeof window.updateRiskSlotPreview === 'function') window.updateRiskSlotPreview();
 });
 
 document.getElementById('tpSlSelect')?.addEventListener('change', () => {

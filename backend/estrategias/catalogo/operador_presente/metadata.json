@@ -1,1 +1,57 @@
-{}
+{
+  "kula_cava_sol_1h.py": {
+    "id": "kula_cava_sol_1h",
+    "titulo": "⚡👑 Kula Cava & Ruiz SOL 1H (Zona Dorada)",
+    "subtitulo": "1H Cripto · PF 2.66 · WR 51.61% · OOS PF 3.11 · WFO 5/5 · MC DD 5.51%",
+    "descripcion": "Estrategia presencial estructural en SOL/USDT 1H: retroceso Fibonacci 0.50-0.75 + fallo de histograma MACD + vela gatillo V3 sobre EMA 50.",
+    "dataset_sugerido": "binance_SOL_USDT_1h.parquet",
+    "timeframe": "1h",
+    "lote_sugerido": 0.1,
+    "activo_default": "SOL/USDT",
+    "rendimiento_lab": "Lab Validado (PF 2.66 · MC DD 5.51%)"
+  },
+  "kula_cava_eth_1h.py": {
+    "id": "kula_cava_eth_1h",
+    "titulo": "🔷⚡ Kula Cava & Ruiz ETH 1H (Meseta S46)",
+    "subtitulo": "1H Cripto · PF 1.76 · WR 46.67% · OOS PF 2.55 · WFO 3/5 · MC DD 6.32%",
+    "descripcion": "Retroceso estructural Fibonacci 0.50-0.75 en ETH/USDT 1H con filtro de expansión ATR > SMA20, fallo de MACD y sizing fraccional 0.60%.",
+    "dataset_sugerido": "binance_ETH_USDT_1h.parquet",
+    "timeframe": "1h",
+    "lote_sugerido": 0.01,
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Lab Validado (PF 1.76 · MC DD 6.32%)"
+  },
+  "cava_fallo_macd_eurusd_1h.py": {
+    "id": "cava_fallo_macd_eurusd_1h",
+    "titulo": "💶🏦 Cava Fallo MACD EURUSD 1H (Londres/NY)",
+    "subtitulo": "1H Forex · PF 1.79 · WR 55.56% · OOS PF 9.30 · WFO 5/5 · MC DD 1.29%",
+    "descripcion": "Divergencia y fallo de histograma MACD + mechas de absorción institucional sobre EMA 50 en EUR/USD 1H (07:00-18:00 UTC).",
+    "dataset_sugerido": "yf_EURUSD_1h.parquet",
+    "timeframe": "1h",
+    "lote_sugerido": 0.1,
+    "activo_default": "EURUSD=X",
+    "rendimiento_lab": "Lab Validado Forex (PF 1.79 · MC DD 1.29%)"
+  },
+  "mtf_presencial_15m.py": {
+    "id": "mtf_presencial_15m",
+    "titulo": "⚡🎯 MTF Presencial 15M (1H -> 15M · ETH/Cripto)",
+    "subtitulo": "15M Presencial · Ventana corta PF 2.09 · Requiere criterio en vivo (3y N>=100 reprueba)",
+    "descripcion": "Contexto 1H (EMA50 + ADX>=18 + Fibo 0.48-0.75 + MACD 1H) con gatillo de cruce EMA15 y MACD 15M + Árbitro IA. Objetivo estructural en sw_h/sw_l de 1H (R:R >= 1:2 neto).",
+    "dataset_sugerido": "binance_ETH_USDT_15m.parquet",
+    "timeframe": "15m",
+    "lote_sugerido": 0.01,
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Supervisión Humana Obligatoria (187d PF 2.09 · MC DD 3.48%)"
+  },
+  "mtf_presencial_5m.py": {
+    "id": "mtf_presencial_5m",
+    "titulo": "⚡⏱️ MTF Presencial 5M (1H -> 15M -> 5M · ETH/Cripto)",
+    "subtitulo": "5M Presencial · Ventana corta PF 1.62 · Requiere criterio en vivo (1.5y N>=100 reprueba)",
+    "descripcion": "Tríada causal 1H (EMA50 + ADX>=18 + Fibo 0.50-0.75) + confirmación MACD 15M + gatillo cruce EMA50 en 5M + Árbitro IA. Objetivo en extremo 1H (R:R >= 1:2 neto).",
+    "dataset_sugerido": "binance_ETH_USDT_5m.parquet",
+    "timeframe": "5m",
+    "lote_sugerido": 0.01,
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Supervisión Humana Obligatoria (96d PF 1.62 · MC DD 3.40%)"
+  }
+}

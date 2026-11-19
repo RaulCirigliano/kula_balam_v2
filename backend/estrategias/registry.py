@@ -457,9 +457,11 @@ def evaluate_strategy(
         from backend.kula_rules import check_universal_wick_veto
 
         eligible_candidates = []
+        shadow_veto_candidates = []
         first_eval = None
         kula_eval = None
         donchian_eval = None
+        per_strategy: Dict[str, Any] = {}
 
         for s_id in valid_allowed:
             strat = get_strategy(s_id)
@@ -477,21 +479,34 @@ def evaluate_strategy(
                 df=df,
             )
 
-            # Veto Universal de Mechas (contraria >= 50%) para todo candidato
-            eval_side = m.get("side") or ("LONG" if eff_net > 0 else "SHORT")
-            if df is not None and len(df) > 0:
-                wick_veto_msg = check_universal_wick_veto(df, eval_side, 0.50)
-                if wick_veto_msg:
-                    if wick_veto_msg not in fails:
-                        fails.append(wick_veto_msg)
-                    elig = False
-                    m["candidate_eligible"] = False
-                    m["suggested_signal"] = "MANTENER"
-                    m["side"] = "MANTENER"
+            # Veto Universal de Mechas (contraria >= 50%) solo cuando la fórmula habilitó candidata real
+            if elig and df is not None and len(df) > 0:
+                eval_side = str(m.get("side") or ("LONG" if eff_net > 0 else "SHORT")).upper()
+                if eval_side in ("LONG", "SHORT", "BUY", "SELL"):
+                    wick_veto_msg = check_universal_wick_veto(df, eval_side, 0.50)
+                    if wick_veto_msg:
+                        if wick_veto_msg not in fails:
+                            fails.append(wick_veto_msg)
+                        elig = False
+                        m["candidate_eligible"] = False
+                        m["suggested_signal"] = "MANTENER"
+                        m["side"] = "MANTENER"
 
             m["institutional_sweep"] = sweep_bonus
             m["is_institutional_sweep"] = sweep_bonus["sweep_detected"]
             m["conviction_multiplier"] = sweep_bonus["conviction_multiplier"]
+
+            # Telemetría del Embudo de Rechazos: resultado por fórmula (no altera selección ni reglas)
+            try:
+                from backend.rejection_funnel import classify_rejection_tags, formula_fired
+                _funnel_txts = [str(f) for f in fails] + [str(m.get("presencial_telemetry") or "")]
+                per_strategy[s_id] = {
+                    "eligible": bool(elig),
+                    "fired": formula_fired(_funnel_txts, bool(elig)),
+                    "tags": [] if elig else classify_rejection_tags(_funnel_txts),
+                }
+            except Exception:
+                pass
 
             eval_tuple = (s_id, m, eff_net, elig, fails, min_p)
             if s_id == "kula_balam_cava_ruiz":
@@ -501,6 +516,8 @@ def evaluate_strategy(
 
             if first_eval is None:
                 first_eval = eval_tuple
+            if (not elig) and isinstance(m.get("shadow_veto_candidate"), dict):
+                shadow_veto_candidates.append(m["shadow_veto_candidate"])
             cand_rr = float(m.get("net_rr") or 0.0)
             if elig and cand_rr >= 1.95:
                 eligible_candidates.append(eval_tuple)
@@ -521,6 +538,9 @@ def evaluate_strategy(
                 "selected_strategy": best_id,
                 "reason": f"Cerebro Kula seleccionó '{best_id}' entre las {len(valid_allowed)} autorizadas por ofrecer máxima asimetría neta (R:R {best_rr:.2f}, TP neto +{eff_net:.2f}%){sweep_msg}."
             }
+            m["per_strategy"] = per_strategy
+            if shadow_veto_candidates:
+                m["shadow_veto_candidates"] = shadow_veto_candidates
             return (m, eff_net, elig, fails, min_p)
 
         # Si ninguna fue elegible, retornar la primera autorizada indicando que ninguna cumplió
@@ -550,6 +570,9 @@ def evaluate_strategy(
                 "selected_strategy": s_id,
                 "reason": auto_reason,
             }
+            m["per_strategy"] = per_strategy
+            if shadow_veto_candidates:
+                m["shadow_veto_candidates"] = shadow_veto_candidates
             return (m, eff_net, False, fails_copy, min_p)
 
     auto_info = None
@@ -584,6 +607,8 @@ def evaluate_strategy(
         metrics["conviction_multiplier"] = sweep_bonus["conviction_multiplier"]
         if auto_info:
             metrics["auto_orchestrator"] = auto_info
+        if (not eligible) and isinstance(metrics.get("shadow_veto_candidate"), dict):
+            metrics["shadow_veto_candidates"] = [metrics["shadow_veto_candidate"]]
         return (metrics, eff_net_tp, eligible, failures, min_tp)
 
     # Fallback para 'manual'

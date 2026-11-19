@@ -148,3 +148,75 @@ def test_watchdog_monitor_404_falls_back_to_status_yellow():
     assert out["lights"]["balam_puente"]["status"] == "YELLOW"
     assert out["lights"]["balam_puente"]["monitor_online"] is True
 
+
+def test_watchdog_quick_check_binary_ok_and_alert_states(tmp_path, monkeypatch):
+    buf_path = tmp_path / "macro_qc.json"
+    buf_path.write_text(
+        json.dumps({"BTC/USDT": {"created_at": datetime.now(timezone.utc).isoformat()}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MACRO_BIAS_BUFFER_PATH", str(buf_path))
+
+    daemon = _make_daemon(tmp_path)
+    daemon.last_reason = "[ETH/USDT 15m] Close $1793.60 | ADX1H: 13.68 (<18) | Bloqueo: ADX1H<18 -> En espera"
+    daemon.last_patrol_coverage = {
+        "ts": time.time(),
+        "expected_symbols": ["SOL/USDT", "ETH/USDT"],
+        "evaluated_symbols": ["SOL/USDT"],
+        "cached_symbols": ["ETH/USDT"],
+        "market_closed_symbols": [],
+        "skipped_symbols": [],
+        "policy_skipped_symbols": [],
+        "missing_or_error_symbols": {},
+    }
+    daemon.forced_tf_warnings = []
+
+    fake_mon_payload = json.dumps({
+        "status": "GREEN",
+        "lights": {
+            "rss_ingesta": {"status": "GREEN", "feeds_ok": 20, "feeds_failed": 0, "total_feeds": 20},
+            "puente_kula": {"status": "GREEN", "last_inject_ok": True},
+        },
+    }).encode("utf-8")
+    fake_resp = MagicMock()
+    fake_resp.status = 200
+    fake_resp.read.return_value = fake_mon_payload
+    fake_resp.__enter__.return_value = fake_resp
+    fake_resp.__exit__.return_value = False
+
+    wd = HealthWatchdog()
+    with patch("backend.health_watchdog.urlopen", return_value=fake_resp):
+        res_ok = wd.evaluate(daemon, force_probe=True, notify_on_red=False, monitor_url="http://127.0.0.1:8520")
+
+    qc_ok = res_ok["quick_check"]
+    assert qc_ok["binary_status"] == "OK"
+    assert qc_ok["binary_label"] == "✅ 100% OK"
+    assert qc_ok["assets_coverage"]["reviewed"] == 2
+    assert qc_ok["assets_coverage"]["expected"] == 2
+    assert "ADX1H: 13.68" in qc_ok["last_no_trade_reason"]
+    assert qc_ok["triad_state"]["cerebro"]["status"] == "GREEN"
+    assert qc_ok["triad_state"]["balam"]["status"] == "GREEN"
+    assert qc_ok["triad_state"]["kula"]["status"] == "GREEN"
+
+    # Si Balam está en "Balam (Solo Técnico)" con Monitor online y 20/20 RSS OK => NO debe disparar FALTA / ALERTA
+    buf_path.unlink(missing_ok=True)
+    with patch("backend.health_watchdog.urlopen", return_value=fake_resp):
+        res_solo_tec = wd.evaluate(daemon, force_probe=False, notify_on_red=False, monitor_url="http://127.0.0.1:8520")
+    assert res_solo_tec["lights"]["balam_puente"]["status"] == "YELLOW"
+    assert res_solo_tec["lights"]["balam_puente"]["label"] == "Balam (Solo Técnico)"
+    assert res_solo_tec["quick_check"]["binary_status"] == "OK"
+    assert res_solo_tec["quick_check"]["binary_label"] == "✅ 100% OK"
+
+    # Si falta un activo o hay TF forzada => debe pasar a ALERT con detalle
+    daemon.last_patrol_coverage["missing_or_error_symbols"] = {"ETH/USDT": "Precio <= 0"}
+    daemon.forced_tf_warnings = ["kula_cava_eth_1h: nativa 1h ejecutándose en 4h"]
+    with patch("backend.health_watchdog.urlopen", return_value=fake_resp):
+        res_alert = wd.evaluate(daemon, force_probe=False, notify_on_red=False, monitor_url="http://127.0.0.1:8520")
+
+    qc_alert = res_alert["quick_check"]
+    assert qc_alert["binary_status"] == "ALERT"
+    assert qc_alert["binary_label"].startswith("⚠️ FALTA / ALERTA:")
+    assert qc_alert["active_mode_summary"]["tf_alert"] is True
+    assert qc_alert["assets_coverage"]["reviewed"] == 1
+
+

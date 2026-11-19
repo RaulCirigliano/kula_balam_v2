@@ -557,6 +557,7 @@
                 <div class="flex items-center justify-between border-b border-slate-800 pb-2">
                   <span class="font-bold text-white text-sm flex items-center gap-1.5">
                     <span class="text-indigo-400">⚡</span> ${sym}
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">EN VIVO</span>
                   </span>
                   <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isComp ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
                     MODO ${item.active_mode} (${item.active_dist_pct}%)
@@ -568,7 +569,7 @@
                     <strong class="text-emerald-400">$${(item.peak_price || 0).toLocaleString()} (+${(item.peak_gross_pct || 0).toFixed(2)}%)</strong>
                   </div>
                   <div class="text-slate-400 text-[11px] leading-relaxed bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">
-                    <strong class="text-indigo-300">Criterio IA:</strong> ${item.ai_reason || 'Monitoreo activo'}
+                    <strong class="text-indigo-300">Criterio IA:</strong> ${escapeHtml(item.ai_reason || 'Monitoreo activo')}
                   </div>
                   <div class="pt-1.5 border-t border-slate-900 grid grid-cols-2 gap-2 text-[11px] font-mono">
                     <div class="p-1.5 rounded bg-emerald-950/40 border border-emerald-800/50">
@@ -589,8 +590,66 @@
               `;
               cfContainer.appendChild(card);
             });
+          } else if (closedTrades.length > 0) {
+            closedTrades.slice(0, 6).forEach(t => {
+              const entryPx = Number(t.entry_price || 0);
+              const exitPx = Number(t.exit_price || entryPx);
+              const peakPx = Number(t.peak_price || exitPx || entryPx);
+              const isShort = String(t.side || '').toUpperCase() === 'SHORT';
+              const peakPct = entryPx > 0
+                ? (isShort ? ((entryPx - peakPx) / entryPx) * 100.0 : ((peakPx - entryPx) / entryPx) * 100.0)
+                : 0.0;
+              const modeLabel = String(t.trailing_mode || 'AUTO').toUpperCase();
+              const isComp = modeLabel === 'COMPRIMIDO';
+              const stopNetPct = Number(t.current_stop_net_pct || 0);
+              const cfDiff = Number(t.counterfactual_diff || 0);
+              const pnlUsd = Number(t.realized_pnl || 0);
+              const altMode = (modeLabel === 'COMPRIMIDO' || modeLabel === 'AUTO') && peakPct >= 4.0
+                ? 'HOLGADO (2.0%)'
+                : 'COMPRIMIDO (0.8%)';
+              const aiReason = t.ai_decision_reason || `Salida: ${t.exit_reason || 'Cierre'} · Stop móvil neto: ${stopNetPct >= 0 ? '+' : ''}${stopNetPct.toFixed(2)}%`;
+
+              const card = document.createElement('div');
+              card.className = 'p-4 rounded-xl bg-slate-950/70 border border-slate-800/90 space-y-2.5';
+              card.innerHTML = `
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span class="font-bold text-white text-sm flex items-center gap-1.5">
+                    <span class="text-cyan-400">📜</span> ${escapeHtml(t.symbol)}
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 text-slate-300 border border-slate-700">HISTÓRICO · ${escapeHtml(t.side || 'LONG')}</span>
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isComp ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'}">
+                    MODO ${escapeHtml(modeLabel)}
+                  </span>
+                </div>
+                <div class="space-y-1.5 text-xs">
+                  <div class="text-slate-300 font-mono flex justify-between">
+                    <span>Entrada → Pico:</span>
+                    <strong class="text-emerald-400">$${entryPx.toLocaleString('en-US', {minimumFractionDigits: 2})} → $${peakPx.toLocaleString('en-US', {minimumFractionDigits: 2})} (${peakPct >= 0 ? '+' : ''}${peakPct.toFixed(2)}%)</strong>
+                  </div>
+                  <div class="text-slate-400 text-[11px] leading-relaxed bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">
+                    <strong class="text-indigo-300">Criterio IA:</strong> ${escapeHtml(aiReason)}
+                  </div>
+                  <div class="pt-1.5 border-t border-slate-900 grid grid-cols-2 gap-2 text-[11px] font-mono">
+                    <div class="p-1.5 rounded bg-emerald-950/30 border border-emerald-800/40">
+                      <span class="text-slate-400 block text-[9px] uppercase">Resultado Real:</span>
+                      <span class="${pnlUsd >= 0 ? 'text-emerald-300' : 'text-rose-300'} font-bold">${pnlUsd >= 0 ? '+' : ''}$${pnlUsd.toFixed(4)}</span>
+                      <span class="text-[10px] text-slate-400 block">Salida: $${exitPx.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="p-1.5 rounded bg-purple-950/30 border border-purple-800/40">
+                      <span class="text-slate-400 block text-[9px] uppercase">Camino Alternativo:</span>
+                      <span class="text-purple-300 font-bold">${altMode}</span>
+                      <span class="text-[10px] text-slate-400 block">Dif.: ${cfDiff >= 0 ? '+' : ''}${cfDiff.toFixed(2)}% neto</span>
+                    </div>
+                  </div>
+                  <div class="text-[10px] font-mono text-slate-500 text-right pt-0.5">
+                    Cerrado: ${escapeHtml(t.closed_at || t.opened_at || 'N/A')}
+                  </div>
+                </div>
+              `;
+              cfContainer.appendChild(card);
+            });
           } else {
-            cfContainer.innerHTML = '<div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-center text-xs text-slate-500 italic col-span-full">Sin telemetría de trailing activa (no hay posiciones con trailing en curso).</div>';
+            cfContainer.innerHTML = '<div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-center text-xs text-slate-500 italic col-span-full">Sin registros de trailing aún (0 posiciones en curso y 0 operaciones cerradas en el ledger actual).</div>';
           }
         }
 

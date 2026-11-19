@@ -495,3 +495,248 @@ def test_impact_vector_and_vix_gate():
         assert "event_type" in iv
         assert "implied_bias" in iv
 
+
+def test_shadow_trades_deduplication_and_24h_expiry():
+    """
+    Calibración 2:
+    - open_shadow_trade(..., deduplicate=True) evita duplicados OPEN para el mismo (symbol, strategy, side).
+    - update_and_close_shadow_trades(..., expiry_hours=24.0) cierra como EXPIRED a las 24h si no tocó SL ni TP.
+    """
+    from auditar_sqlite import auditar
+
+    with tempfile.NamedTemporaryFile(suffix=".sqlite3") as tmp_db:
+        ledger = LedgerStore(db_path=tmp_db.name)
+
+        id1 = ledger.open_shadow_trade(
+            symbol="SOL/USDT",
+            side="LONG",
+            qty=2.0,
+            entry_price=80.0,
+            sl_price=75.0,
+            tp_price=92.0,
+            initial_sl_pct=6.25,
+            initial_tp_pct=15.0,
+            strategy="mtf_presencial_5m",
+            arbiter_verdict="VETO_ARBITRO_IA",
+            arbiter_reason="VETO IA Sobreextensión EMA (3.10 ATR > 2.6)",
+        )
+        id2 = ledger.open_shadow_trade(
+            symbol="SOL/USDT",
+            side="LONG",
+            qty=2.0,
+            entry_price=80.5,
+            sl_price=75.0,
+            tp_price=92.0,
+            initial_sl_pct=6.25,
+            initial_tp_pct=15.0,
+            strategy="mtf_presencial_5m",
+            arbiter_verdict="VETO_ARBITRO_IA",
+            arbiter_reason="VETO IA Sobreextensión EMA (3.20 ATR > 2.6)",
+        )
+        assert id1 == id2
+        assert len(ledger.get_open_shadow_trades("SOL/USDT")) == 1
+
+        # Envejecer opened_at a 25 horas atrás
+        conn = ledger._connect()
+        try:
+            conn.execute("UPDATE shadow_trades SET opened_at = datetime('now', '-25 hours') WHERE id = ?", (id1,))
+            conn.commit()
+        finally:
+            conn.close()
+
+        closed = ledger.update_and_close_shadow_trades(
+            symbol="SOL/USDT",
+            current_price=82.5,
+            expiry_hours=24.0,
+        )
+        assert len(closed) == 1
+        assert closed[0]["outcome"] == "EXPIRED"
+        assert closed[0]["status"] == "CLOSED"
+        assert closed[0]["virtual_pnl_usd"] == 5.0  # (82.5 - 80.0) * 2.0
+
+        summary = ledger.get_shadow_trades_summary()
+        assert summary["expired_count"] == 1
+        assert summary["expired_pnl_usd"] == 5.0
+        assert summary["open_count"] == 0
+
+        report = auditar(db_path=tmp_db.name)
+        assert "Expiradas 24h sin tocar SL/TP (EXPIRED): 1 operaciones" in report
+
+
+def test_catalog_arbitro_ia_vetos_traced_in_daemon_shadow_trades(tmp_path):
+    """
+    Calibración 2 end-to-end:
+    Todo veto de arbitro_ia en CatalogFormulaStrategy (Sobreextensión EMA/ATR y Volumen Seco / RVOL)
+    genera shadow_veto_candidate y TraderDaemon lo persiste deduplicado en shadow_trades.
+    """
+    from types import SimpleNamespace
+    from backend.estrategias.catalog_adapter import CatalogFormulaStrategy
+
+    cat_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "backend", "estrategias", "catalogo", "operador_presente",
+    )
+    strat = CatalogFormulaStrategy(
+        {"id": "mtf_presencial_5m", "timeframe": "5m", "activo_default": "ETH/USDT"},
+        os.path.join(cat_dir, "mtf_presencial_5m.py"),
+    )
+
+    df = pd.DataFrame({
+        "timestamp": [1795000000000 + i * 300_000 for i in range(40)],
+        "open": [1800.0] * 40,
+        "high": [1805.0] * 40,
+        "low": [1795.0] * 40,
+        "close": [1802.0] * 40,
+        "volume": [1000.0] * 40,
+    })
+    ind = {
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "latest": df.iloc[-1].to_dict(),
+        "live_price": 1802.0,
+        "atr_14": 6.0,
+        "relative_volume": 0.45,
+    }
+
+    for veto_reason in (
+        "VETO IA Sobreextensión EMA (3.10 ATR > 2.6)",
+        "VETO IA Volumen Seco (RVOL 0.42 < 0.60)",
+    ):
+        fake_mod = SimpleNamespace(
+            formula_matematica=lambda _df, _i: (True, "LONG", 1780.0, 1850.0),
+            arbitro_ia=lambda _fila, _side, _e, _sl, _tp, msg=veto_reason: (False, 0.0, msg),
+        )
+        with patch.object(strat, "_load_module", return_value=fake_mod):
+            m, _, elig, fails, _ = strat.evaluar(ind, 2.0, 1.0, 0.10, 0.05, 0.5, 0.3, 2.0, df=df)
+
+        assert elig is False
+        assert "shadow_veto_candidate" in m
+        sc = m["shadow_veto_candidate"]
+        assert sc["symbol"] == "ETH/USDT"
+        assert sc["strategy"] == "mtf_presencial_5m"
+        assert sc["side"] == "LONG"
+        assert sc["sl_price"] == 1780.0
+        assert sc["tp_price"] == 1850.0
+        assert sc["arbiter_verdict"] == "VETO_ARBITRO_IA"
+        assert sc["arbiter_reason"] == veto_reason
+
+    # Integración con TraderDaemon: 2 ciclos con el mismo veto => 1 sola fila OPEN en shadow_trades (dedup)
+    db_file = str(tmp_path / "daemon_shadow.sqlite3")
+    broker = PaperBrokerAdapter(initial_vault_usd=500.0, db_path=db_file, fee_pct=0.10)
+    daemon = TraderDaemon(broker=broker)
+    with patch.object(daemon, "_run_loop", return_value=None):
+        daemon.start_scalping(symbol="ETH/USDT", strategy="mtf_presencial_5m", timeframe="5m", slot_alloc_pct=100.0)
+
+    fake_res = {
+        "signal": "MANTENER",
+        "reason": "[ETH/USDT 5m] Close $1802.00 | Bloqueo: VETO IA Sobreextensión EMA -> En espera",
+        "signal_candle_ts": 1795009500,
+        "strategy_metrics": {
+            "atr_14": 6.0,
+            "shadow_veto_candidates": [
+                {
+                    "symbol": "ETH/USDT",
+                    "strategy": "mtf_presencial_5m",
+                    "side": "LONG",
+                    "entry_price": 1802.0,
+                    "sl_price": 1780.0,
+                    "tp_price": 1850.0,
+                    "initial_sl_pct": 1.22,
+                    "initial_tp_pct": 2.66,
+                    "arbiter_verdict": "VETO_ARBITRO_IA",
+                    "arbiter_reason": "VETO IA Sobreextensión EMA (3.10 ATR > 2.6)",
+                }
+            ],
+        },
+        "indicators": {"rsi": 55.0, "atr_14": 6.0},
+    }
+    with patch("backend.main.get_analysis", return_value=fake_res), \
+         patch("backend.main.get_price", return_value={"symbol": "ETH/USDT", "price": 1802.0}):
+        daemon._execute_cycle()
+        daemon._evaluated_candles.pop(("ETH/USDT", "5m"), None)
+        fake_res["signal_candle_ts"] = 1795009800
+        daemon._execute_cycle()
+
+    assert len(broker.fetch_positions()) == 0
+    shadows = broker.ledger.get_open_shadow_trades("ETH/USDT")
+    assert len(shadows) == 1
+    assert shadows[0]["arbiter_verdict"] == "VETO_ARBITRO_IA"
+    assert "Sobreextensión EMA" in shadows[0]["arbiter_reason"]
+    daemon.is_running = False
+
+
+def test_registry_wick_veto_solo_sobre_candidata_elegible():
+    """No debe etiquetar Veto Universal de Mechas cuando la fórmula ya devolvió eligible=False (MANTENER)."""
+    from backend.estrategias.registry import evaluate_strategy, get_strategy
+    from backend.rejection_funnel import classify_rejection_tags
+
+    strat_obj = get_strategy("mtf_presencial_5m")
+    assert strat_obj is not None
+
+    # Vela con mecha inferior > 50% (que dispararía Kula:Mecha50 para SHORT si se evaluara sin candidata)
+    df_wick = pd.DataFrame({
+        "timestamp": [1795000000000 + i * 300_000 for i in range(40)],
+        "open": [100.0] * 39 + [100.0],
+        "high": [101.0] * 39 + [101.0],
+        "low": [99.0] * 39 + [90.0],
+        "close": [100.2] * 39 + [99.5],
+        "volume": [1000.0] * 40,
+    })
+    ind = {
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "latest": df_wick.iloc[-1].to_dict(),
+        "live_price": 99.5,
+        "atr_14": 2.0,
+        "relative_volume": 1.0,
+    }
+
+    fake_hold = (
+        {
+            "mode": "mtf_presencial_5m",
+            "side": "MANTENER",
+            "suggested_signal": "MANTENER",
+            "net_rr": 0.0,
+            "presencial_telemetry": "[ETH/USDT 5m] Close $99.50 | ADX1H: 14.0 (<18) | Bloqueo: ADX1H<18 -> En espera",
+        },
+        0.0,
+        False,
+        ["[ETH/USDT 5m] Close $99.50 | ADX1H: 14.0 (<18) | Bloqueo: ADX1H<18 -> En espera"],
+        0.5,
+    )
+    with patch.object(strat_obj, "evaluar", return_value=fake_hold):
+        m, _, elig, fails, _ = evaluate_strategy(
+            strategy_id="mtf_presencial_5m",
+            ind=ind, tp=2.0, sl=1.0, fee=0.10, spread=0.05,
+            min_profit_pct=0.5, round_trip_cost=0.30, net_tp_manual=1.8,
+            df=df_wick, allowed_strategies=["mtf_presencial_5m"],
+        )
+
+    assert elig is False
+    assert not any("Veto Universal de Mechas" in f for f in fails)
+    tags = classify_rejection_tags(fails)
+    assert "Kula:Mecha50" not in tags
+    assert m["per_strategy"]["mtf_presencial_5m"]["fired"] is False
+
+    # Cuando sí es candidata SHORT y tiene mecha inferior > 50% => SÍ aplica Kula:Mecha50
+    fake_short = (
+        {"mode": "mtf_presencial_5m", "side": "SHORT", "suggested_signal": "SHORT", "net_rr": 2.5},
+        2.5,
+        True,
+        [],
+        0.5,
+    )
+    with patch.object(strat_obj, "evaluar", return_value=fake_short):
+        m2, _, elig2, fails2, _ = evaluate_strategy(
+            strategy_id="mtf_presencial_5m",
+            ind=ind, tp=2.0, sl=1.0, fee=0.10, spread=0.05,
+            min_profit_pct=0.5, round_trip_cost=0.30, net_tp_manual=1.8,
+            df=df_wick, allowed_strategies=["mtf_presencial_5m"],
+        )
+
+    assert elig2 is False
+    assert any("Veto Universal de Mechas" in f for f in fails2)
+    assert m2["per_strategy"]["mtf_presencial_5m"]["fired"] is True
+
+
+

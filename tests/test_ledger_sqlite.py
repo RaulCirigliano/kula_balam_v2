@@ -169,3 +169,83 @@ def test_vault_thermometer_accounting_ratios_consistency(tmp_path):
         slot_amt = op_cap * frac
         assert round(slot_amt, 2) == expected_slot_amt
         assert int(round(1 / frac)) == expected_slots
+
+
+def test_record_signal_evaluation_and_auditar_sqlite_funnel_section(tmp_path):
+    """Verifica persistencia en tabla signals (incluyendo SHORT normalizado) y reporte en auditar_sqlite.py."""
+    import json
+    from auditar_sqlite import auditar
+    from backend.rejection_funnel import build_signal_payload, classify_rejection_tags, dump_payload
+
+    db_file = str(tmp_path / "signals_funnel.sqlite3")
+    ledger = LedgerStore(db_path=db_file, initial_vault={"USDT": 500.0})
+
+    reason_hold = (
+        "[ETH/USDT 5m] Close $1794.79 | ADX1H: 14.06 (<18) | Cruces1H: 4 (>3) | "
+        "Fibo: 0.455 (meta 0.50-0.75, SHORT) | Bloqueo: ADX1H<18, Cruces1H>3, Fibo<0.50 -> En espera"
+    )
+    tags_hold = classify_rejection_tags([reason_hold])
+    assert "ADX1H<18" in tags_hold
+    assert "Cruces1H>3" in tags_hold
+    assert "Fibo" in tags_hold
+
+    payload_hold = build_signal_payload(
+        stage="analysis",
+        strategy="mtf_presencial_5m",
+        tags=tags_hold,
+        eligible=False,
+        side=None,
+    )
+    sig_id1 = ledger.record_signal_evaluation(
+        symbol="ETH/USDT",
+        engine="antigravity_operador",
+        signal="MANTENER",
+        reason=reason_hold,
+        price=1794.79,
+        timeframe="5m",
+        signal_candle_ts=1795009500,
+        data_age_s=5,
+        raw_response=dump_payload(payload_hold),
+    )
+    assert sig_id1
+
+    # Señal SHORT candidata: debe persistirse como COMPRAR por el CHECK y conservar signal_original="SHORT"
+    payload_short = build_signal_payload(
+        stage="analysis",
+        strategy="mtf_presencial_5m",
+        tags=[],
+        eligible=True,
+        side="SHORT",
+    )
+    sig_id2 = ledger.record_signal_evaluation(
+        symbol="SOL/USDT",
+        engine="antigravity_operador",
+        signal="SHORT",
+        reason="[SOL/USDT 5m] Close $84.20 | SHORT R:R 2.35 -> Candidata",
+        price=84.20,
+        timeframe="5m",
+        signal_candle_ts=1795009500,
+        data_age_s=4,
+        raw_response=dump_payload(payload_short),
+    )
+    assert sig_id2
+
+    conn = ledger._connect()
+    try:
+        rows = conn.execute("SELECT symbol, signal, raw_response FROM signals ORDER BY rowid ASC").fetchall()
+        assert len(rows) == 2
+        assert rows[0]["signal"] == "MANTENER"
+        assert rows[1]["signal"] == "COMPRAR"
+        raw2 = json.loads(rows[1]["raw_response"])
+        assert raw2["signal_original"] == "SHORT"
+        assert raw2["eligible"] is True
+    finally:
+        conn.close()
+
+    report_txt = auditar(db_path=db_file)
+    assert "EMBUDO DE RECHAZOS 24H, COBERTURA DE ACTIVOS Y DETECTOR DE REDUNDANCIA 30D" in report_txt
+    assert "1H lateral (ADX1H < 18)" in report_txt
+    assert "Serrucho 1H (cruces EMA50 > 3)" in report_txt
+    assert "Retroceso fuera de zona Fibo" in report_txt
+    assert "DETECTOR DE REDUNDANCIA / INACTIVIDAD (30 DÍAS)" in report_txt
+

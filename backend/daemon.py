@@ -31,6 +31,10 @@ SWING_4H_LAB_STRATEGIES = (
 )
 BE_THRESHOLD_GROSS_BY_STRATEGY: Dict[str, float] = {
     "donchian_breakout_1h": 1.00,
+    "kula_cava_sol_1h": 1.00,
+    "kula_cava_eth_1h": 1.00,
+    "mtf_presencial_15m": 1.00,
+    "mtf_presencial_5m": 1.00,
     "1_donchian_breakout_sol_4h": 1.40,
     "squeeze_dual_eth_fondeo_strict_4h": 1.40,
     "squeeze_dual_eth_4h_slot1": 1.40,
@@ -113,6 +117,11 @@ class TraderDaemon:
         self.symbol_indicators: Dict[str, Dict[str, Any]] = {}
         self._evaluated_candles: Dict[tuple, Dict[str, Any]] = {}
         self._next_wakeup_ts: float = 0.0
+        self._wakeup_event = threading.Event()
+        # Cobertura del último barrido (X/Y activos), desajustes de TF y dedupe del Embudo de Rechazos
+        self.last_patrol_coverage: Dict[str, Any] = {}
+        self.forced_tf_warnings: List[str] = []
+        self._recorded_signal_keys: Dict[tuple, bool] = {}
         self.enable_futures_simulation: bool = False
 
         # Módulo de Scalping Presencial (Supervisión en vivo con Árbitro IA)
@@ -121,6 +130,8 @@ class TraderDaemon:
         self.scalping_strategy: str = "scalping_vwap_2sigma_5m"
         self.scalping_timeframe: str = "5m"
         self.scalping_symbol: str = "ETH/USDT"
+        self.scalping_symbols: List[str] = ["ETH/USDT"]
+        self._presencial_symbol_reasons: Dict[str, str] = {}
         self.scalping_start_ts: float = 0.0
         self.scalping_trades_opened: int = 0
 
@@ -129,6 +140,8 @@ class TraderDaemon:
         self.backup_timeframe: str = "4h"
         self.backup_symbol: str = "SOL/USDT"
         self.backup_mode: str = "smart"
+        self.backup_slot_alloc_pct: Optional[float] = None
+        self._has_backup_slot_alloc: bool = False
 
         self._lock = threading.RLock()
 
@@ -363,7 +376,133 @@ class TraderDaemon:
                 "next_wakeup_in_s": max(0.0, round(self._next_wakeup_ts - time.time(), 1)) if self._next_wakeup_ts > 0 else None,
                 "evaluated_candles_count": len(self._evaluated_candles),
                 "enable_futures_simulation": bool(getattr(self, "enable_futures_simulation", False)),
+                "patrol_coverage": self._snapshot_patrol_coverage(),
+                "forced_tf_warnings": list(self.forced_tf_warnings),
             }
+
+    # ------------------------------------------------------------------
+    # Embudo de Rechazos y cobertura de patrullaje (solo telemetría; no altera reglas de entrada)
+    # ------------------------------------------------------------------
+    def _snapshot_patrol_coverage(self) -> Dict[str, Any]:
+        cov = self.last_patrol_coverage or {}
+        return {
+            k: (list(v) if isinstance(v, list) else (dict(v) if isinstance(v, dict) else v))
+            for k, v in cov.items()
+        }
+
+    def _record_signal_row(
+        self,
+        symbol: str,
+        timeframe: str,
+        signal: str,
+        reason: str,
+        price: float,
+        candle_ts: int,
+        data_age_s: int,
+        payload: Dict[str, Any],
+    ) -> None:
+        """Escribe una fila en `signals` sin permitir que un fallo de SQLite interrumpa el ciclo."""
+        ledger_ref = getattr(self.broker, "ledger", None)
+        if ledger_ref is None or not hasattr(ledger_ref, "record_signal_evaluation"):
+            return
+        try:
+            from backend.rejection_funnel import dump_payload
+            ledger_ref.record_signal_evaluation(
+                symbol=symbol,
+                engine=str(self.engine or "local"),
+                signal=signal,
+                reason=reason,
+                price=price,
+                timeframe=timeframe,
+                signal_candle_ts=candle_ts,
+                data_age_s=data_age_s,
+                raw_response=dump_payload(payload),
+            )
+        except Exception as exc:
+            logger.debug(f"Embudo de Rechazos: no se pudo registrar señal de {symbol} [{timeframe}]: {exc}")
+
+    def _record_analysis_row(
+        self,
+        res: Dict[str, Any],
+        symbol: str,
+        timeframe: str,
+        strategy: str,
+        strategy_ids: Optional[List[str]],
+        price: float,
+        forced_tf: Optional[List[str]] = None,
+    ) -> None:
+        """Registra el veredicto de la fórmula para una vela cerrada nueva (una fila por vela y bucket)."""
+        from backend.rejection_funnel import build_signal_payload, classify_rejection_tags
+
+        tf_sec_local = {"1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400}
+        tf_s = tf_sec_local.get(timeframe, 300)
+        candle_ts = int(res.get("signal_candle_ts") or (int(time.time() // tf_s) * tf_s))
+        dedupe_key = (symbol, timeframe, tuple(strategy_ids or []), candle_ts)
+        if dedupe_key in self._recorded_signal_keys:
+            return
+        if len(self._recorded_signal_keys) > 4000:
+            self._recorded_signal_keys.clear()
+        self._recorded_signal_keys[dedupe_key] = True
+
+        metrics = res.get("strategy_metrics") or {}
+        signal = str(res.get("signal") or "MANTENER")
+        eligible = signal in ("COMPRAR", "SHORT")
+        texts = [res.get("reason")] + list(metrics.get("filter_failures") or []) + [metrics.get("presencial_telemetry")]
+        tags = [] if eligible else classify_rejection_tags(texts)
+        side = "SHORT" if signal == "SHORT" else ("LONG" if signal == "COMPRAR" else None)
+        selected = (metrics.get("auto_orchestrator") or {}).get("selected_strategy") or strategy
+        payload = build_signal_payload(
+            stage="analysis",
+            strategy=str(selected),
+            tags=tags,
+            eligible=eligible,
+            side=side,
+            per_strategy=metrics.get("per_strategy"),
+            forced_tf=forced_tf,
+        )
+        self._record_signal_row(
+            symbol=symbol,
+            timeframe=timeframe,
+            signal=signal,
+            reason=str(metrics.get("presencial_telemetry") or res.get("reason") or ""),
+            price=price,
+            candle_ts=candle_ts,
+            data_age_s=int(res.get("data_age_s") or 0),
+            payload=payload,
+        )
+
+    def _record_gate_veto(
+        self,
+        res: Dict[str, Any],
+        symbol: str,
+        timeframe: str,
+        strategy: str,
+        price: float,
+        veto_text: str,
+        extra_tags: Optional[List[str]] = None,
+        side: Optional[str] = None,
+    ) -> None:
+        """Registra un veto POSTERIOR a la fórmula (pausa, slots, cooldown, entry_gate, árbitro informativo)."""
+        from backend.rejection_funnel import build_signal_payload, classify_rejection_tags
+
+        tags = classify_rejection_tags([veto_text], extra_tags=extra_tags)
+        payload = build_signal_payload(
+            stage="gate",
+            strategy=strategy,
+            tags=tags,
+            eligible=False,
+            side=side,
+        )
+        self._record_signal_row(
+            symbol=symbol,
+            timeframe=timeframe,
+            signal="MANTENER",
+            reason=veto_text,
+            price=price,
+            candle_ts=int((res or {}).get("signal_candle_ts") or 0),
+            data_age_s=int((res or {}).get("data_age_s") or 0),
+            payload=payload,
+        )
 
     def ensure_guardian_running(self) -> bool:
         """Garantiza que el hilo guardián esté corriendo en segundo plano si hay posiciones abiertas."""
@@ -399,6 +538,21 @@ class TraderDaemon:
                 "strategy": self.strategy,
                 "allowed_strategies": list(self.allowed_strategies),
                 "slot_alloc_pct": getattr(self, "slot_alloc_pct", None),
+                "symbol": self.symbol,
+                "active_symbol": self.last_active_symbol or self.symbol,
+                "timeframe": self.timeframe,
+                "engine": self.engine,
+                "mode": self.mode,
+                "last_reason": self.last_reason,
+                "scalping": {
+                    "active": bool(getattr(self, "scalping_active", False)),
+                    "draining": bool(getattr(self, "scalping_draining", False)),
+                    "symbol": getattr(self, "scalping_symbol", ""),
+                    "strategy": getattr(self, "scalping_strategy", ""),
+                    "timeframe": getattr(self, "scalping_timeframe", ""),
+                },
+                "patrol_coverage": self._snapshot_patrol_coverage(),
+                "forced_tf_warnings": list(self.forced_tf_warnings),
             }
 
     def start(
@@ -500,14 +654,25 @@ class TraderDaemon:
         logger.info(f"TraderDaemon detenido. Guardian activo: {guardian_active}")
         return {"status": "stopped", "message": self.last_reason, "guardian_active": guardian_active}
 
+    def _get_presencial_target_symbols(self, symbol_override: Optional[str] = None) -> List[str]:
+        """Resuelve la lista de activos vigilados en sesión presencial (soporta MULTI_CRYPTO o lista CSV)."""
+        raw = str(symbol_override if symbol_override is not None else getattr(self, "scalping_symbol", "ETH/USDT") or "ETH/USDT").strip()
+        if raw.upper() in ("MULTI_CRYPTO", "CANASTA_CRIPTO", "ALL_CRYPTO"):
+            return ["ETH/USDT", "SOL/USDT", "BTC/USDT"]
+        if "," in raw:
+            parsed = [s.strip() for s in raw.split(",") if s.strip()]
+            return parsed if parsed else ["ETH/USDT"]
+        return [raw]
+
     def start_scalping(
         self,
         symbol: str = "ETH/USDT",
         strategy: str = "scalping_vwap_2sigma_5m",
         timeframe: str = "5m",
         lot_size: float = 0.01,
+        slot_alloc_pct: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Inicia una sesión de scalping presencial supervisada."""
+        """Inicia una sesión presencial supervisada (gobernada por Slot % / Riesgo)."""
         with self._lock:
             # Respaldar la configuración previa si no estábamos ya en scalping
             if not self.scalping_active and not self.scalping_draining:
@@ -515,22 +680,40 @@ class TraderDaemon:
                 self.backup_timeframe = self.timeframe
                 self.backup_symbol = self.symbol
                 self.backup_mode = self.mode
+                self.backup_allowed_strategies = list(self.allowed_strategies or [])
+                self.backup_slot_alloc_pct = getattr(self, "slot_alloc_pct", None)
+                self._has_backup_slot_alloc = True
 
+            try:
+                from backend.estrategias.registry import get_strategy
+                st_obj = get_strategy(strategy)
+                ntf = str(getattr(st_obj, "native_timeframe", "") or "").lower()
+                if ntf in ("15m", "1h", "4h", "1d") and timeframe != ntf:
+                    logger.warning(f"🛡️ [PRESENCIAL] Ajustando timeframe '{timeframe}' -> '{ntf}' nativo para {strategy}.")
+                    timeframe = ntf
+            except Exception:
+                pass
+
+            target_symbols = self._get_presencial_target_symbols(symbol)
             self.scalping_active = True
             self.scalping_draining = False
             self.scalping_strategy = strategy
             self.scalping_timeframe = timeframe
             self.scalping_symbol = symbol
+            self.scalping_symbols = list(target_symbols)
+            self._presencial_symbol_reasons = {}
             self.scalping_lot_size = float(lot_size)
             self.scalping_start_ts = time.time()
             self.scalping_trades_opened = 0
 
-            # Conmutar parámetros del daemon en caliente
-            self.symbol = symbol
+            # Conmutar parámetros del daemon en caliente (symbol primario válido para costos/bóveda)
+            self.symbol = target_symbols[0]
             self.timeframe = timeframe
             self.strategy = strategy
             self.allowed_strategies = [strategy]
             self.mode = "fixed"
+            if slot_alloc_pct is not None:
+                self.slot_alloc_pct = min(100.0, max(10.0, float(slot_alloc_pct)))
 
             # Asegurar que el hilo del daemon esté en ejecución
             if not self.is_running:
@@ -540,9 +723,15 @@ class TraderDaemon:
                     self._thread = threading.Thread(target=self._run_loop, name="TraderDaemonThread", daemon=True)
                     self._thread.start()
 
+            for sym_item in target_symbols:
+                self._evaluated_candles.pop((sym_item, timeframe), None)
+            self._next_wakeup_ts = 0.0
             self.last_signal = "SCALPING_PRESENCIAL_ACTIVO"
-            self.last_reason = f"Sesión presencial de scalping iniciada en {symbol} [{timeframe}] con estrategia {strategy}."
-            logger.info(f"⚡ [SCALPING PRESENCIAL] Iniciado: {symbol} [{timeframe}] - {strategy}. Config habitual respaldada: {self.backup_strategy} [{self.backup_timeframe}].")
+            syms_label = ", ".join(target_symbols) if len(target_symbols) > 1 else symbol
+            self.last_reason = f"Sesión presencial de scalping iniciada en {syms_label} [{timeframe}] con estrategia {strategy}."
+            logger.info(f"⚡ [SCALPING PRESENCIAL] Iniciado: {syms_label} [{timeframe}] - {strategy}. Config habitual respaldada: {self.backup_strategy} [{self.backup_timeframe}].")
+            if hasattr(self, "_wakeup_event"):
+                self._wakeup_event.set()
             return self.get_scalping_status()
 
     def stop_scalping(self) -> Dict[str, Any]:
@@ -560,9 +749,10 @@ class TraderDaemon:
 
             # Verificar si quedan posiciones abiertas de scalping
             open_positions = self.broker.fetch_positions() if hasattr(self, "broker") else []
+            pres_syms = set(self._get_presencial_target_symbols())
             open_scalp = [
                 p for p in open_positions
-                if p.get("strategy") == self.scalping_strategy or p.get("symbol") == self.scalping_symbol
+                if p.get("strategy") == self.scalping_strategy or p.get("symbol") in pres_syms
             ]
 
             if not open_scalp:
@@ -592,7 +782,11 @@ class TraderDaemon:
         self.timeframe = self.backup_timeframe or "4h"
         self.symbol = self.backup_symbol or "SOL/USDT"
         self.mode = self.backup_mode or "smart"
-        self.allowed_strategies = [self.strategy]
+        backup_allowed = getattr(self, "backup_allowed_strategies", None)
+        self.allowed_strategies = list(backup_allowed) if backup_allowed else [self.strategy]
+        if getattr(self, "_has_backup_slot_alloc", False):
+            self.slot_alloc_pct = getattr(self, "backup_slot_alloc_pct", None)
+            self._has_backup_slot_alloc = False
         self.last_signal = "MODO_HABITUAL_RESTAURADO"
         self.last_reason = f"Retorno automático a modo de fondo: {self.strategy} [{self.timeframe}] ({reason})"
         logger.info(f"🔄 [RETORNO AUTOMÁTICO] {self.last_reason}")
@@ -600,18 +794,22 @@ class TraderDaemon:
     def get_scalping_status(self) -> Dict[str, Any]:
         """Retorna el estado en vivo de la sesión presencial de scalping."""
         open_positions = self.broker.fetch_positions() if hasattr(self, "broker") else []
+        pres_targets = self._get_presencial_target_symbols()
+        pres_set = set(pres_targets)
         open_scalp = [
             p for p in open_positions
-            if p.get("strategy") == getattr(self, "scalping_strategy", "") or p.get("symbol") == getattr(self, "scalping_symbol", "")
+            if p.get("strategy") == getattr(self, "scalping_strategy", "") or p.get("symbol") in pres_set
         ]
         elapsed_s = max(0.0, time.time() - getattr(self, "scalping_start_ts", 0.0)) if getattr(self, "scalping_start_ts", 0.0) > 0 else 0.0
         return {
             "active": getattr(self, "scalping_active", False),
             "draining": getattr(self, "scalping_draining", False),
             "symbol": getattr(self, "scalping_symbol", "ETH/USDT"),
+            "symbols": pres_targets,
             "strategy": getattr(self, "scalping_strategy", "scalping_vwap_2sigma_5m"),
             "timeframe": getattr(self, "scalping_timeframe", "5m"),
             "lot_size": getattr(self, "scalping_lot_size", 0.01),
+            "slot_alloc_pct": getattr(self, "slot_alloc_pct", None),
             "elapsed_minutes": round(elapsed_s / 60.0, 1),
             "open_scalp_positions": len(open_scalp),
             "backup_strategy": getattr(self, "backup_strategy", "donchian_breakout_1h"),
@@ -1666,24 +1864,23 @@ class TraderDaemon:
 
         self._check_radar_for_autorouting()
 
-        # 0. Actualizar posiciones espejo de Shadow Testing (Tabla #19)
+        # 0. Actualizar posiciones espejo de Shadow Testing (Tabla #19) con expiración 24h
         ledger_inst = getattr(self.broker, "ledger", None)
         if ledger_inst and hasattr(ledger_inst, "get_open_shadow_trades") and hasattr(ledger_inst, "update_and_close_shadow_trades"):
             try:
                 open_shadows = ledger_inst.get_open_shadow_trades()
-                for st in open_shadows:
-                    st_sym = st.get("symbol")
-                    if st_sym:
-                        try:
-                            px_res = get_price(st_sym)
-                            px_cur = float(px_res.get("price") or 0.0)
-                            if px_cur > 0:
-                                ledger_inst.update_and_close_shadow_trades(
-                                    symbol=st_sym,
-                                    current_price=px_cur,
-                                )
-                        except Exception:
-                            pass
+                for st_sym in sorted({str(st.get("symbol") or "") for st in open_shadows if st.get("symbol")}):
+                    try:
+                        px_res = get_price(st_sym)
+                        px_cur = float(px_res.get("price") or 0.0)
+                        if px_cur > 0:
+                            ledger_inst.update_and_close_shadow_trades(
+                                symbol=st_sym,
+                                current_price=px_cur,
+                                expiry_hours=24.0,
+                            )
+                    except Exception:
+                        pass
             except Exception as _st_err:
                 logger.debug(f"[Shadow Testing] Error actualizando trades virtuales: {_st_err}")
 
@@ -1710,9 +1907,10 @@ class TraderDaemon:
 
         # 2b. Control de Drenado Elegante en Scalping Presencial
         if getattr(self, "scalping_draining", False):
+            pres_drain_syms = set(self._get_presencial_target_symbols())
             open_scalp = [
                 p for p in open_positions
-                if p.get("strategy") == getattr(self, "scalping_strategy", "") or p.get("symbol") == getattr(self, "scalping_symbol", "")
+                if p.get("strategy") == getattr(self, "scalping_strategy", "") or p.get("symbol") in pres_drain_syms
             ]
             if not open_scalp:
                 self._restore_backup_strategy("Todas las operaciones de scalping han sido liquidadas exitosamente.")
@@ -1740,7 +1938,9 @@ class TraderDaemon:
         global_free_slots = max(0, self.max_positions - len(open_positions))
 
         def _can_add_candidate(cand_sym: str) -> bool:
-            if not cand_sym or cand_sym in symbols_to_process or not is_asset_market_open(cand_sym):
+            if not cand_sym or str(cand_sym).strip().upper() in ("CRYPTO", "GENERAL", "MULTI_CRYPTO", "CANASTA_CRIPTO", "ALL_CRYPTO"):
+                return False
+            if cand_sym in symbols_to_process or not is_asset_market_open(cand_sym):
                 return False
             c_up = cand_sym.upper()
             is_us_equity = (
@@ -1796,8 +1996,9 @@ class TraderDaemon:
                     pass
 
         if getattr(self, "scalping_active", False):
-            # Cupo Dual: procesa el activo de scalping (ej. ETH/USDT) y también BTC/USDT para el slot macro
-            symbols_to_process = [self.scalping_symbol]
+            # Modo Presencial (Individual o Multi-Activo) + Cupo Dual BTC para slot macro si no está en la canasta
+            pres_targets = self._get_presencial_target_symbols()
+            symbols_to_process = [s for s in pres_targets if is_asset_market_open(s)]
             if "BTC/USDT" not in symbols_to_process and is_asset_market_open("BTC/USDT"):
                 symbols_to_process.append("BTC/USDT")
         elif self.strategy == "donchian_breakout_1h":
@@ -1811,17 +2012,32 @@ class TraderDaemon:
             symbols_to_process.append(self.symbol)
 
         evaluated_any_symbol = False
+        # Cobertura del barrido: qué activos debían revisarse y cuáles se revisaron (Chequeo Rápido)
+        coverage: Dict[str, Any] = {
+            "ts": time.time(),
+            "expected_symbols": list(symbols_to_process),
+            "evaluated_symbols": [],
+            "cached_symbols": [],
+            "market_closed_symbols": [],
+            "skipped_symbols": [],
+            "policy_skipped_symbols": [],
+            "missing_or_error_symbols": {},
+        }
+        cycle_forced_tf: List[str] = []
         tf_sec_map = {
             "1m": 60, "3m": 180, "5m": 300, "15m": 900,
             "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400,
         }
 
+        from backend.entry_gate import is_btc
+        eval_tasks = []
         for active_symbol in symbols_to_process:
             if self._stop_event.is_set():
                 break
 
             # Exclusión categórica para Donchian: rechazar cualquier símbolo fuera de la lista blanca
             if self.strategy == "donchian_breakout_1h" and active_symbol not in DONCHIAN_WHITELIST_TIMEFRAMES:
+                coverage["policy_skipped_symbols"].append(active_symbol)
                 continue
 
             active_pos = next((p for p in open_market_positions if p.get("symbol") == active_symbol), None)
@@ -1832,10 +2048,12 @@ class TraderDaemon:
             is_tradfi_stock = active_symbol in DONCHIAN_TRADFI_WHITELIST
             is_eval_window = is_tradfi_stock and self.is_stocks_evaluation_window()
             if not is_asset_market_open(active_symbol):
+                coverage["market_closed_symbols"].append(active_symbol)
                 continue
 
             # Control horario para nuevas entradas en Wall Street: solo dentro de rueda líquida sin blackouts (09:45-15:30 NY)
             if is_tradfi_stock and not has_position and not is_eval_window:
+                coverage["market_closed_symbols"].append(active_symbol)
                 continue
 
             # Consultar precio fresco de mercado
@@ -1847,9 +2065,8 @@ class TraderDaemon:
                 logger.debug(f"Precio usando fallback para {active_symbol}: {px_err}")
 
             if cur_price <= 0:
+                coverage["missing_or_error_symbols"][active_symbol] = "Precio <= 0 / feed sin cotización"
                 continue
-
-            # La consulta del navegador es estrictamente solo lectura: nunca suprimir evaluaciones del daemon.
 
             # Mock request para llamar a get_analysis de forma interna
             scope = {
@@ -1866,9 +2083,9 @@ class TraderDaemon:
             effective_strategy = self.strategy
             effective_allowed_strats = self.allowed_strategies
 
-            from backend.entry_gate import is_btc
             if getattr(self, "scalping_active", False):
-                if active_symbol == self.scalping_symbol:
+                pres_targets = self._get_presencial_target_symbols()
+                if active_symbol in pres_targets:
                     effective_timeframe = getattr(self, "scalping_timeframe", "5m")
                     effective_strategy = getattr(self, "scalping_strategy", "scalping_vwap_2sigma_5m")
                     effective_allowed_strats = [effective_strategy]
@@ -1876,75 +2093,88 @@ class TraderDaemon:
                     effective_timeframe = getattr(self, "backup_timeframe", "4h")
                     effective_strategy = getattr(self, "backup_strategy", "donchian_breakout_1h")
                     effective_allowed_strats = [effective_strategy]
+                eval_tasks.append((
+                    active_symbol, cur_price, active_pos, has_position, entry_price,
+                    fake_request, effective_timeframe, effective_strategy, effective_allowed_strats,
+                ))
             elif self.strategy == "donchian_breakout_1h":
                 effective_timeframe = DONCHIAN_WHITELIST_TIMEFRAMES.get(active_symbol, "4h" if "/" in active_symbol else "1d")
                 # Excluir de la ejecución automática cualquier temporalidad intradiaria menor (5m, 15m, 1h)
                 if effective_timeframe in ("1m", "3m", "5m", "15m", "30m", "1h"):
+                    coverage["policy_skipped_symbols"].append(active_symbol)
                     continue
+                eval_tasks.append((
+                    active_symbol, cur_price, active_pos, has_position, entry_price,
+                    fake_request, effective_timeframe, effective_strategy, effective_allowed_strats,
+                ))
+            elif self.strategy == "auto":
+                if has_position:
+                    pos_strat_name = str((active_pos or {}).get("strategy") or "")
+                    pos_tf = None
+                    if pos_strat_name:
+                        try:
+                            from backend.estrategias.registry import get_strategy
+                            p_obj = get_strategy(pos_strat_name)
+                            p_ntf = getattr(p_obj, "native_timeframe", None) if p_obj else None
+                            if p_ntf in ("15m", "1h", "4h", "1d"):
+                                pos_tf = p_ntf
+                        except Exception:
+                            pass
+                    resolved_tf = pos_tf or self._resolve_single_auto_timeframe(active_symbol, effective_allowed_strats)
+                    eval_tasks.append((
+                        active_symbol, cur_price, active_pos, has_position, entry_price,
+                        fake_request, resolved_tf, effective_strategy, effective_allowed_strats,
+                    ))
+                else:
+                    for b_tf, b_strats in self._resolve_auto_timeframe_buckets(active_symbol, effective_allowed_strats):
+                        eval_tasks.append((
+                            active_symbol, cur_price, active_pos, has_position, entry_price,
+                            fake_request, b_tf, effective_strategy, b_strats,
+                        ))
             elif active_symbol in ("NVDA", "AAPL", "MSFT", "TSLA", "SPY", "QQQ"):
                 effective_timeframe = "1d"
+                eval_tasks.append((
+                    active_symbol, cur_price, active_pos, has_position, entry_price,
+                    fake_request, effective_timeframe, effective_strategy, effective_allowed_strats,
+                ))
             elif "/" in active_symbol and self.timeframe == "15m":
                 effective_timeframe = "1h"
-            elif self.strategy == "auto":
-                from backend.estrategias.registry import resolve_auto_strategy, get_strategy
-                matched_tf = None
-                is_fx_sym = "=X" in active_symbol.upper()
-                allowed_objs = [(a_id, get_strategy(a_id)) for a_id in (effective_allowed_strats or [])]
-                # Paso 1: priorizar coincidencia exacta con activo_default == active_symbol
-                for a_id, st_obj in allowed_objs:
-                    if not st_obj:
-                        continue
-                    def_asset = str(getattr(st_obj, "activo_default", "") or "").upper()
-                    if def_asset == active_symbol.upper():
-                        ntf = getattr(st_obj, "native_timeframe", None)
-                        if ntf in ("15m", "1h", "4h", "1d"):
-                            matched_tf = ntf
-                            break
-                # Paso 2: coincidencia por clase de activo (priorizando Donchian 1D y Squeeze 4H antes que Kula 5M en activos compartidos)
-                if matched_tf is None:
-                    allowed_ids_set = {a_id for a_id, _ in allowed_objs}
-                    from backend.quant_risk import is_micro_futures_symbol as _is_mf_tf
-                    if _is_mf_tf(active_symbol):
-                        matched_tf = "5m"
-                    elif not is_fx_sym and "/" not in active_symbol and "=F" not in active_symbol.upper():
-                        if "donchian_breakout_1h" in allowed_ids_set and active_symbol in DONCHIAN_WHITELIST_TIMEFRAMES:
-                            matched_tf = DONCHIAN_WHITELIST_TIMEFRAMES[active_symbol]
-                        elif "nasdaq_araujo_vwap" in allowed_ids_set:
-                            matched_tf = "15m"
-                        elif "hyenuk_chu_multibagger" in allowed_ids_set:
-                            matched_tf = "1h"
-                        elif "kula_balam_cava_ruiz" in allowed_ids_set:
-                            matched_tf = "5m"
-                    else:
-                        for a_id, st_obj in allowed_objs:
-                            if not st_obj:
-                                continue
-                            def_asset = str(getattr(st_obj, "activo_default", "") or "").upper()
-                            if is_fx_sym and "=X" in def_asset:
-                                matched_tf = getattr(st_obj, "native_timeframe", None)
-                                break
-                            if not is_fx_sym and "/" in active_symbol and "=X" not in def_asset:
-                                ntf = getattr(st_obj, "native_timeframe", None)
-                                if ntf in ("1h", "4h", "1d"):
-                                    matched_tf = ntf
-                                    break
-                                if a_id in ("donchian_breakout_1h", "squeeze_dual_eth_4h"):
-                                    matched_tf = "4h"
-                                    break
-                if matched_tf in ("15m", "1h", "4h", "1d"):
-                    effective_timeframe = matched_tf
-                else:
-                    resolved_strat, _ = resolve_auto_strategy(active_symbol, {})
-                    if resolved_strat == "nasdaq_araujo_vwap":
-                        effective_timeframe = "15m"
-                    elif resolved_strat == "hyenuk_chu_multibagger":
-                        effective_timeframe = "1h"
-                    elif resolved_strat == "mean_reversion_atr" and self.timeframe not in ("15m", "1h"):
-                        effective_timeframe = "15m"
+                eval_tasks.append((
+                    active_symbol, cur_price, active_pos, has_position, entry_price,
+                    fake_request, effective_timeframe, effective_strategy, effective_allowed_strats,
+                ))
+            else:
+                eval_tasks.append((
+                    active_symbol, cur_price, active_pos, has_position, entry_price,
+                    fake_request, effective_timeframe, effective_strategy, effective_allowed_strats,
+                ))
+
+        opened_this_cycle = set()
+        for (
+            active_symbol, cur_price, active_pos, has_position, entry_price,
+            fake_request, effective_timeframe, effective_strategy, effective_allowed_strats,
+        ) in eval_tasks:
+            if self._stop_event.is_set():
+                break
+            if not has_position and active_symbol in opened_this_cycle:
+                continue
 
             active_side = str(active_pos.get("side") or "LONG").upper() if active_pos else "LONG"
             cand_key = (active_symbol, effective_timeframe)
             eff_tf_sec = tf_sec_map.get(effective_timeframe, 300)
+            task_forced_tf: List[str] = []
+            if not has_position:
+                try:
+                    from backend.estrategias.registry import get_strategy as _get_strat_tf
+                    from backend.rejection_funnel import forced_timeframe_warnings
+                    task_forced_tf = forced_timeframe_warnings(
+                        effective_allowed_strats, effective_timeframe, _get_strat_tf
+                    )
+                except Exception:
+                    task_forced_tf = []
+                for _w in task_forced_tf:
+                    if _w not in cycle_forced_tf:
+                        cycle_forced_tf.append(_w)
             config_sig = (
                 effective_strategy,
                 tuple(effective_allowed_strats or []),
@@ -1959,6 +2189,8 @@ class TraderDaemon:
                     and cached_candle.get("config_sig") == config_sig
                     and time.time() < float(cached_candle.get("next_close_due_ts", 0.0))
                 ):
+                    if active_symbol not in coverage["cached_symbols"]:
+                        coverage["cached_symbols"].append(active_symbol)
                     continue
 
             from backend.quant_risk import get_asset_friction_costs, is_micro_futures_symbol
@@ -1975,28 +2207,37 @@ class TraderDaemon:
             eval_tp_pct = float(active_pos.get("initial_tp_pct") or self.tp) if (has_position and active_pos) else float(self.tp)
             eval_sl_pct = float(active_pos.get("initial_sl_pct") or self.sl) if (has_position and active_pos) else float(self.sl)
 
-            res = get_analysis(
-                request=fake_request,
-                symbol=active_symbol,
-                timeframe=effective_timeframe,
-                engine=self.engine,
-                model=self.model,
-                strategy=effective_strategy,
-                allowed_strategies=effective_allowed_strats,
-                tp=eval_tp_pct,
-                sl=eval_sl_pct,
-                risk=float(self.risk),
-                sentiment=0.0,
-                macro=self.macro or "",
-                fee=float(active_fee),
-                spread=float(active_spread),
-                min_profit_pct=eff_min_profit,
-                has_position=has_position,
-                entry_price=entry_price,
-                position_side=active_side,
-                x_api_token=None,
-            )
+            try:
+                res = get_analysis(
+                    request=fake_request,
+                    symbol=active_symbol,
+                    timeframe=effective_timeframe,
+                    engine=self.engine,
+                    model=self.model,
+                    strategy=effective_strategy,
+                    allowed_strategies=effective_allowed_strats,
+                    tp=eval_tp_pct,
+                    sl=eval_sl_pct,
+                    risk=float(self.risk),
+                    sentiment=0.0,
+                    macro=self.macro or "",
+                    fee=float(active_fee),
+                    spread=float(active_spread),
+                    min_profit_pct=eff_min_profit,
+                    has_position=has_position,
+                    entry_price=entry_price,
+                    position_side=active_side,
+                    x_api_token=None,
+                )
+            except Exception as analysis_exc:
+                coverage["missing_or_error_symbols"][active_symbol] = f"{type(analysis_exc).__name__}: {analysis_exc}"[:160]
+                coverage["ts"] = time.time()
+                with self._lock:
+                    self.last_patrol_coverage = coverage
+                raise
 
+            if active_symbol not in coverage["evaluated_symbols"]:
+                coverage["evaluated_symbols"].append(active_symbol)
             evaluated_any_symbol = True
             if self._stop_event.is_set():
                 return
@@ -2012,33 +2253,113 @@ class TraderDaemon:
                             "config_sig": config_sig,
                         }
 
+            ind_dict = res.get("indicators") or {}
+            metrics_dict = res.get("strategy_metrics") or {}
             signal = res.get("signal", "MANTENER")
             reason = res.get("reason", "Análisis completado.")
+            pres_targets = self._get_presencial_target_symbols() if getattr(self, "scalping_active", False) else []
+            is_presencial_sym = bool(
+                getattr(self, "scalping_active", False)
+                and active_symbol in pres_targets
+            )
+            presencial_tele = str(metrics_dict.get("presencial_telemetry") or "").strip()
+            if is_presencial_sym and signal == "MANTENER":
+                if presencial_tele:
+                    reason = presencial_tele
+                elif not reason.startswith(f"[{active_symbol}"):
+                    reason = f"[{active_symbol} {effective_timeframe}] Close ${cur_price:.2f} | {reason}"
+                if not hasattr(self, "_presencial_symbol_reasons") or not isinstance(self._presencial_symbol_reasons, dict):
+                    self._presencial_symbol_reasons = {}
+                self._presencial_symbol_reasons[active_symbol] = reason
+
+            def _format_presencial_veto(veto_txt: str) -> str:
+                if presencial_tele and "->" in presencial_tele:
+                    head = presencial_tele.rsplit("->", 1)[0].strip()
+                    return f"{head} | Bloqueo: {veto_txt} -> En espera"
+                return f"[{active_symbol} {effective_timeframe}] Close ${cur_price:.2f} | Bloqueo: {veto_txt} -> En espera"
 
             with self._lock:
                 self.cycle_count += 1
                 self.last_cycle_ts = time.time()
                 # Prioridad de telemetría: evitar que activos secundarios con señal MANTENER
                 # sobrescriban SOL/USDT o una señal de entrada/salida activa evaluada en este mismo ciclo
-                should_update_status = True
+                should_update_status = is_presencial_sym if getattr(self, "scalping_active", False) else True
                 if signal == "MANTENER":
-                    if self.last_active_symbol == "SOL/USDT" and active_symbol != "SOL/USDT":
-                        should_update_status = False
-                    elif self.last_signal in ("COMPRAR", "SHORT", "VENDER"):
-                        should_update_status = False
+                    if getattr(self, "scalping_active", False):
+                        if opened_this_cycle and self.last_signal in ("COMPRAR", "SHORT", "VENDER"):
+                            should_update_status = False
+                    else:
+                        if self.last_active_symbol == "SOL/USDT" and active_symbol != "SOL/USDT":
+                            should_update_status = False
+                        elif self.last_signal in ("COMPRAR", "SHORT", "VENDER"):
+                            should_update_status = False
 
                 if should_update_status:
                     self.last_active_symbol = active_symbol
                     self.last_signal = signal
-                    self.last_reason = reason
+                    if is_presencial_sym and len(pres_targets) > 1 and signal == "MANTENER":
+                        other_notes = []
+                        for p_sym in pres_targets:
+                            if p_sym == active_symbol:
+                                continue
+                            p_rsn = (self._presencial_symbol_reasons or {}).get(p_sym, "")
+                            if p_rsn:
+                                short_tag = p_rsn.split("Bloqueo:")[-1].replace("-> En espera", "").strip() if "Bloqueo:" in p_rsn else "OK"
+                                other_notes.append(f"{p_sym.split('/')[0]}:{short_tag}")
+                        self.last_reason = f"{reason} || Canasta [{' · '.join(other_notes)}]" if other_notes else reason
+                    else:
+                        self.last_reason = reason
                 self.last_error = None
 
-            logger.info(f"Ciclo #{self.cycle_count} [{active_symbol}]: {signal} - {reason[:80]}")
+            if is_presencial_sym:
+                logger.info(f"👁️ [KULA CEREBRO · Ciclo #{self.cycle_count}] {reason}")
+            else:
+                logger.info(f"Ciclo #{self.cycle_count} [{active_symbol} {effective_timeframe}]: {signal} - {reason[:240]}")
+            if not has_position and isinstance(res, dict):
+                self._record_analysis_row(
+                    res, active_symbol, effective_timeframe, effective_strategy,
+                    effective_allowed_strats, cur_price, task_forced_tf,
+                )
+                # Registrar en shadow_trades todo veto de arbitro_ia / custom_brain_filter (Sobreextensión, RVOL, etc.)
+                if signal == "MANTENER":
+                    shadow_cands = metrics_dict.get("shadow_veto_candidates") or (
+                        [metrics_dict["shadow_veto_candidate"]] if isinstance(metrics_dict.get("shadow_veto_candidate"), dict) else []
+                    )
+                    ledger_ref = getattr(self.broker, "ledger", None)
+                    if shadow_cands and ledger_ref and hasattr(ledger_ref, "open_shadow_trade"):
+                        try:
+                            bal_map = self.broker.fetch_balances() if hasattr(self.broker, "fetch_balances") else {}
+                            sym_ccy = symbol_to_currency(active_symbol)
+                            op_usd = float(bal_map.get(sym_ccy) or 0.0)
+                        except Exception:
+                            op_usd = 0.0
+                        ref_notional = op_usd if op_usd >= 10.0 else 100.0
+                        for sc in shadow_cands:
+                            if not isinstance(sc, dict):
+                                continue
+                            sc_entry = float(sc.get("entry_price") or cur_price or 0.0)
+                            sc_sl = float(sc.get("sl_price") or 0.0)
+                            sc_tp = float(sc.get("tp_price") or 0.0)
+                            if sc_entry <= 0 or sc_sl <= 0 or sc_tp <= 0:
+                                continue
+                            sc_qty = round(ref_notional / sc_entry, 6)
+                            ledger_ref.open_shadow_trade(
+                                symbol=str(sc.get("symbol") or active_symbol),
+                                side=str(sc.get("side") or "LONG"),
+                                qty=sc_qty,
+                                entry_price=sc_entry,
+                                sl_price=sc_sl,
+                                tp_price=sc_tp,
+                                initial_sl_pct=float(sc.get("initial_sl_pct") or 1.0),
+                                initial_tp_pct=float(sc.get("initial_tp_pct") or 2.0),
+                                strategy=str(sc.get("strategy") or effective_strategy),
+                                arbiter_verdict=str(sc.get("arbiter_verdict") or "VETO_ARBITRO_IA"),
+                                arbiter_reason=str(sc.get("arbiter_reason") or "Veto Árbitro IA"),
+                                deduplicate=True,
+                            )
             self._write_contexto_macro_file(active_symbol, cur_price, res, effective_timeframe=effective_timeframe)
 
             # Actualizar telemetría de mercado en vivo por símbolo (RSI, ATR)
-            ind_dict = res.get("indicators") or {}
-            metrics_dict = res.get("strategy_metrics") or {}
             cur_rsi = ind_dict.get("rsi") if ind_dict.get("rsi") is not None else metrics_dict.get("rsi")
             cur_atr = ind_dict.get("atr_14") if ind_dict.get("atr_14") is not None else metrics_dict.get("atr_14")
             self.symbol_indicators[active_symbol] = {
@@ -2064,9 +2385,16 @@ class TraderDaemon:
             elif signal in ("COMPRAR", "SHORT") and not has_position and cur_price > 0:
                 if self.paused_new_entries:
                     logger.info(f"⏸️ [DAEMON PAUSADO] Entrada en {active_symbol} bloqueada por instrucción del operador.")
+                    pause_msg = self.pause_reason or "Apertura de nuevas posiciones pausada por instrucción del operador."
+                    self._record_gate_veto(
+                        res, active_symbol, effective_timeframe, effective_strategy, cur_price,
+                        pause_msg, extra_tags=["Pausa"], side=("SHORT" if signal == "SHORT" else "LONG"),
+                    )
                     with self._lock:
                         self.last_signal = "PAUSADO"
-                        self.last_reason = self.pause_reason or "Apertura de nuevas posiciones pausada por instrucción del operador."
+                        self.last_reason = _format_presencial_veto(pause_msg) if is_presencial_sym else pause_msg
+                    if is_presencial_sym:
+                        logger.info(f"👁️ [KULA CEREBRO · Ciclo #{self.cycle_count}] {self.last_reason}")
                     continue
 
                 metrics = res.get("strategy_metrics") or {}
@@ -2092,19 +2420,46 @@ class TraderDaemon:
                             f"Ya existe {len(book_positions)} posición en {book_limits['currency']} ({[p.get('symbol') for p in book_positions]}). "
                             f"Orden en {active_symbol} bloqueada."
                         )
-                        with self._lock:
-                            self.last_signal = "MANTENER"
-                            self.last_reason = f"Límite de 1 posición en caídas alcanzado en bóveda {book_limits['currency']} ({len(book_positions)}/1 activa: {drop_reason})"
-                    else:
-                        logger.info(
-                            f"🛡️ [DAEMON MULTI-SLOT] Límite de {allowed_slots} posiciones alcanzado (libro {book_limits['currency']}: {len(book_positions)}/{allowed_slots}, total: {len(current_open)}/{self.max_positions}). Orden en {active_symbol} pospuesta."
+                        drop_msg = f"Límite de 1 posición en caídas alcanzado en bóveda {book_limits['currency']} ({len(book_positions)}/1 activa: {drop_reason})"
+                        self._record_gate_veto(
+                            res, active_symbol, effective_timeframe, effective_strategy, cur_price,
+                            drop_msg, extra_tags=["Slot/Cupo"], side=("SHORT" if signal == "SHORT" else "LONG"),
                         )
+                        if not getattr(self, "scalping_active", False) or is_presencial_sym:
+                            with self._lock:
+                                self.last_signal = "MANTENER"
+                                self.last_reason = _format_presencial_veto(drop_msg) if is_presencial_sym else drop_msg
+                    else:
+                        slot_msg = (
+                            f"Límite de {allowed_slots} posiciones alcanzado (libro {book_limits['currency']}: {len(book_positions)}/{allowed_slots}, total: {len(current_open)}/{self.max_positions})."
+                        )
+                        logger.info(f"🛡️ [DAEMON MULTI-SLOT] {slot_msg} Orden en {active_symbol} pospuesta.")
+                        self._record_gate_veto(
+                            res, active_symbol, effective_timeframe, effective_strategy, cur_price,
+                            slot_msg, extra_tags=["Slot/Cupo"], side=("SHORT" if signal == "SHORT" else "LONG"),
+                        )
+                        if is_presencial_sym:
+                            with self._lock:
+                                self.last_signal = "MANTENER"
+                                self.last_reason = _format_presencial_veto(slot_msg)
+                    if is_presencial_sym:
+                        logger.info(f"👁️ [KULA CEREBRO · Ciclo #{self.cycle_count}] {self.last_reason}")
                     continue
 
                 sym_cd = self.cooldown_per_symbol.get(active_symbol, 0.0)
                 if time.time() < sym_cd:
                     rem_min = max(0.1, (sym_cd - time.time()) / 60.0)
+                    cd_msg = f"Cooldown activo en {active_symbol} (restan {rem_min:.1f} min)"
+                    self._record_gate_veto(
+                        res, active_symbol, effective_timeframe, effective_strategy, cur_price,
+                        cd_msg, extra_tags=["Cooldown"], side=("SHORT" if signal == "SHORT" else "LONG"),
+                    )
                     logger.info(f"⏳ [DAEMON COOLDOWN] Orden bloqueada en {active_symbol}. Restan {rem_min:.1f} min tras el último cierre.")
+                    if is_presencial_sym:
+                        with self._lock:
+                            self.last_signal = "MANTENER"
+                            self.last_reason = _format_presencial_veto(cd_msg)
+                        logger.info(f"👁️ [KULA CEREBRO · Ciclo #{self.cycle_count}] {self.last_reason}")
                     continue
 
                 if self.mode == "copilot":
@@ -2332,9 +2687,17 @@ class TraderDaemon:
                 )
                 if exec_failures:
                     logger.info(f"🚧 [COMPUERTA DAEMON] Entrada bloqueada en {active_symbol}: {' | '.join(exec_failures)}")
-                    with self._lock:
-                        self.last_signal = "MANTENER"
-                        self.last_reason = "Compuerta de entrada: " + " | ".join(exec_failures)
+                    gate_msg = "Compuerta de entrada: " + " | ".join(exec_failures)
+                    self._record_gate_veto(
+                        res, active_symbol, effective_timeframe, effective_strategy, cur_price,
+                        gate_msg, side=order_side,
+                    )
+                    if not getattr(self, "scalping_active", False) or is_presencial_sym:
+                        with self._lock:
+                            self.last_signal = "MANTENER"
+                            self.last_reason = _format_presencial_veto(gate_msg) if is_presencial_sym else gate_msg
+                    if is_presencial_sym:
+                        logger.info(f"👁️ [KULA CEREBRO · Ciclo #{self.cycle_count}] {self.last_reason}")
                     continue
 
                 if (qty < 1.0) if is_micro_fut_order else (qty * cur_price < 5.0):
@@ -2376,9 +2739,17 @@ class TraderDaemon:
                             arbiter_reason=arb_reason,
                             headlines=arb_res.get("headlines"),
                         )
-                    with self._lock:
-                        self.last_signal = "MANTENER"
-                        self.last_reason = f"[Árbitro AHORA_NO] {arb_reason}"
+                    arb_msg = f"[Árbitro AHORA_NO] {arb_reason}"
+                    self._record_gate_veto(
+                        res, active_symbol, effective_timeframe, effective_strategy, cur_price,
+                        arb_msg, extra_tags=["ÁrbitroInfo"], side=order_side,
+                    )
+                    if not getattr(self, "scalping_active", False) or is_presencial_sym:
+                        with self._lock:
+                            self.last_signal = "MANTENER"
+                            self.last_reason = _format_presencial_veto(arb_msg) if is_presencial_sym else arb_msg
+                    if is_presencial_sym:
+                        logger.info(f"👁️ [KULA CEREBRO · Ciclo #{self.cycle_count}] {self.last_reason}")
                     continue
 
                 logger.info(
@@ -2453,6 +2824,20 @@ class TraderDaemon:
                     self.symbol = active_symbol
                 if active_symbol == self.radar_candidate_symbol:
                     self.radar_candidate_symbol = None
+                opened_this_cycle.add(active_symbol)
+
+        reviewed_set = (
+            set(coverage["evaluated_symbols"])
+            | set(coverage["cached_symbols"])
+            | set(coverage["market_closed_symbols"])
+            | set(coverage["policy_skipped_symbols"])
+            | set(coverage["missing_or_error_symbols"].keys())
+        )
+        coverage["skipped_symbols"] = [s for s in coverage["expected_symbols"] if s not in reviewed_set]
+        coverage["ts"] = time.time()
+        with self._lock:
+            self.last_patrol_coverage = coverage
+            self.forced_tf_warnings = list(cycle_forced_tf)
 
         if not evaluated_any_symbol:
             with self._lock:
@@ -2460,6 +2845,140 @@ class TraderDaemon:
                 self.last_error = None
                 if self.cycle_count == 0:
                     self.cycle_count = 1
+
+    def _resolve_single_auto_timeframe(
+        self, active_symbol: str, allowed_strats: Optional[List[str]]
+    ) -> str:
+        from backend.estrategias.registry import resolve_auto_strategy, get_strategy
+        from backend.quant_risk import is_micro_futures_symbol as _is_mf_tf
+
+        matched_tf = None
+        is_fx_sym = "=X" in active_symbol.upper()
+        allowed_objs = [(a_id, get_strategy(a_id)) for a_id in (allowed_strats or [])]
+        for a_id, st_obj in allowed_objs:
+            if not st_obj:
+                continue
+            def_asset = str(getattr(st_obj, "activo_default", "") or "").upper()
+            if def_asset == active_symbol.upper():
+                ntf = getattr(st_obj, "native_timeframe", None)
+                if ntf in ("15m", "1h", "4h", "1d"):
+                    matched_tf = ntf
+                    break
+        if matched_tf is None:
+            allowed_ids_set = {a_id for a_id, _ in allowed_objs}
+            if _is_mf_tf(active_symbol):
+                matched_tf = "5m"
+            elif not is_fx_sym and "/" not in active_symbol and "=F" not in active_symbol.upper():
+                if "donchian_breakout_1h" in allowed_ids_set and active_symbol in DONCHIAN_WHITELIST_TIMEFRAMES:
+                    matched_tf = DONCHIAN_WHITELIST_TIMEFRAMES[active_symbol]
+                elif "nasdaq_araujo_vwap" in allowed_ids_set:
+                    matched_tf = "15m"
+                elif "hyenuk_chu_multibagger" in allowed_ids_set:
+                    matched_tf = "1h"
+                elif "kula_balam_cava_ruiz" in allowed_ids_set:
+                    matched_tf = "5m"
+            else:
+                for a_id, st_obj in allowed_objs:
+                    if not st_obj:
+                        continue
+                    def_asset = str(getattr(st_obj, "activo_default", "") or "").upper()
+                    if is_fx_sym and "=X" in def_asset:
+                        matched_tf = getattr(st_obj, "native_timeframe", None)
+                        break
+                    if not is_fx_sym and "/" in active_symbol and "=X" not in def_asset:
+                        ntf = getattr(st_obj, "native_timeframe", None)
+                        if ntf in ("1h", "4h", "1d"):
+                            matched_tf = ntf
+                            break
+                        if a_id in ("donchian_breakout_1h", "squeeze_dual_eth_4h"):
+                            matched_tf = "4h"
+                            break
+        if matched_tf in ("15m", "1h", "4h", "1d"):
+            return matched_tf
+        resolved_strat, _ = resolve_auto_strategy(active_symbol, {})
+        if resolved_strat == "nasdaq_araujo_vwap":
+            return "15m"
+        if resolved_strat == "hyenuk_chu_multibagger":
+            return "1h"
+        if resolved_strat == "mean_reversion_atr" and self.timeframe not in ("15m", "1h"):
+            return "15m"
+        return self.timeframe
+
+    def _resolve_auto_timeframe_buckets(
+        self, active_symbol: str, allowed_strats: Optional[List[str]]
+    ) -> List[Tuple[str, List[str]]]:
+        """
+        Agrupa las estrategias autorizadas compatibles con `active_symbol` por su temporalidad nativa,
+        permitiendo que un mismo par (ej. SOL/USDT) evalúe estrategias 4H (Donchian) y 1H (Kula Cava)
+        de forma independiente en el mismo ciclo, sin cruzar fórmulas especializadas hacia otros pares.
+        """
+        if not allowed_strats:
+            return [(self._resolve_single_auto_timeframe(active_symbol, allowed_strats), [])]
+
+        from backend.estrategias.registry import get_strategy
+        from backend.quant_risk import is_micro_futures_symbol as _is_mf_tf
+
+        sym_u = active_symbol.upper().strip()
+        is_fx_sym = "=X" in sym_u
+        is_crypto_sym = "/" in sym_u
+        is_micro_fut = _is_mf_tf(active_symbol)
+        is_us_equity = (
+            not is_fx_sym
+            and not is_crypto_sym
+            and not is_micro_fut
+            and "=F" not in sym_u
+            and not sym_u.endswith(".BA")
+            and not sym_u.startswith("^")
+        )
+
+        buckets: Dict[str, List[str]] = {}
+        for a_id in allowed_strats:
+            st_obj = get_strategy(a_id)
+            if st_obj is None:
+                continue
+
+            def_asset = str(getattr(st_obj, "activo_default", "") or "").upper().strip()
+            rec_assets = {str(r).upper().strip() for r in (getattr(st_obj, "activos_recomendados", None) or []) if r}
+
+            if def_asset:
+                if "=X" in def_asset and not is_fx_sym:
+                    continue
+                if "/" in def_asset and is_fx_sym:
+                    continue
+                if ("/" in def_asset or "=X" in def_asset) and def_asset != sym_u and sym_u not in rec_assets:
+                    continue
+
+            ntf = getattr(st_obj, "native_timeframe", None)
+            if ntf in ("15m", "1h", "4h", "1d"):
+                target_tf = ntf
+            elif is_micro_fut:
+                target_tf = "5m"
+            elif a_id == "donchian_breakout_1h":
+                target_tf = DONCHIAN_WHITELIST_TIMEFRAMES.get(active_symbol, "1d" if is_us_equity else "4h")
+            elif is_us_equity:
+                if a_id == "nasdaq_araujo_vwap":
+                    target_tf = "15m"
+                elif a_id == "hyenuk_chu_multibagger":
+                    target_tf = "1h"
+                elif active_symbol in DONCHIAN_WHITELIST_TIMEFRAMES:
+                    target_tf = DONCHIAN_WHITELIST_TIMEFRAMES[active_symbol]
+                elif a_id == "kula_balam_cava_ruiz":
+                    target_tf = "5m"
+                else:
+                    target_tf = self.timeframe
+            elif is_crypto_sym:
+                target_tf = "4h"
+            else:
+                target_tf = self.timeframe
+
+            buckets.setdefault(target_tf, []).append(a_id)
+
+        if not buckets:
+            return [(self._resolve_single_auto_timeframe(active_symbol, allowed_strats), list(allowed_strats))]
+
+        tf_priority = {"1d": 0, "4h": 1, "1h": 2, "15m": 3, "5m": 4}
+        ordered_tfs = sorted(buckets.keys(), key=lambda t: tf_priority.get(t, 99))
+        return [(tf, buckets[tf]) for tf in ordered_tfs]
 
     def _tracked_timeframes(self) -> List[int]:
         """Devuelve las duraciones en segundos de temporalidades activas monitoreadas por el daemon."""
@@ -2514,6 +3033,8 @@ class TraderDaemon:
         while not self._stop_event.is_set():
             try:
                 if self.is_running:
+                    if hasattr(self, "_wakeup_event"):
+                        self._wakeup_event.clear()
                     # _execute_cycle() ya invoca _check_open_positions_protections al inicio del ciclo
                     self._execute_cycle()
                 else:
@@ -2546,11 +3067,14 @@ class TraderDaemon:
             delay_s = self._compute_next_wakeup_delay(has_open_positions=open_now)
             self._next_wakeup_ts = time.time() + delay_s
             deadline = time.monotonic() + delay_s
-            while not self._stop_event.is_set():
+            while not self._stop_event.is_set() and not (hasattr(self, "_wakeup_event") and self._wakeup_event.is_set()):
                 rem = deadline - time.monotonic()
                 if rem <= 0:
                     break
-                time.sleep(min(0.5, rem))
+                if hasattr(self, "_wakeup_event"):
+                    self._wakeup_event.wait(timeout=min(0.5, rem))
+                else:
+                    time.sleep(min(0.5, rem))
 
         with self._lock:
             self._thread = None

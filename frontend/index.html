@@ -216,7 +216,7 @@
                     <span class="p-2 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-lg">⚡</span>
                     <div>
                         <div class="flex items-center gap-2">
-                            <span class="text-xs font-black tracking-wide text-white uppercase">Trading con Presencia · Scalping 5M</span>
+                            <span class="text-xs font-black tracking-wide text-white uppercase">Trading con Presencia · Sesiones Activas (1H · 15M · 5M)</span>
                             <span id="badgeScalpingState" class="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-400 border border-slate-700">INACTIVO</span>
                             <span id="txtScalpingTelemetry" class="text-[11px] font-mono text-indigo-300 hidden"></span>
                         </div>
@@ -235,20 +235,27 @@
                     <div class="flex items-center gap-1.5 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700">
                         <label for="selScalpingSymbol" class="text-[11px] text-slate-400 font-bold uppercase">Activo:</label>
                         <select id="selScalpingSymbol" class="bg-slate-900 text-white text-xs font-semibold px-2 py-1 rounded border border-slate-600 outline-none cursor-pointer">
-                            <option value="ETH/USDT" selected>🔷 ETH/USDT (Recomendado)</option>
-                            <option value="BTC/USDT">🟠 BTC/USDT</option>
-                            <option value="SOL/USDT">🟣 SOL/USDT</option>
+                            <option value="MULTI_CRYPTO" selected>🔥 CANASTA CRIPTO (ETH + SOL + BTC)</option>
+                            <option value="ETH/USDT">🔷 ETH/USDT (Individual)</option>
+                            <option value="BTC/USDT">🟠 BTC/USDT (Individual)</option>
+                            <option value="SOL/USDT">🟣 SOL/USDT (Individual)</option>
+                            <option value="EURUSD=X">💶 EURUSD=X (Forex Londres/NY)</option>
                         </select>
                     </div>
 
-                    <div class="flex items-center gap-1.5 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700">
-                        <label for="inputScalpingLot" class="text-[11px] text-slate-400 font-bold uppercase">Lote:</label>
-                        <input type="number" id="inputScalpingLot" value="0.01" step="0.005" min="0.001" class="w-16 bg-slate-900 text-white text-xs font-mono font-bold px-2 py-1 rounded border border-slate-600 outline-none text-center" title="Lotaje calibrable para esta sesión presencial">
+                    <div class="flex items-center gap-1.5 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700" title="Asignación de Slot desde Bóveda (% sobre Dinero para Operar, sincronizado con Gestión de Capital)">
+                        <label for="selScalpingSlot" class="text-[11px] text-slate-400 font-bold uppercase">Slot:</label>
+                        <select id="selScalpingSlot" class="bg-slate-900 text-white text-xs font-semibold px-2 py-1 rounded border border-slate-600 outline-none cursor-pointer">
+                            <option value="0.25" selected>25% (1/4)</option>
+                            <option value="0.50">50% (1/2)</option>
+                            <option value="1.00">100% (1/1)</option>
+                        </select>
+                        <span id="txtScalpingSlotUsd" class="text-[11px] font-mono font-bold text-emerald-400 px-1">--</span>
                     </div>
 
                     <button id="btnScalpingToggle" type="button" onclick="window.toggleScalpingSession && window.toggleScalpingSession()" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30">
                         <span id="scalpingBtnIcon">⚡</span>
-                        <span id="scalpingBtnText">Iniciar Scalping Presencial</span>
+                        <span id="scalpingBtnText">Iniciar Sesión Presencial</span>
                     </button>
                 </div>
             </div>
@@ -300,18 +307,28 @@
             </div>
         </div>
 
-        <!-- SEMÁFORO OPERATIVO DETERMINISTA DE 4 LUCES (0 TOKENS) -->
+        <!-- SEMÁFORO OPERATIVO DETERMINISTA DE 4 LUCES + CHEQUEO RÁPIDO 3S (0 TOKENS) -->
         <div class="px-2 sm:px-2.5">
-            <div id="kula-semaforo-bar" class="kula-sem-strip" aria-label="Semáforo de salud operativo">
+            <div id="kula-semaforo-bar" class="kula-sem-strip" aria-label="Semáforo de salud operativo y chequeo rápido">
                 <div class="kula-sem-pills">
+                    <span id="kula-qc-binary" class="kula-sem-pill sem-yellow" title="Diagnóstico binario instantáneo (Motor + Guardián + Fórmulas + Balam + Cobertura)"><span class="kula-sem-dot"></span><span>⏳ Verificando...</span></span>
                     <span id="kula-sem-motor" class="kula-sem-pill sem-yellow" title="Estado del ciclo de análisis del TraderDaemon"><span class="kula-sem-dot"></span><span>Motor: Verificando</span></span>
                     <span id="kula-sem-guardian" class="kula-sem-pill sem-yellow" title="Guardián SL / Breakeven / Trailing Stop"><span class="kula-sem-dot"></span><span>Guardián: --</span></span>
                     <span id="kula-sem-formulas" class="kula-sem-pill sem-yellow" title="Auto-test sintético en memoria de estrategias autorizadas (0 tokens)"><span class="kula-sem-dot"></span><span>Fórmulas: --</span></span>
                     <span id="kula-sem-balam" class="kula-sem-pill sem-yellow" title="Monitor del Mercado: RSS Feeds y Puente Macro"><span class="kula-sem-dot"></span><span>Balam/RSS: --</span></span>
+                    <span id="kula-qc-coverage" class="kula-sem-pill sem-yellow" title="Cobertura de activos revisados en el último barrido"><span class="kula-sem-dot"></span><span>Activos: --</span></span>
                 </div>
                 <div class="flex items-center gap-2">
                     <span id="kula-sem-mode-note" class="text-[10px] font-mono text-slate-400">0 tokens IA</span>
                     <button id="btnKulaWatchdogProbe" type="button" class="kula-sem-btn" onclick="window.checkKulaSemaforo && window.checkKulaSemaforo(true)" title="Ejecutar auto-test sintético inmediato sin consumir tokens IA">🔄 Auto-Check</button>
+                </div>
+                <div id="kula-qc-summary-row" class="w-full flex flex-wrap items-center justify-between gap-2 pt-1 mt-0.5 border-t border-slate-700/60 text-[11px] font-mono text-slate-300">
+                    <div class="flex flex-wrap items-center gap-2 min-w-0">
+                        <span id="kula-qc-mode" class="text-cyan-300 font-semibold truncate" title="Objetivo, fórmula activa y temporalidad real ejecutándose">Modo: --</span>
+                        <span id="kula-qc-tf-alert" class="hidden px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-500/60 text-amber-300 text-[10px] font-bold"></span>
+                        <span id="kula-qc-triad" class="text-slate-400 truncate" title="Estado de Cerebro, Balam y Kula">Cerebro · Balam · Kula: --</span>
+                    </div>
+                    <div id="kula-qc-reason" class="text-amber-200 truncate max-w-full lg:max-w-[52%]" title="Último motivo exacto de no-operación">Motivo: --</div>
                 </div>
             </div>
             <div id="kula-semaforo-alert" class="kula-sem-alert hidden"></div>
@@ -2100,7 +2117,7 @@
 
     <script src="js/trading_guards.js?v=5"></script>
     <script src="js/ui_components.js?v=20261019_ui"></script>
-    <script src="js/app.js?v=20261110_sem"></script>
+    <script src="js/app.js?v=20261117_bg1h"></script>
     <script src="js/cio_cockpit.js?v=1"></script>
     <script>
         // Controlador interactivo ultra-estable para el menú desplegable de Terminales & Páginas del Ecosistema

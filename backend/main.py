@@ -3198,6 +3198,7 @@ class ScalpingStartRequest(BaseModel):
     strategy: str = "scalping_vwap_2sigma_5m"
     timeframe: str = "5m"
     lot_size: float = 0.01
+    slot_alloc_pct: Optional[float] = None
 
 
 @app.get("/api/daemon/scalping/status")
@@ -3215,7 +3216,8 @@ def start_daemon_scalping(req: ScalpingStartRequest, request: Request, x_api_tok
         symbol=req.symbol,
         strategy=req.strategy,
         timeframe=req.timeframe,
-        lot_size=req.lot_size
+        lot_size=req.lot_size,
+        slot_alloc_pct=req.slot_alloc_pct,
     )
 
 

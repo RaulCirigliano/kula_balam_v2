@@ -14,6 +14,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+import numpy as np
 import pandas as pd
 
 from backend.estrategias.base import EstrategiaBase
@@ -73,6 +74,230 @@ def _prepare_eval_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         df_eval["dist_ema_atrs"] = (df_eval["close"] - df_eval["ema_50"]).abs() / (df_eval["atr"] + 1e-9)
 
     return df_eval
+
+
+def _format_price_tele(px: float, symbol: str = "") -> str:
+    """Formatea precio según escala de mercado (Forex/alts baratos vs Cripto mayor)."""
+    is_small = "=X" in str(symbol).upper() or (0 < px < 10.0)
+    return f"{px:.4f}" if is_small else f"{px:.2f}"
+
+
+def format_presencial_telemetry(
+    diag: Dict[str, Any],
+    symbol: str = "",
+    timeframe: str = "",
+    extra_vetoes: Optional[List[str]] = None,
+) -> str:
+    """Formatea en una línea los valores reales medidos y el motivo exacto de bloqueo."""
+    sym = str(symbol or diag.get("symbol") or "").strip() or "ACTIVO"
+    tf = str(timeframe or diag.get("timeframe") or "").strip() or "tf"
+    px = float(diag.get("close") or 0.0)
+    px_txt = f"${_format_price_tele(px, sym)}" if px > 0 else "N/A"
+    hdr = f"[{sym} {tf}] Close {px_txt}"
+
+    vetoes = list(diag.get("reasons") or [])
+    for ev in (extra_vetoes or []):
+        ev_s = str(ev or "").strip()
+        if ev_s and ev_s not in vetoes:
+            vetoes.append(ev_s)
+
+    if not diag.get("ready", False):
+        why = ", ".join(vetoes) if vetoes else "Historial insuficiente"
+        return f"{hdr} | {why} -> En espera"
+
+    adx1h = float(diag.get("adx1h", 0.0))
+    adx_min = float(diag.get("adx_min", 18.0))
+    adx_cmp = f"<{adx_min:.0f}" if adx1h < adx_min else f">={adx_min:.0f}"
+
+    crosses = int(round(float(diag.get("crosses1h", 0))))
+    cross_max = int(diag.get("crosses_max", 3))
+    cross_cmp = f">{cross_max}" if crosses > cross_max else f"<={cross_max}"
+
+    retr = float(diag.get("retr", 0.0))
+    f_min = float(diag.get("fibo_min", 0.50))
+    f_max = float(diag.get("fibo_max", 0.75))
+    fibo_ok = f_min <= retr <= f_max
+    fibo_tag = f"OK {f_min:.2f}-{f_max:.2f}" if fibo_ok else f"meta {f_min:.2f}-{f_max:.2f}"
+
+    side_lbl = str(diag.get("side") or "").strip()
+    side_suffix = f", {side_lbl}" if side_lbl else ""
+    base = (
+        f"{hdr} | ADX1H: {adx1h:.2f} ({adx_cmp}) | "
+        f"Cruces1H: {crosses} ({cross_cmp}) | "
+        f"Fibo: {retr:.3f} ({fibo_tag}{side_suffix})"
+    )
+    if vetoes:
+        return f"{base} | Bloqueo: {', '.join(vetoes)} -> En espera"
+    return f"{base} | Confluencia OK -> Evaluando gatillo"
+
+
+def build_mtf_presencial_diagnostic(
+    df: pd.DataFrame,
+    i: int,
+    spec: Dict[str, Any],
+    symbol: str = "",
+    timeframe: str = "",
+    extra_vetoes: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Reconstruye la telemetría diagnóstica exacta de estrategias MTF Presenciales (1H -> 15M/5M)
+    a partir de `df` ya evaluado por `formula_matematica`, sin alterar ninguna regla matemática.
+    """
+    tf_label = str(timeframe or spec.get("default_tf") or "")
+    min_i = int(spec.get("min_i", 320))
+    adx_min = float(spec.get("adx_min", 18.0))
+    cross_max = int(spec.get("crosses_max", 3))
+    f_min = float(spec.get("fibo_min", 0.50))
+    f_max = float(spec.get("fibo_max", 0.75))
+
+    def _incomplete(why: str, close_val: float = 0.0) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "ready": False,
+            "symbol": symbol,
+            "timeframe": tf_label,
+            "close": close_val,
+            "reasons": [why],
+        }
+        d["line"] = format_presencial_telemetry(d, symbol, tf_label, extra_vetoes)
+        return d
+
+    if df is None or len(df) == 0 or i < 0 or i >= len(df):
+        return _incomplete("Sin velas disponibles")
+
+    r = df.iloc[i]
+    c = float(r.get("close", 0.0) or 0.0)
+    bad_col = str(spec.get("bad_col") or "")
+    if (bad_col and bad_col in df.columns and bool(df[bad_col].iloc[0])) or i < min_i:
+        return _incomplete(f"Historial insuficiente ({len(df)} velas, min {min_i + 1})", c)
+    if "_hi_adx" not in df.columns or pd.isna(r.get("_hi_ema50")) or pd.isna(r.get("_hi_atr1")):
+        return _incomplete("Indicadores 1H aún sin calentar (NaN)", c)
+
+    o = float(r["open"])
+    h = float(r["high"])
+    l = float(r["low"])
+    atr_trig = float(r.get("_atr_trig", 0.0) or 0.0)
+    adx1h = float(r.get("_hi_adx", 0.0) or 0.0)
+    crosses1h = float(r.get("_hi_crosses", 0.0) or 0.0)
+    ema1h = float(r["_hi_ema50"])
+    ema1h_p = float(r["_hi_ema50_prev"])
+    sw_h = float(r["_hi_sw_h"])
+    sw_l = float(r["_hi_sw_l"])
+    atr1 = float(r["_hi_atr1"])
+    rng_fibo = max(sw_h - sw_l, 1e-9)
+    bull_1h = int(r["_hi_bull_imp"]) == 1
+    is_ema_falling = ema1h < ema1h_p * 0.995
+    if is_ema_falling and not bull_1h and c < ema1h * 0.998:
+        side = "SHORT"
+    elif bull_1h:
+        side = "LONG"
+    else:
+        side = "SHORT" if c < ema1h else "LONG"
+
+    retr = ((sw_h - c) / rng_fibo) if side == "LONG" else ((c - sw_l) / rng_fibo)
+
+    reasons: List[str] = []
+    if atr_trig <= 0 or c <= 0:
+        reasons.append("ATR/Precio inválido")
+    if adx1h < adx_min:
+        reasons.append(f"ADX1H<{adx_min:.0f}")
+    if crosses1h > cross_max:
+        reasons.append(f"Cruces1H>{cross_max}")
+    if retr < f_min:
+        reasons.append(f"Fibo<{f_min:.2f}")
+    elif retr > f_max:
+        reasons.append(f"Fibo>{f_max:.2f}")
+
+    # Si pasó contexto 1H + Fibo, detallamos por qué frenó la capa de ejecución
+    if not reasons:
+        e_trig = float(r["_ema_trig"])
+        rng = max(h - l, 1e-9)
+        body_pct = abs(c - o) / rng
+        lookback = int(spec.get("cross_lookback", 6))
+        body_min = float(spec.get("body_min", 0.30))
+        ema_prev = df["_ema_trig"].iloc[max(0, i - lookback):i]
+        has_mid_tf = bool(spec.get("has_mid_tf", False))
+
+        if has_mid_tf:
+            hi_macd_ok = (int(r["_hi_macd_up"]) == 1) if side == "LONG" else (int(r["_hi_macd_dn"]) == 1)
+            mid_col = "_mid_macd_up" if side == "LONG" else "_mid_macd_dn"
+            mid_macd_ok = (not pd.isna(r[mid_col])) and int(r[mid_col]) == 1
+            if not hi_macd_ok:
+                reasons.append(f"MACD 1H contra {side}")
+            if not mid_macd_ok:
+                reasons.append(f"MACD 15M contra {side}")
+        else:
+            hc = float(r["_hist"])
+            hp1 = float(df["_hist"].iloc[i - 1])
+            hp2 = float(df["_hist"].iloc[i - 2])
+            mc = float(r["_macd"])
+            mp1 = float(df["_macd"].iloc[i - 1])
+            if side == "LONG":
+                macd_ok = (hc > hp1 or hc > hp2 or mc > mp1) and (int(r["_hi_macd_up"]) == 1)
+            else:
+                macd_ok = (hc < hp1 or hc < hp2 or mc < mp1) and (int(r["_hi_macd_dn"]) == 1)
+            if not macd_ok:
+                reasons.append(f"MACD sin giro {side}")
+
+        if side == "LONG":
+            if c < ema1h * 0.995:
+                reasons.append("Close<EMA1H*0.995")
+            if not (c > e_trig):
+                reasons.append(f"Close<=EMA({e_trig:.2f})")
+            elif not (c > o):
+                reasons.append("Vela no alcista")
+            elif body_pct < body_min:
+                reasons.append(f"Cuerpo {body_pct*100:.0f}%<{body_min*100:.0f}%")
+            elif ((h - max(o, c)) / rng) >= 0.45:
+                reasons.append("Mecha sup>=45%")
+            elif not (df["low"].iloc[max(0, i - lookback):i] <= ema_prev * 1.002).any():
+                reasons.append(f"Sin toque EMA en {lookback}v")
+            loc_low = float(df.iloc[max(0, i - int(spec.get("loc_lookback", 12))):i + 1]["low"].min())
+            sl_dist = min(3.0 * atr1, max(c - loc_low + 0.2 * atr1, 1.0 * atr1, float(spec.get("sl_floor_pct", 0.008)) * c))
+            sl_px, tp_px = c - sl_dist, sw_h
+        else:
+            if c > ema1h * 1.005:
+                reasons.append("Close>EMA1H*1.005")
+            if not (c < e_trig):
+                reasons.append(f"Close>=EMA({e_trig:.2f})")
+            elif not (c < o):
+                reasons.append("Vela no bajista")
+            elif body_pct < body_min:
+                reasons.append(f"Cuerpo {body_pct*100:.0f}%<{body_min*100:.0f}%")
+            elif ((min(o, c) - l) / rng) >= 0.45:
+                reasons.append("Mecha inf>=45%")
+            elif not (df["high"].iloc[max(0, i - lookback):i] >= ema_prev * 0.998).any():
+                reasons.append(f"Sin toque EMA en {lookback}v")
+            loc_high = float(df.iloc[max(0, i - int(spec.get("loc_lookback", 12))):i + 1]["high"].max())
+            sl_dist = min(3.0 * atr1, max(loc_high - c + 0.2 * atr1, 1.0 * atr1, float(spec.get("sl_floor_pct", 0.008)) * c))
+            sl_px, tp_px = c + sl_dist, sw_l
+
+        if not reasons:
+            sl_pct = abs(c - sl_px) / c * 100.0
+            tp_pct = ((tp_px - c) / c * 100.0) if side == "LONG" else ((c - tp_px) / c * 100.0)
+            rr_val = net_rr_metrics(tp_pct, sl_pct, 0.10, 0.05).get("net_rr", 0.0)
+            if tp_pct <= 0 or float(rr_val or 0.0) < 2.0:
+                reasons.append(f"Net R:R {float(rr_val or 0.0):.2f}<2.0")
+
+    d: Dict[str, Any] = {
+        "ready": True,
+        "symbol": symbol,
+        "timeframe": tf_label,
+        "close": c,
+        "adx1h": adx1h,
+        "adx_min": adx_min,
+        "crosses1h": int(round(crosses1h)),
+        "crosses_max": cross_max,
+        "retr": retr,
+        "fibo_min": f_min,
+        "fibo_max": f_max,
+        "side": side,
+        "sw_l": sw_l,
+        "sw_h": sw_h,
+        "ema1h": ema1h,
+        "reasons": reasons,
+    }
+    d["line"] = format_presencial_telemetry(d, symbol, tf_label, extra_vetoes)
+    return d
 
 
 class CatalogFormulaStrategy(EstrategiaBase):
@@ -156,7 +381,16 @@ class CatalogFormulaStrategy(EstrategiaBase):
         default_sl_pct = round(min(25.0, max(0.12 if is_forex else 0.70, raw_default_sl)), 2)
         default_tp_pct = round(required_tp_gross_for_rr(default_sl_pct, fee, spread, target_rr=2.0) + 0.01, 2)
 
-        def _base_metrics(eligible: bool, failures: List[str], side: str = "MANTENER", sl_p: float = default_sl_pct, tp_p: float = default_tp_pct, arb_msg: str = "") -> Tuple[Dict[str, Any], float, bool, List[str], float]:
+        def _base_metrics(
+            eligible: bool,
+            failures: List[str],
+            side: str = "MANTENER",
+            sl_p: float = default_sl_pct,
+            tp_p: float = default_tp_pct,
+            arb_msg: str = "",
+            presencial_telemetry: str = "",
+            shadow_veto_candidate: Optional[Dict[str, Any]] = None,
+        ) -> Tuple[Dict[str, Any], float, bool, List[str], float]:
             n_tp = round(net_return_after_costs(tp_p, fee, spread), 4)
             n_sl = round(net_return_after_costs(-sl_p, fee, spread), 4)
             rr_info = net_rr_metrics(tp_p, sl_p, fee, spread)
@@ -181,7 +415,10 @@ class CatalogFormulaStrategy(EstrategiaBase):
                 "candidate_eligible": eligible,
                 "filter_failures": failures,
                 "arbitro_ia_verdict": arb_msg,
+                "presencial_telemetry": presencial_telemetry,
             }
+            if shadow_veto_candidate is not None:
+                metrics["shadow_veto_candidate"] = shadow_veto_candidate
             return (metrics, eff_net, eligible, failures, min_profit_pct)
 
         mismatch = self._asset_class_mismatch(symbol)
@@ -200,10 +437,24 @@ class CatalogFormulaStrategy(EstrategiaBase):
             idx = len(df_eval) - 1
             entry_px = float(current_price or df_eval["close"].iloc[idx])
             atr_14 = float(df_eval["atr"].iloc[idx] or atr_14)
+            sym_hint = symbol or self.activo_default or "ACTIVO"
+            tf_hint = str(ind.get("timeframe") or self.native_timeframe or "")
 
             ok, side, sl_px, tp_px = mod.formula_matematica(df_eval, idx)
             if not ok or not side:
-                return _base_metrics(False, [f"Sin confluencia en fórmula '{self.id}' sobre vela cerrada actual."])
+                tele_line = ""
+                if hasattr(mod, "diagnosticar_vela"):
+                    try:
+                        diag = mod.diagnosticar_vela(df_eval, idx, symbol=sym_hint, timeframe=tf_hint)
+                        if isinstance(diag, dict):
+                            tele_line = str(diag.get("line") or "").strip()
+                        elif isinstance(diag, str):
+                            tele_line = diag.strip()
+                    except Exception as diag_exc:
+                        logger.debug(f"Telemetría diagnóstica omitida en '{self.id}': {diag_exc}")
+                if not tele_line:
+                    tele_line = f"[{sym_hint} {tf_hint}] Close ${_format_price_tele(entry_px, sym_hint)} | Bloqueo: sin confluencia en '{self.id}' -> En espera"
+                return _base_metrics(False, [tele_line], presencial_telemetry=tele_line)
 
             side_norm = "SHORT" if str(side).upper() in ("SHORT", "SELL") else "LONG"
             sl_dist_pct = abs(entry_px - float(sl_px)) / entry_px * 100.0 if (entry_px > 0 and sl_px) else default_sl_pct
@@ -215,6 +466,7 @@ class CatalogFormulaStrategy(EstrategiaBase):
 
             failures: List[str] = []
             arb_msg = "Sin árbitro heurístico"
+            arbiter_vetoed = False
 
             # Soporte de Gancho Extensible custom_brain_filter (prioritario) y fallback a arbitro_ia legacy
             if hasattr(mod, "custom_brain_filter"):
@@ -231,22 +483,78 @@ class CatalogFormulaStrategy(EstrategiaBase):
                         cbf_ok, cbf_reason = bool(cbf_res), "CUSTOM_BRAIN"
                     arb_msg = str(cbf_reason)
                     if not cbf_ok:
+                        arbiter_vetoed = True
                         failures.append(f"[Custom Brain {self.id}] VETO_CUSTOM_BRAIN: {arb_msg}")
                 except Exception as exc:
                     logger.warning(f"Error ejecutando custom_brain_filter en '{self.id}': {exc}")
+                    arb_msg = f"Error ({exc})"
+                    arbiter_vetoed = True
                     failures.append(f"[Custom Brain {self.id}] VETO_CUSTOM_BRAIN: Error ({exc})")
             elif hasattr(mod, "arbitro_ia"):
                 fila = df_eval.iloc[idx]
                 arb_ok, _, arb_reason = mod.arbitro_ia(fila, side_norm, entry_px, float(sl_px), float(tp_px))
                 arb_msg = str(arb_reason)
                 if not arb_ok:
+                    arbiter_vetoed = True
                     failures.append(f"[Árbitro IA {self.id}] {arb_msg}")
 
             rr_info = net_rr_metrics(tp_calc, sl_calc, fee, spread)
             if not rr_info.get("valid") or float(rr_info.get("net_rr") or 0.0) < 1.95:
                 failures.append(f"Asimetría neta insuficiente en '{self.id}': R:R {rr_info.get('net_rr', 0.0)} < 1.95")
 
-            return _base_metrics(len(failures) == 0, failures, side=side_norm, sl_p=sl_calc, tp_p=tp_calc, arb_msg=arb_msg)
+            shadow_cand: Optional[Dict[str, Any]] = None
+            if arbiter_vetoed and entry_px > 0:
+                sl_v = float(sl_px) if (sl_px and float(sl_px) > 0) else (
+                    entry_px * (1.0 - sl_calc / 100.0) if side_norm == "LONG" else entry_px * (1.0 + sl_calc / 100.0)
+                )
+                tp_v = float(tp_px) if (tp_px and float(tp_px) > 0) else (
+                    entry_px * (1.0 + tp_calc / 100.0) if side_norm == "LONG" else entry_px * (1.0 - tp_calc / 100.0)
+                )
+                shadow_cand = {
+                    "symbol": sym_hint,
+                    "strategy": self.id,
+                    "side": side_norm,
+                    "entry_price": round(entry_px, 6 if is_forex else 4),
+                    "sl_price": round(sl_v, 6 if is_forex else 4),
+                    "tp_price": round(tp_v, 6 if is_forex else 4),
+                    "initial_sl_pct": sl_calc,
+                    "initial_tp_pct": tp_calc,
+                    "arbiter_verdict": "VETO_ARBITRO_IA",
+                    "arbiter_reason": arb_msg,
+                }
+
+            tele_line = ""
+            if hasattr(mod, "diagnosticar_vela"):
+                try:
+                    diag = mod.diagnosticar_vela(
+                        df_eval,
+                        idx,
+                        symbol=sym_hint,
+                        timeframe=tf_hint,
+                        extra_vetoes=failures if failures else None,
+                    )
+                    if isinstance(diag, dict):
+                        tele_line = str(diag.get("line") or "").strip()
+                    elif isinstance(diag, str):
+                        tele_line = diag.strip()
+                except Exception as diag_exc:
+                    logger.debug(f"Telemetría diagnóstica post-gatillo omitida en '{self.id}': {diag_exc}")
+            if not tele_line:
+                if failures:
+                    tele_line = f"[{sym_hint} {tf_hint}] Close ${_format_price_tele(entry_px, sym_hint)} | Bloqueo: {'; '.join(failures)} -> En espera"
+                else:
+                    tele_line = f"[{sym_hint} {tf_hint}] Close ${_format_price_tele(entry_px, sym_hint)} | {side_norm} R:R {rr_info.get('net_rr', 0.0)} -> Candidata"
+
+            return _base_metrics(
+                len(failures) == 0,
+                failures,
+                side=side_norm,
+                sl_p=sl_calc,
+                tp_p=tp_calc,
+                arb_msg=arb_msg,
+                presencial_telemetry=tele_line,
+                shadow_veto_candidate=shadow_cand,
+            )
 
         except Exception as exc:
             logger.warning(f"Error ejecutando fórmula de catálogo '{self.id}': {exc}")
@@ -255,26 +563,26 @@ class CatalogFormulaStrategy(EstrategiaBase):
 
 def discover_catalog_principal_strategies(existing_ids: Set[str]) -> Dict[str, CatalogFormulaStrategy]:
     """
-    Descubre dinámicamente las estrategias promovidas en `backend/estrategias/catalogo/principal/`
-    cuyo ID aún no tenga una clase manual registrada en `existing_ids`.
+    Descubre dinámicamente las estrategias promovidas en `catalogo/principal/` y
+    `catalogo/operador_presente/` cuyo ID aún no tenga una clase manual registrada en `existing_ids`.
     """
-    from backend.estrategias.catalogo_manager import PRINCIPAL_DIR, _read_metadata
+    from backend.estrategias.catalogo_manager import OPERADOR_DIR, PRINCIPAL_DIR, _read_metadata
 
     discovered: Dict[str, CatalogFormulaStrategy] = {}
-    if not PRINCIPAL_DIR.exists():
-        return discovered
-
-    meta_map = _read_metadata(PRINCIPAL_DIR)
-    for py_file in sorted(PRINCIPAL_DIR.glob("*.py")):
-        info = dict(meta_map.get(py_file.name, {}))
-        strat_id = str(info.get("id") or py_file.stem)
-        if not strat_id or strat_id in existing_ids or strat_id in discovered:
+    for folder in (PRINCIPAL_DIR, OPERADOR_DIR):
+        if not folder.exists():
             continue
-        info["id"] = strat_id
-        info["archivo"] = py_file.name
-        try:
-            discovered[strat_id] = CatalogFormulaStrategy(info, py_file)
-        except Exception as exc:
-            logger.warning(f"No se pudo registrar adaptador para {py_file.name}: {exc}")
+        meta_map = _read_metadata(folder)
+        for py_file in sorted(folder.glob("*.py")):
+            info = dict(meta_map.get(py_file.name, {}))
+            strat_id = str(info.get("id") or py_file.stem)
+            if not strat_id or strat_id in existing_ids or strat_id in discovered:
+                continue
+            info["id"] = strat_id
+            info["archivo"] = py_file.name
+            try:
+                discovered[strat_id] = CatalogFormulaStrategy(info, py_file)
+            except Exception as exc:
+                logger.warning(f"No se pudo registrar adaptador para {py_file.name}: {exc}")
 
     return discovered

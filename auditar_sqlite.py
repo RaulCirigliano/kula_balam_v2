@@ -257,8 +257,10 @@ def auditar(db_path=None):
                     SUM(CASE WHEN status = 'CLOSED' THEN 1 ELSE 0 END) as closed_count,
                     SUM(CASE WHEN outcome = 'SAVED_SL' THEN 1 ELSE 0 END) as saved_sl,
                     SUM(CASE WHEN outcome = 'MISSED_TP' THEN 1 ELSE 0 END) as missed_tp,
+                    SUM(CASE WHEN outcome = 'EXPIRED' THEN 1 ELSE 0 END) as expired_count,
                     SUM(CASE WHEN outcome = 'SAVED_SL' THEN ABS(virtual_pnl_usd) ELSE 0.0 END) as saved_dd_usd,
-                    SUM(CASE WHEN outcome = 'MISSED_TP' THEN virtual_pnl_usd ELSE 0.0 END) as missed_gain_usd
+                    SUM(CASE WHEN outcome = 'MISSED_TP' THEN virtual_pnl_usd ELSE 0.0 END) as missed_gain_usd,
+                    SUM(CASE WHEN outcome = 'EXPIRED' THEN virtual_pnl_usd ELSE 0.0 END) as expired_pnl_usd
                 FROM shadow_trades;
             """)
             st_row = cursor.fetchone()
@@ -270,17 +272,209 @@ def auditar(db_path=None):
                 cl_v = st_row['closed_count'] or 0
                 s_sl = st_row['saved_sl'] or 0
                 m_tp = st_row['missed_tp'] or 0
+                exp_v = st_row['expired_count'] or 0
                 s_dd = st_row['saved_dd_usd'] or 0.0
                 m_gn = st_row['missed_gain_usd'] or 0.0
+                exp_pnl = st_row['expired_pnl_usd'] or 0.0
                 net_v = s_dd - m_gn
                 edge_sign = "+" if net_v >= 0 else ""
+                exp_sign = "+" if exp_pnl >= 0 else ""
                 log(f"  Total Señales Vetadas por Árbitro IA: {tot_v} ({op_v} Activas en seguimiento / {cl_v} Resueltas)")
                 log(f"  🛡️ Drawdown Ahorrado (Tocó SL): {s_sl} operaciones | +${s_dd:,.2f} USD retenidos en bóveda")
                 log(f"  ⚠️ Ganancia Perdida (Tocó TP): {m_tp} operaciones | -${m_gn:,.2f} USD de oportunidad perdida")
-                log(f"  ⚖️ Ventaja Neta del Árbitro IA (Edge Real): {edge_sign}${net_v:,.2f} USD")
+                if exp_v > 0:
+                    log(f"  ⏱️ Expiradas 24h sin tocar SL/TP (EXPIRED): {exp_v} operaciones | PnL virtual: {exp_sign}${exp_pnl:,.2f} USD")
+                log(f"  ⚖️ Ventaja Neta del Árbitro IA (Edge Real SL vs TP): {edge_sign}${net_v:,.2f} USD")
             log()
         except sqlite3.OperationalError:
             log("  (0 operaciones vetadas por el Árbitro IA hasta el momento | Drawdown Ahorrado: $0.00 | Ganancia Perdida: $0.00)")
+            log()
+
+        # 5c. Embudo de Rechazos 24H, Cobertura de Activos y Detector de Redundancia 30D
+        log("--- [ 🔬 EMBUDO DE RECHAZOS 24H, COBERTURA DE ACTIVOS Y DETECTOR DE REDUNDANCIA 30D ] ---")
+        try:
+            import json
+            from collections import Counter
+            from backend.rejection_funnel import (
+                TAG_LABELS,
+                TAG_ORDER,
+                classify_rejection_tags,
+                forced_timeframe_warnings,
+                formula_fired,
+                parse_payload,
+            )
+
+            state_path = os.path.join(PROJECT_ROOT, "backend", "config", "daemon_state.json")
+            daemon_cfg = {}
+            if os.path.exists(state_path):
+                try:
+                    with open(state_path, "r", encoding="utf-8") as f_st:
+                        daemon_cfg = json.load(f_st) or {}
+                except Exception:
+                    daemon_cfg = {}
+
+            cfg_symbol = str(daemon_cfg.get("symbol") or "ETH/USDT")
+            cfg_tf = str(daemon_cfg.get("timeframe") or "4h")
+            cfg_strategy = str(daemon_cfg.get("strategy") or "auto")
+            cfg_allowed = list(daemon_cfg.get("allowed_strategies") or ([cfg_strategy] if cfg_strategy != "auto" else []))
+
+            # 1) Cobertura de Activos (últimas 24h en tabla signals + estado configurado)
+            cursor.execute(
+                """
+                SELECT symbol, timeframe, COUNT(*) as evals,
+                       SUM(CASE WHEN signal IN ('COMPRAR', 'SHORT') THEN 1 ELSE 0 END) as candidates
+                FROM signals
+                WHERE created_at >= datetime('now', '-24 hours')
+                GROUP BY symbol, timeframe
+                ORDER BY evals DESC, symbol ASC;
+                """
+            )
+            cov_rows = cursor.fetchall()
+            seen_symbols_24h = {r["symbol"] for r in cov_rows}
+            expected_syms = [cfg_symbol] if cfg_symbol else []
+            if str(daemon_cfg.get("mode") or "smart") == "smart":
+                for s_liq in ("SOL/USDT", "ETH/USDT", "BTC/USDT"):
+                    if s_liq not in expected_syms:
+                        expected_syms.append(s_liq)
+
+            missing_24h = [s for s in expected_syms if s not in seen_symbols_24h]
+            log(f"  📡 [1. COBERTURA DE ACTIVOS (24H)] Configurado: {cfg_strategy} [{cfg_tf}] · Base: {cfg_symbol}")
+            if not cov_rows:
+                log("     • Sin velas registradas en tabla `signals` en las últimas 24h.")
+                if expected_syms:
+                    log(f"     • ⚠️ Activos esperados sin evaluaciones 24h: {', '.join(expected_syms)}")
+            else:
+                for cr in cov_rows:
+                    log(
+                        f"     • ✅ {cr['symbol']:<10} [{cr['timeframe']:<3}] -> "
+                        f"{cr['evals']} vela(s) evaluada(s) | {cr['candidates'] or 0} candidata(s)"
+                    )
+                if missing_24h:
+                    log(f"     • ⚠️ Activos esperados con 0 velas en 24h: {', '.join(missing_24h)}")
+                else:
+                    log(f"     • Cobertura completa sobre activos base ({len(seen_symbols_24h)} activo(s) con actividad).")
+
+            # 2) Acumulado de Bloqueos por Filtro (últimas 24h)
+            cursor.execute(
+                """
+                SELECT symbol, signal, reason, timeframe, raw_response
+                FROM signals
+                WHERE created_at >= datetime('now', '-24 hours')
+                ORDER BY rowid DESC;
+                """
+            )
+            sig_24h = cursor.fetchall()
+            tag_counts: Counter = Counter()
+            total_evals_24h = len(sig_24h)
+            total_cands_24h = 0
+
+            for srow in sig_24h:
+                payload = parse_payload(srow["raw_response"])
+                is_elig = bool(payload.get("eligible")) or (str(srow["signal"]).upper() in ("COMPRAR", "SHORT") and payload.get("stage") != "gate")
+                if is_elig and payload.get("stage") != "gate":
+                    total_cands_24h += 1
+                    continue
+                tags = payload.get("tags")
+                if not isinstance(tags, list) or not tags:
+                    tags = classify_rejection_tags([srow["reason"]])
+                for tg in tags:
+                    tag_counts[str(tg)] += 1
+                    if str(tg).startswith("VetoIA:"):
+                        tag_counts["VetoIA"] += 1
+
+            log(f"  🧱 [2. ACUMULADO DE BLOQUEOS POR FILTRO (24H)] Evaluaciones: {total_evals_24h} | Candidatas habilitadas: {total_cands_24h}")
+            if total_evals_24h == 0 or not tag_counts:
+                log("     • (Sin bloqueos registrados en las últimas 24h)")
+            else:
+                ordered_tags = [t for t in TAG_ORDER if tag_counts.get(t, 0) > 0]
+                for extra_t in sorted(tag_counts.keys()):
+                    if extra_t not in ordered_tags and tag_counts[extra_t] > 0:
+                        ordered_tags.append(extra_t)
+                for tg in ordered_tags:
+                    lbl = TAG_LABELS.get(tg, tg)
+                    log(f"     • {lbl:<44}: {tag_counts[tg]} bloqueo(s)")
+
+            # 3) Detector de Redundancia e Inactividad (30 días) + Conflicto de TF
+            cursor.execute(
+                """
+                SELECT reason, raw_response, signal
+                FROM signals
+                WHERE created_at >= datetime('now', '-30 days');
+                """
+            )
+            sig_30d = cursor.fetchall()
+            cursor.execute(
+                """
+                SELECT strategy, COUNT(*) as cnt
+                FROM trades
+                WHERE opened_at >= datetime('now', '-30 days')
+                GROUP BY strategy;
+                """
+            )
+            trades_30d_map = {str(r["strategy"] or ""): int(r["cnt"] or 0) for r in cursor.fetchall()}
+
+            eval_30d_by_strat: Counter = Counter()
+            raw_fired_30d_by_strat: Counter = Counter()
+            eligible_30d_by_strat: Counter = Counter()
+
+            for srow in sig_30d:
+                payload = parse_payload(srow["raw_response"])
+                if payload.get("stage") == "gate":
+                    continue
+                per_st = payload.get("per_strategy")
+                if isinstance(per_st, dict) and per_st:
+                    for sid, sdata in per_st.items():
+                        eval_30d_by_strat[sid] += 1
+                        if isinstance(sdata, dict):
+                            if sdata.get("eligible"):
+                                eligible_30d_by_strat[sid] += 1
+                                raw_fired_30d_by_strat[sid] += 1
+                            elif sdata.get("fired"):
+                                raw_fired_30d_by_strat[sid] += 1
+                else:
+                    sid = str(payload.get("strategy") or "")
+                    if sid:
+                        eval_30d_by_strat[sid] += 1
+                        elig = bool(payload.get("eligible"))
+                        if elig:
+                            eligible_30d_by_strat[sid] += 1
+                            raw_fired_30d_by_strat[sid] += 1
+                        elif formula_fired([srow["reason"]], False):
+                            raw_fired_30d_by_strat[sid] += 1
+
+            tf_warnings = []
+            try:
+                from backend.estrategias.registry import get_strategy, _sync_catalog_registry
+                _sync_catalog_registry()
+                tf_warnings = forced_timeframe_warnings(cfg_allowed, cfg_tf, get_strategy)
+            except Exception:
+                tf_warnings = []
+
+            log(f"  🧭 [3. DETECTOR DE REDUNDANCIA / INACTIVIDAD (30 DÍAS)] Fórmulas activas ({len(cfg_allowed)}): {', '.join(cfg_allowed) if cfg_allowed else 'ninguna'}")
+            if tf_warnings:
+                for tw in tf_warnings:
+                    log(f"     • ⚠️ ALERTA DE TEMPORALIDAD FORZADA: {tw}")
+            if not cfg_allowed:
+                log("     • ⚠️ Sin fórmulas activas configuradas en allowed_strategies.")
+            else:
+                for sid in cfg_allowed:
+                    ev_cnt = eval_30d_by_strat.get(sid, 0)
+                    fired_cnt = raw_fired_30d_by_strat.get(sid, 0)
+                    elig_cnt = eligible_30d_by_strat.get(sid, 0)
+                    tr_cnt = trades_30d_map.get(sid, 0)
+                    if fired_cnt == 0 and tr_cnt == 0:
+                        log(
+                            f"     • ⚠️ ALERTA DE REDUNDANCIA / INACTIVIDAD [{sid}]: "
+                            f"0 señales crudas y 0 trades en 30d ({ev_cnt} velas evaluadas)."
+                        )
+                    else:
+                        log(
+                            f"     • ✅ [{sid}]: {fired_cnt} señal(es) cruda(s) | "
+                            f"{elig_cnt} candidata(s) | {tr_cnt} trade(s) en 30d ({ev_cnt} velas evaluadas)."
+                        )
+            log()
+        except Exception as funnel_err:
+            log(f"  (Aviso procesando Embudo de Rechazos / Redundancia: {funnel_err})")
             log()
 
         # 6. Directiva de Auditoría y Mejora Continua para Cualquier IA Auditora
@@ -299,6 +493,8 @@ def auditar(db_path=None):
         conn.close()
 
     texto_completo = "\n".join(lineas)
+    if db_path is not None:
+        return texto_completo
 
     # 1. Guardar informe histórico en /home/raul/Escritorio/informes_auditoria con fecha como primera parte del título
     informes_dir = "/home/raul/Escritorio/informes_auditoria"
