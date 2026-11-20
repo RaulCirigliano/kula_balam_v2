@@ -304,7 +304,7 @@ def auditar(db_path=None):
                 parse_payload,
             )
 
-            state_path = os.path.join(PROJECT_ROOT, "backend", "config", "daemon_state.json")
+            state_path = os.getenv("DAEMON_STATE_PATH") or os.path.join(PROJECT_ROOT, "backend", "config", "daemon_state.json")
             daemon_cfg = {}
             if os.path.exists(state_path):
                 try:
@@ -446,7 +446,29 @@ def auditar(db_path=None):
             try:
                 from backend.estrategias.registry import get_strategy, _sync_catalog_registry
                 _sync_catalog_registry()
-                tf_warnings = forced_timeframe_warnings(cfg_allowed, cfg_tf, get_strategy)
+                recorded_forced_24h = []
+                for _srow in (sig_24h or []):
+                    _pl = parse_payload(_srow["raw_response"])
+                    for _fw in (_pl.get("forced_tf") or []):
+                        _fws = str(_fw).strip()
+                        if _fws and _fws not in recorded_forced_24h:
+                            recorded_forced_24h.append(_fws)
+
+                if cfg_strategy == "auto":
+                    cfg_tf_norm = str(cfg_tf or "").strip().lower()
+                    if cfg_tf_norm not in ("4h", "1d"):
+                        tf_warnings.append(
+                            f"Selector de fondo 'auto' en {cfg_tf} (debe ser 4h; 5m queda reservado para Sesión Presencial)"
+                        )
+                        tf_warnings.extend(forced_timeframe_warnings(cfg_allowed, cfg_tf, get_strategy))
+                    for _fw in recorded_forced_24h:
+                        if _fw not in tf_warnings:
+                            tf_warnings.append(_fw)
+                else:
+                    tf_warnings = forced_timeframe_warnings(cfg_allowed, cfg_tf, get_strategy)
+                    for _fw in recorded_forced_24h:
+                        if _fw not in tf_warnings:
+                            tf_warnings.append(_fw)
             except Exception:
                 tf_warnings = []
 

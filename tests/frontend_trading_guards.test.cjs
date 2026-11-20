@@ -3,7 +3,10 @@ const assert = require('node:assert/strict');
 const {
     ATR_STRATEGY_TIMEFRAMES,
     ATR_Z_SCORE_THRESHOLD,
+    AUTO_BACKGROUND_TIMEFRAME,
     isAllowedAtrTimeframe,
+    resolveBackgroundDaemonTimeframe,
+    shouldSyncChartTimeframeToDaemon,
     isEligibleMacroDirective,
     matchDirectiveSymbol,
     isFreshQuote,
@@ -133,3 +136,20 @@ test('isAssetMarketOpenAt enforces trading hours per market class', () => {
     assert.equal(isAssetMarketOpenAt('EURUSD=X', wednesdayOpenUtc), true);
     assert.equal(isAssetMarketOpenAt('EURUSD=X', saturdayUtc), false);
 });
+
+test('auto background timeframe stays isolated at 4h while 5m chart/presencial never overrides auto daemon', () => {
+    assert.equal(AUTO_BACKGROUND_TIMEFRAME, '4h');
+    assert.equal(resolveBackgroundDaemonTimeframe('auto', '5m'), '4h');
+    assert.equal(resolveBackgroundDaemonTimeframe('auto', '1m'), '4h');
+    assert.equal(resolveBackgroundDaemonTimeframe('auto', '4h'), '4h');
+    assert.equal(resolveBackgroundDaemonTimeframe('mtf_presencial_5m', '5m'), '5m');
+    assert.equal(resolveBackgroundDaemonTimeframe('manual', '15m'), '15m');
+
+    assert.equal(shouldSyncChartTimeframeToDaemon('auto', { active: false, draining: false }), false);
+    assert.equal(shouldSyncChartTimeframeToDaemon('auto', { active: true, draining: false }), false);
+    assert.equal(shouldSyncChartTimeframeToDaemon('manual', { active: true, draining: false }), false);
+    assert.equal(shouldSyncChartTimeframeToDaemon('manual', { active: false, draining: true }), false);
+    assert.equal(shouldSyncChartTimeframeToDaemon('manual', { active: false, draining: false }), true);
+    assert.equal(shouldSyncChartTimeframeToDaemon('mean_reversion_atr', null), true);
+});
+

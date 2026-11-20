@@ -6479,14 +6479,21 @@ function startAgent(reason = 'user') {
 
 function syncRunningDaemonConfig(options = {}) {
     if (!isAgentActive) return;
+    if (window.scalpingSessionState && (window.scalpingSessionState.active || window.scalpingSessionState.draining)) {
+        // 5m y el ciclo presencial son exclusivos de Sesión Presencial; no pisar con config de fondo ni grabar 5m en daemon_state.json
+        return;
+    }
     try {
         const { syncSymbol = false, syncTimeframe = false } = options || {};
         const srv = window.serverDaemonConfig || {};
-        const targetDaemonSymbol = (!syncSymbol && srv.symbol) ? srv.symbol : currentSymbol;
-        const targetDaemonTimeframe = (!syncTimeframe && srv.timeframe)
-            ? srv.timeframe
-            : (document.getElementById('timeframeSelect')?.value || '15m');
         const targetStrategy = document.getElementById('strategyModeSelect')?.value || 'auto';
+        const targetDaemonSymbol = (!syncSymbol && srv.symbol) ? srv.symbol : currentSymbol;
+        const rawDaemonTimeframe = (!syncTimeframe && srv.timeframe)
+            ? srv.timeframe
+            : (document.getElementById('timeframeSelect')?.value || '4h');
+        const targetDaemonTimeframe = (typeof tradingGuards !== 'undefined' && typeof tradingGuards.resolveBackgroundDaemonTimeframe === 'function')
+            ? tradingGuards.resolveBackgroundDaemonTimeframe(targetStrategy, rawDaemonTimeframe)
+            : (targetStrategy === 'auto' ? '4h' : rawDaemonTimeframe);
         const targetAllowed = typeof window.getAllowedStrategies === 'function'
             ? window.getAllowedStrategies()
             : ALL_TACTICAL_STRATEGIES.map(s => s.id);
@@ -8873,7 +8880,12 @@ document.getElementById('timeframeSelect')?.addEventListener('change', () => {
         updateChartHeaderTitles();
     }
     fetchMarketData();
-    if (typeof syncRunningDaemonConfig === 'function') syncRunningDaemonConfig({ syncSymbol: false, syncTimeframe: true });
+    const shouldSyncTfToDaemon = (typeof tradingGuards !== 'undefined' && typeof tradingGuards.shouldSyncChartTimeframeToDaemon === 'function')
+        ? tradingGuards.shouldSyncChartTimeframeToDaemon(getStrategyMode(), window.scalpingSessionState)
+        : (getStrategyMode() !== 'auto' && !(window.scalpingSessionState && (window.scalpingSessionState.active || window.scalpingSessionState.draining)));
+    if (shouldSyncTfToDaemon && typeof syncRunningDaemonConfig === 'function') {
+        syncRunningDaemonConfig({ syncSymbol: false, syncTimeframe: true });
+    }
 });
 
 

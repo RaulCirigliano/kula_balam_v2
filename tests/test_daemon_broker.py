@@ -1908,6 +1908,52 @@ def test_daemon_presencial_multi_crypto_escanea_canasta_completa(isolated_daemon
     isolated_daemon.is_running = False
 
 
+def test_daemon_auto_mantiene_4h_fondo_y_aisla_5m_exclusivo_presencial(isolated_daemon):
+    """start(strategy='auto', timeframe='5m') normaliza a 4h y una sesión presencial activa en 5m no es pisada."""
+    with patch.object(isolated_daemon, "_run_loop", return_value=None):
+        isolated_daemon.start(
+            symbol="ETH/USDT",
+            timeframe="5m",
+            strategy="auto",
+            allowed_strategies=["kula_balam_cava_ruiz", "1_donchian_breakout_sol_4h", "kula_cava_eth_1h"],
+            slot_alloc_pct=50.0,
+        )
+        assert isolated_daemon.strategy == "auto"
+        assert isolated_daemon.timeframe == "4h"
+
+        st = isolated_daemon.start_scalping(
+            symbol="MULTI_CRYPTO",
+            strategy="mtf_presencial_5m",
+            timeframe="5m",
+            slot_alloc_pct=25.0,
+        )
+        assert st["active"] is True
+        assert isolated_daemon.timeframe == "5m"
+        assert isolated_daemon.backup_timeframe == "4h"
+
+        # Sincronización tardía desde UI mientras Presencial corre no pisa 5m ni corrompe backup_timeframe
+        res_mid = isolated_daemon.start(
+            symbol="SOL/USDT",
+            timeframe="1m",
+            strategy="auto",
+            allowed_strategies=["kula_balam_cava_ruiz", "1_donchian_breakout_sol_4h"],
+            slot_alloc_pct=50.0,
+        )
+        assert res_mid["status"] == "presencial_active"
+        assert isolated_daemon.scalping_active is True
+        assert isolated_daemon.timeframe == "5m"
+        assert isolated_daemon.backup_timeframe == "4h"
+        assert isolated_daemon.backup_symbol == "SOL/USDT"
+
+        isolated_daemon.stop_scalping()
+        assert isolated_daemon.scalping_active is False
+        assert isolated_daemon.strategy == "auto"
+        assert isolated_daemon.timeframe == "4h"
+
+    isolated_daemon.is_running = False
+
+
+
 
 
 

@@ -249,3 +249,44 @@ def test_record_signal_evaluation_and_auditar_sqlite_funnel_section(tmp_path):
     assert "Retroceso fuera de zona Fibo" in report_txt
     assert "DETECTOR DE REDUNDANCIA / INACTIVIDAD (30 DÍAS)" in report_txt
 
+
+def test_auditar_sqlite_auto_4h_sin_falsas_alertas_tf_y_detecta_auto_5m(tmp_path, monkeypatch):
+    """Con strategy='auto' y timeframe='4h', auditar_sqlite no emite falsas alertas TF; en '5m' sí alerta."""
+    import json
+    from auditar_sqlite import auditar
+
+    db_file = str(tmp_path / "audit_tf.sqlite3")
+    LedgerStore(db_path=db_file, initial_vault={"USDT": 500.0})
+
+    state_file = tmp_path / "daemon_state.json"
+    allowed = [
+        "kula_balam_cava_ruiz",
+        "1_donchian_breakout_sol_4h",
+        "2_squeeze_dual_eth_4h",
+        "donchian_breakout_1h",
+        "cava_fallo_macd_eurusd_1h_slot1",
+        "kula_cava_eth_1h",
+    ]
+    monkeypatch.setenv("DAEMON_STATE_PATH", str(state_file))
+
+    state_file.write_text(json.dumps({
+        "symbol": "ETH/USDT",
+        "timeframe": "4h",
+        "strategy": "auto",
+        "allowed_strategies": allowed,
+    }), encoding="utf-8")
+    report_4h = auditar(db_path=db_file)
+    assert "Configurado: auto [4h]" in report_4h
+    assert "ALERTA DE TEMPORALIDAD FORZADA" not in report_4h
+
+    state_file.write_text(json.dumps({
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "strategy": "auto",
+        "allowed_strategies": allowed,
+    }), encoding="utf-8")
+    report_5m = auditar(db_path=db_file)
+    assert "Configurado: auto [5m]" in report_5m
+    assert "ALERTA DE TEMPORALIDAD FORZADA" in report_5m
+
+

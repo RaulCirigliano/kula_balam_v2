@@ -353,10 +353,10 @@
                         <!-- Selector Directo de Temporalidad en Ventana Principal (1m, 5m, 15m, 1h, 4h, 1d) -->
                         <div id="ku-quick-tf-bar" class="flex items-center bg-gray-950 p-0.5 rounded-lg border border-gray-700 shrink-0 gap-0.5 font-mono">
                             <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('1m')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="1m" title="1 Minuto">1m</button>
-                            <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('5m')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 cursor-pointer transition" data-tf="5m" title="5 Minutos">5m</button>
+                            <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('5m')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="5m" title="5 Minutos">5m</button>
                             <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('15m')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="15m" title="15 Minutos">15m</button>
                             <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('1h')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="1h" title="1 Hora">1h</button>
-                            <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('4h')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="4h" title="4 Horas (Donchian Breakout)">4h</button>
+                            <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('4h')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 cursor-pointer transition" data-tf="4h" title="4 Horas (Donchian Breakout)">4h</button>
                             <button type="button" onclick="window.setChartTimeframe && window.setChartTimeframe('1d')" class="ku-tf-btn px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer transition" data-tf="1d" title="1 Día (Macro / Posicional)">1d</button>
                         </div>
                         <!-- BADGE INDICADOR DE TIPO DE VELA (ANCHO FIJO ESTABILIZADO) + CLIC PATRONES -->
@@ -1368,7 +1368,7 @@
                             </div>
 
                             <!-- Temporalidad fija nativa (gobernada por la fórmula activa) -->
-                            <input type="hidden" id="timeframeSelect" value="5m">
+                            <input type="hidden" id="timeframeSelect" value="4h">
 
                             <!-- Beneficio neto mínimo para tomar ganancias (Filtro Anti-Desgaste) -->
                             <div id="minProfitContainer" class="pt-2 border-t border-gray-800/80">

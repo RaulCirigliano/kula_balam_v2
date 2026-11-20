@@ -145,16 +145,37 @@
     // Se mantiene activamente -2.0 en toda la arquitectura.
     const ATR_STRATEGY_TIMEFRAMES = Object.freeze(["15m", "1h"]);
     const ATR_Z_SCORE_THRESHOLD = -2.0;
+    const AUTO_BACKGROUND_TIMEFRAME = "4h";
 
     function isAllowedAtrTimeframe(timeframe) {
         if (typeof timeframe !== 'string') return false;
         return ATR_STRATEGY_TIMEFRAMES.includes(timeframe.trim());
     }
 
+    function resolveBackgroundDaemonTimeframe(strategyMode, requestedTimeframe) {
+        const mode = String(strategyMode || 'auto').trim();
+        if (!mode || mode === 'auto') {
+            return AUTO_BACKGROUND_TIMEFRAME;
+        }
+        const tf = String(requestedTimeframe || AUTO_BACKGROUND_TIMEFRAME).trim();
+        return tf || AUTO_BACKGROUND_TIMEFRAME;
+    }
+
+    function shouldSyncChartTimeframeToDaemon(strategyMode, scalpingState) {
+        if (scalpingState && (scalpingState.active || scalpingState.draining)) {
+            return false;
+        }
+        const mode = String(strategyMode || 'auto').trim();
+        return Boolean(mode && mode !== 'auto');
+    }
+
     const api = {
         ATR_STRATEGY_TIMEFRAMES,
         ATR_Z_SCORE_THRESHOLD,
+        AUTO_BACKGROUND_TIMEFRAME,
         isAllowedAtrTimeframe,
+        resolveBackgroundDaemonTimeframe,
+        shouldSyncChartTimeframeToDaemon,
         isEligibleMacroDirective,
         matchDirectiveSymbol,
         isFreshQuote,

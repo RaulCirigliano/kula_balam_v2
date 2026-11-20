@@ -577,8 +577,33 @@ class TraderDaemon:
         enable_futures_simulation: Optional[bool] = None,
     ) -> Dict[str, Any]:
         with self._lock:
+            normalized_tf = str(timeframe or "4h").strip().lower() or "4h"
+            if strategy == "auto" and normalized_tf != "4h":
+                logger.info(
+                    f"🛡️ [DAEMON] Temporalidad de fondo 'auto' normalizada de '{normalized_tf}' -> '4h' "
+                    "(5m queda reservado para Sesión Presencial)."
+                )
+                normalized_tf = "4h"
+
+            if getattr(self, "scalping_active", False) or getattr(self, "scalping_draining", False):
+                # No pisar la sesión presencial activa ni persistir su 5m como config de fondo
+                self.backup_symbol = symbol
+                self.backup_timeframe = normalized_tf
+                self.backup_strategy = strategy
+                self.backup_mode = mode
+                if allowed_strategies is not None:
+                    self.backup_allowed_strategies = list(allowed_strategies)
+                if slot_alloc_pct is not None:
+                    self.backup_slot_alloc_pct = min(100.0, max(10.0, float(slot_alloc_pct)))
+                    self._has_backup_slot_alloc = True
+                return {
+                    "status": "presencial_active",
+                    "message": "Sesión Presencial activa; configuración de fondo respaldada sin interrumpir 5m presencial.",
+                    "config": self.get_status(),
+                }
+
             self.symbol = symbol
-            self.timeframe = timeframe
+            self.timeframe = normalized_tf
             self.strategy = strategy
             if allowed_strategies is not None:
                 self.allowed_strategies = list(allowed_strategies)
