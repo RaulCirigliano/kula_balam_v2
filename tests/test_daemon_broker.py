@@ -1662,6 +1662,7 @@ def test_operador_presente_catalogo_registro_y_watchdog():
         "kula_cava_sol_1h": "1h",
         "kula_cava_eth_1h": "1h",
         "cava_fallo_macd_eurusd_1h": "1h",
+        "fractal_squeeze_15m": "15m",
         "mtf_presencial_15m": "15m",
         "mtf_presencial_5m": "5m",
     }
@@ -1671,6 +1672,7 @@ def test_operador_presente_catalogo_registro_y_watchdog():
 
     # Verificar que no contaminan el panel autónomo principal
     principal_ids = {item["id"] for item in (data.get("panel_principal") or [])}
+    assert "fractal_squeeze_15m" not in principal_ids
     assert "mtf_presencial_15m" not in principal_ids
     assert "mtf_presencial_5m" not in principal_ids
 

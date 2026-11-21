@@ -55,5 +55,9 @@
   "ttm_squeeze_sol_4h.py": {
     "comentario": "🚀🧩 TTM Squeeze Direccional SOL 4H (Slot 1 · PF 1.89 · OOS PF 2.10 · WFO 5/5 · MC DD 7.61%)",
     "arbitro_sugerido": "arbitro_ttm_squeeze_4h.py"
+  },
+  "fractal_squeeze_15m.py": {
+    "comentario": "⚡🌀 Fractal Squeeze Presencial 15M ETH (365d · PF 1.45 · OOS PF 2.89 · MC DD 6.36% · WFO 2/5)",
+    "arbitro_sugerido": "arbitro_fractal_squeeze_15m.py"
   }
 }

@@ -8,6 +8,7 @@
   "arbitro_mtf_presencial.py": "⚡ [CEREBRO MTF PRESENCIAL 15M/5M] ADX 1H >= 18 + Sobreextensión <= 2.6 ATR + RVOL >= 0.60 + Sizing 0.60%",
   "arbitro_ttm_squeeze_1h.py": "🏦 [CEREBRO TTM SQUEEZE 1H ETH] RVOL >= 1.15x + Mechas <= 38% + Sizing 0.45% (MC DD 95% 7.28%)",
   "arbitro_ttm_squeeze_4h.py": "🏦 [CEREBRO TTM SQUEEZE 4H SOL] RVOL >= 0.80x + Mechas <= 40% + Dist EMA50 <= 4.2 ATR + Sizing 0.60% (MC DD 95% 7.61%)",
+  "arbitro_fractal_squeeze_15m.py": "⚡ [CEREBRO FRACTAL SQUEEZE 15M] R:R >= 1:2.0 + Mechas <= 40% + Sizing 0.45% (MC DD 95% 6.36% · Presencial)",
   "arbitro_mejorada cava_fallo_macd_eurusd_1h.py": {
     "comentario": "Árbitro de mejorada cava_fallo_macd_eurusd_1h.py"
   }

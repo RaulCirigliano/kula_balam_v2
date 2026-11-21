@@ -53,5 +53,16 @@
     "lote_sugerido": 0.01,
     "activo_default": "ETH/USDT",
     "rendimiento_lab": "Supervisión Humana Obligatoria (96d PF 1.62 · MC DD 3.40%)"
+  },
+  "fractal_squeeze_15m.py": {
+    "id": "fractal_squeeze_15m",
+    "titulo": "⚡🌀 Fractal Squeeze 15M (1H -> 15M · Londres/NY · ETH)",
+    "subtitulo": "15M Presencial · 365d PF 1.45 · OOS PF 2.89 · R:R 2.04 · WFO 2/5 · MC DD 6.36%",
+    "descripcion": "Tendencia causal 1H (EMA50/EMA200) + ruptura de compresión Bollinger/Keltner en 15M en sesión Londres/NY (excl. Lunch Lull 17:00-18:30 UTC), sin requisito Fibonacci, SL >= 1.2% y Árbitro IA mecha <= 40%.",
+    "dataset_sugerido": "binance_ETH_USDT_15m.parquet",
+    "timeframe": "15m",
+    "lote_sugerido": 0.01,
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Supervisión Humana Obligatoria (365d PF 1.45 · OOS PF 2.89 · WFO 2/5 · MC DD 6.36%)"
   }
 }
