@@ -174,5 +174,27 @@
     "lote_sugerido": 0.01,
     "activo_default": "ETH/USDT",
     "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
+  },
+  "ttm_squeeze_eth_1h.py": {
+    "id": "ttm_squeeze_eth_1h",
+    "titulo": "🚀 ttm_squeeze_eth_1h.py (ETH/USDT)",
+    "subtitulo": "Panel Principal (Cerebro Kula) · Slot 2 · Confianza 90%",
+    "descripcion": "TTM Squeeze Tendencial 1H (ETH/USDT): PF=1.52 | N=91 | OOS PF=1.67 | WFO 4/5 (WFE=0.99) | MC DD 95%=7.28% (<=8%).",
+    "dataset_sugerido": "binance_ETH_USDT_1h.parquet",
+    "timeframe": "1h",
+    "lote_sugerido": 0.1,
+    "activo_default": "ETH/USDT",
+    "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
+  },
+  "ttm_squeeze_sol_4h.py": {
+    "id": "ttm_squeeze_sol_4h",
+    "titulo": "🚀 ttm_squeeze_sol_4h.py (SOL/USDT)",
+    "subtitulo": "Panel Principal (Cerebro Kula) · Slot 1 · Confianza 92%",
+    "descripcion": "TTM Squeeze Direccional 4H (SOL/USDT): PF=1.89 | N=43 | OOS PF=2.10 | WFO 5/5 (WFE=0.83) | MC DD 95%=7.61% (<=8%).",
+    "dataset_sugerido": "binance_SOL_USDT_4h.parquet",
+    "timeframe": "4h",
+    "lote_sugerido": 0.1,
+    "activo_default": "SOL/USDT",
+    "rendimiento_lab": "Promovida (Panel Principal (Cerebro Kula))"
   }
 }

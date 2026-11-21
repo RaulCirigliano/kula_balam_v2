@@ -6,6 +6,8 @@
   "arbitro_kula_cava_sol_1h.py": "🏦 [CEREBRO CAVA 1H SOL] Asimetría >= 1:2.0 + Sizing Fraccional 0.70% (MC DD 95% 5.51% · Sin veto RVOL)",
   "arbitro_kula_cava_eth_1h.py": "🏦 [CEREBRO CAVA 1H ETH] Asimetría >= 1:2.0 + Sizing Fraccional 0.60% (MC DD 95% 6.32% · Meseta S46)",
   "arbitro_mtf_presencial.py": "⚡ [CEREBRO MTF PRESENCIAL 15M/5M] ADX 1H >= 18 + Sobreextensión <= 2.6 ATR + RVOL >= 0.60 + Sizing 0.60%",
+  "arbitro_ttm_squeeze_1h.py": "🏦 [CEREBRO TTM SQUEEZE 1H ETH] RVOL >= 1.15x + Mechas <= 38% + Sizing 0.45% (MC DD 95% 7.28%)",
+  "arbitro_ttm_squeeze_4h.py": "🏦 [CEREBRO TTM SQUEEZE 4H SOL] RVOL >= 0.80x + Mechas <= 40% + Dist EMA50 <= 4.2 ATR + Sizing 0.60% (MC DD 95% 7.61%)",
   "arbitro_mejorada cava_fallo_macd_eurusd_1h.py": {
     "comentario": "Árbitro de mejorada cava_fallo_macd_eurusd_1h.py"
   }

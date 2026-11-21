@@ -191,6 +191,8 @@ def test_watchdog_quick_check_binary_ok_and_alert_states(tmp_path, monkeypatch):
     qc_ok = res_ok["quick_check"]
     assert qc_ok["binary_status"] == "OK"
     assert qc_ok["binary_label"] == "✅ 100% OK"
+    assert qc_ok["timeframe"] == "4h"
+    assert qc_ok["presencial_active"] is False
     assert qc_ok["assets_coverage"]["reviewed"] == 2
     assert qc_ok["assets_coverage"]["expected"] == 2
     assert "ADX1H: 13.68" in qc_ok["last_no_trade_reason"]
@@ -218,5 +220,17 @@ def test_watchdog_quick_check_binary_ok_and_alert_states(tmp_path, monkeypatch):
     assert qc_alert["binary_label"].startswith("⚠️ FALTA / ALERTA:")
     assert qc_alert["active_mode_summary"]["tf_alert"] is True
     assert qc_alert["assets_coverage"]["reviewed"] == 1
+
+    # Cuando Presencial está activo en 5m, quick_check.timeframe debe reflejar '5m' y presencial_active=True
+    daemon.forced_tf_warnings = []
+    daemon.scalping_active = True
+    daemon.scalping_timeframe = "5m"
+    daemon.scalping_strategy = "mtf_presencial_5m"
+    with patch("backend.health_watchdog.urlopen", return_value=fake_resp):
+        res_pres = wd.evaluate(daemon, force_probe=False, notify_on_red=False, monitor_url="http://127.0.0.1:8520")
+    assert res_pres["quick_check"]["timeframe"] == "5m"
+    assert res_pres["quick_check"]["presencial_active"] is True
+    assert res_pres["quick_check"]["active_mode_summary"]["mode"] == "PRESENCIAL"
+
 
 

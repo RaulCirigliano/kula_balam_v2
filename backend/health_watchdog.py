@@ -556,6 +556,8 @@ class HealthWatchdog:
         return {
             "binary_status": "OK" if is_ok else "ALERT",
             "binary_label": "✅ 100% OK" if is_ok else "⚠️ FALTA / ALERTA: " + self._clip("; ".join(alert_details), 240),
+            "timeframe": tf,
+            "presencial_active": presencial,
             "alert_details": alert_details,
             "active_mode_summary": {
                 "mode": mode,

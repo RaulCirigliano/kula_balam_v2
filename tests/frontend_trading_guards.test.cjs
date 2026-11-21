@@ -7,6 +7,7 @@ const {
     isAllowedAtrTimeframe,
     resolveBackgroundDaemonTimeframe,
     shouldSyncChartTimeframeToDaemon,
+    formatSemaforoTimeframeBadge,
     isEligibleMacroDirective,
     matchDirectiveSymbol,
     isFreshQuote,
@@ -152,4 +153,33 @@ test('auto background timeframe stays isolated at 4h while 5m chart/presencial n
     assert.equal(shouldSyncChartTimeframeToDaemon('manual', { active: false, draining: false }), true);
     assert.equal(shouldSyncChartTimeframeToDaemon('mean_reversion_atr', null), true);
 });
+
+test('formatSemaforoTimeframeBadge renders quick_check.timeframe for background and Presencial', () => {
+    assert.deepEqual(
+        formatSemaforoTimeframeBadge({
+            timeframe: '4h',
+            presencial_active: false,
+            active_mode_summary: { mode: 'AUTO/FONDO', timeframe: '4h', tf_alert: false, text: 'AUTO/FONDO · TF real: 4h' },
+        }),
+        { status: 'GREEN', label: 'TF: 4h', detail: 'AUTO/FONDO · TF real: 4h' }
+    );
+    assert.deepEqual(
+        formatSemaforoTimeframeBadge({
+            timeframe: '5m',
+            presencial_active: true,
+            active_mode_summary: { mode: 'PRESENCIAL', timeframe: '5m', tf_alert: false, text: 'PRESENCIAL · TF real: 5m' },
+        }),
+        { status: 'CYAN', label: 'Presencial: 5m', detail: 'PRESENCIAL · TF real: 5m' }
+    );
+    assert.equal(
+        formatSemaforoTimeframeBadge({
+            timeframe: '5m',
+            presencial_active: false,
+            active_mode_summary: { mode: 'AUTO/FONDO', timeframe: '5m', tf_alert: true },
+        }).status,
+        'RED'
+    );
+    assert.equal(formatSemaforoTimeframeBadge(null).label, 'TF: --');
+});
+
 

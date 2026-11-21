@@ -1953,6 +1953,61 @@ def test_daemon_auto_mantiene_4h_fondo_y_aisla_5m_exclusivo_presencial(isolated_
     isolated_daemon.is_running = False
 
 
+def test_ttm_squeeze_eth_1h_and_sol_4h_registered_isolated_and_whitelisted(isolated_daemon):
+    """
+    Opción 1: Las estrategias tendenciales complementarias ttm_squeeze_eth_1h y ttm_squeeze_sol_4h:
+    1. Se cargan dinámicamente desde catalogo/principal/ con native_timeframe y activo_default exactos.
+    2. Superan el HealthWatchdog sintético en estado GREEN (2/2).
+    3. Quedan aisladas por par y temporalidad nativa en _resolve_auto_timeframe_buckets.
+    4. Están habilitadas por defecto en daemon_state.json y PRODUCTION_WHITELIST_DEFAULTS.
+    """
+    import json
+    from pathlib import Path
+    from backend.estrategias.registry import _sync_catalog_registry, get_strategy
+    from backend.health_watchdog import HealthWatchdog
+
+    _sync_catalog_registry()
+    st_eth = get_strategy("ttm_squeeze_eth_1h")
+    st_sol = get_strategy("ttm_squeeze_sol_4h")
+    assert st_eth is not None and st_eth.native_timeframe == "1h" and st_eth.activo_default == "ETH/USDT"
+    assert st_sol is not None and st_sol.native_timeframe == "4h" and st_sol.activo_default == "SOL/USDT"
+
+    probe = HealthWatchdog().probe_active_strategies(["ttm_squeeze_eth_1h", "ttm_squeeze_sol_4h"], force=True)
+    assert probe["status"] == "GREEN", f"HealthWatchdog no devolvió GREEN: {probe}"
+    assert probe["passed"] == 2
+
+    allowed = [
+        "kula_balam_cava_ruiz",
+        "1_donchian_breakout_sol_4h",
+        "2_squeeze_dual_eth_4h",
+        "ttm_squeeze_eth_1h",
+        "ttm_squeeze_sol_4h",
+    ]
+    eth_buckets = dict(isolated_daemon._resolve_auto_timeframe_buckets("ETH/USDT", allowed))
+    assert eth_buckets.get("1h") == ["ttm_squeeze_eth_1h"]
+    assert "2_squeeze_dual_eth_4h" in eth_buckets.get("4h", [])
+    assert "ttm_squeeze_sol_4h" not in eth_buckets.get("4h", [])
+    assert "ttm_squeeze_sol_4h" not in eth_buckets.get("1h", [])
+
+    sol_buckets = dict(isolated_daemon._resolve_auto_timeframe_buckets("SOL/USDT", allowed))
+    assert "ttm_squeeze_sol_4h" in sol_buckets.get("4h", [])
+    assert "1_donchian_breakout_sol_4h" in sol_buckets.get("4h", [])
+    assert "ttm_squeeze_eth_1h" not in sol_buckets.get("1h", [])
+    assert "ttm_squeeze_eth_1h" not in sol_buckets.get("4h", [])
+
+    root = Path(__file__).resolve().parent.parent
+    daemon_state = json.loads((root / "backend" / "config" / "daemon_state.json").read_text(encoding="utf-8"))
+    assert "ttm_squeeze_eth_1h" in daemon_state.get("allowed_strategies", [])
+    assert "ttm_squeeze_sol_4h" in daemon_state.get("allowed_strategies", [])
+
+    app_js = (root / "frontend" / "js" / "app.js").read_text(encoding="utf-8")
+    wl_start = app_js.index("const PRODUCTION_WHITELIST_DEFAULTS")
+    wl_block = app_js[wl_start:app_js.index("]);", wl_start)]
+    assert "'ttm_squeeze_eth_1h'" in wl_block
+    assert "'ttm_squeeze_sol_4h'" in wl_block
+
+
+
 
 
 

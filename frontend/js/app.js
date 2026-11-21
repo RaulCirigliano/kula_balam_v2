@@ -3595,6 +3595,8 @@ const PRODUCTION_WHITELIST_DEFAULTS = new Set([
     'kula_balam_cava_ruiz',
     'kula_cava_sol_1h',
     'kula_cava_eth_1h',
+    'ttm_squeeze_eth_1h',
+    'ttm_squeeze_sol_4h',
     'donchian_breakout_1h',
     'squeeze_dual_eth_fondeo_strict_4h',
     'squeeze_dual_eth_4h_slot1',
@@ -8645,8 +8647,11 @@ function _applyKulaSemPill(elemId, lightData) {
     const el = document.getElementById(elemId);
     if (!el || !lightData) return;
     const st = String(lightData.status || 'YELLOW').toUpperCase();
-    el.classList.remove('sem-green', 'sem-yellow', 'sem-red');
-    el.classList.add(st === 'GREEN' ? 'sem-green' : (st === 'RED' ? 'sem-red' : 'sem-yellow'));
+    el.classList.remove('sem-green', 'sem-yellow', 'sem-red', 'sem-cyan');
+    const cls = st === 'GREEN'
+        ? 'sem-green'
+        : (st === 'RED' ? 'sem-red' : (st === 'CYAN' ? 'sem-cyan' : 'sem-yellow'));
+    el.classList.add(cls);
     el.title = lightData.detail || '';
     const lblSpan = el.querySelector('span:last-child');
     if (lblSpan) lblSpan.textContent = lightData.label || '--';
@@ -8688,6 +8693,15 @@ async function checkKulaSemaforo(forceProbe = false) {
                 label: covShort,
                 detail: cov.label || '',
             });
+
+            const tfBadgeData = (typeof tradingGuards !== 'undefined' && typeof tradingGuards.formatSemaforoTimeframeBadge === 'function')
+                ? tradingGuards.formatSemaforoTimeframeBadge(qc)
+                : {
+                    status: (qc.active_mode_summary?.tf_alert ? 'RED' : (qc.presencial_active ? 'CYAN' : 'GREEN')),
+                    label: `${qc.presencial_active ? 'Presencial' : 'TF'}: ${qc.timeframe || qc.active_mode_summary?.timeframe || '--'}`,
+                    detail: qc.active_mode_summary?.text || '',
+                };
+            _applyKulaSemPill('kula-qc-timeframe', tfBadgeData);
 
             const modeEl = document.getElementById('kula-qc-mode');
             const ams = qc.active_mode_summary || {};

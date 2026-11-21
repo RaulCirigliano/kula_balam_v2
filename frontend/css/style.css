@@ -360,6 +360,7 @@ input[type="text"]:focus {
 .kula-sem-pill.sem-green { border-color: rgba(16, 185, 129, 0.55); color: #6ee7b7; background: rgba(6, 78, 59, 0.35); }
 .kula-sem-pill.sem-yellow { border-color: rgba(245, 158, 11, 0.55); color: #fcd34d; background: rgba(120, 53, 15, 0.35); }
 .kula-sem-pill.sem-red { border-color: rgba(239, 68, 68, 0.75); color: #fca5a5; background: rgba(127, 29, 29, 0.45); }
+.kula-sem-pill.sem-cyan { border-color: rgba(34, 211, 238, 0.65); color: #67e8f9; background: rgba(8, 51, 68, 0.55); }
 .kula-sem-dot {
     width: 8px;
     height: 8px;
@@ -370,6 +371,7 @@ input[type="text"]:focus {
 .sem-green .kula-sem-dot { background: #10b981; box-shadow: 0 0 6px #10b981; }
 .sem-yellow .kula-sem-dot { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
 .sem-red .kula-sem-dot { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+.sem-cyan .kula-sem-dot { background: #22d3ee; box-shadow: 0 0 7px #22d3ee; }
 .kula-sem-btn {
     background: rgba(30, 41, 59, 0.95);
     border: 1px solid rgba(100, 116, 139, 0.65);

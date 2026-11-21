@@ -169,6 +169,24 @@
         return Boolean(mode && mode !== 'auto');
     }
 
+    function formatSemaforoTimeframeBadge(quickCheck) {
+        const ams = (quickCheck && quickCheck.active_mode_summary) || {};
+        const tfRaw = (quickCheck && quickCheck.timeframe) || ams.timeframe || '';
+        const tf = String(tfRaw || '').trim();
+        const isPresencial = Boolean(
+            (quickCheck && quickCheck.presencial_active)
+            || String(ams.mode || '').trim().toUpperCase() === 'PRESENCIAL'
+        );
+        const tfAlert = Boolean(ams.tf_alert);
+        if (!tf) {
+            return { status: 'YELLOW', label: 'TF: --', detail: 'Temporalidad aún no disponible.' };
+        }
+        const label = isPresencial ? `Presencial: ${tf}` : `TF: ${tf}`;
+        const status = tfAlert ? 'RED' : (isPresencial ? 'CYAN' : 'GREEN');
+        const detail = ams.text || `${isPresencial ? 'Sesión Presencial' : 'Daemon de fondo'} · Temporalidad real: ${tf}`;
+        return { status, label, detail };
+    }
+
     const api = {
         ATR_STRATEGY_TIMEFRAMES,
         ATR_Z_SCORE_THRESHOLD,
@@ -176,6 +194,7 @@
         isAllowedAtrTimeframe,
         resolveBackgroundDaemonTimeframe,
         shouldSyncChartTimeframeToDaemon,
+        formatSemaforoTimeframeBadge,
         isEligibleMacroDirective,
         matchDirectiveSymbol,
         isFreshQuote,

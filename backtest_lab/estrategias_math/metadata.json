@@ -47,5 +47,13 @@
   "kula_cava_sol_1h.py": "🏆 [PROMOVIDA] kula_cava_sol_1h (SOL/USDT) Slot 1",
   "kula_cava_eth_1h.py": "🏆 [PROMOVIDA] kula_cava_eth_1h (ETH/USDT) Slot 2",
   "mtf_presencial_15m.py": "🏆 [PROMOVIDA] mtf_presencial_15m (ETH/USDT) Slot 2",
-  "mtf_presencial_5m.py": "🏆 [PROMOVIDA] mtf_presencial_5m (ETH/USDT) Slot 2"
+  "mtf_presencial_5m.py": "🏆 [PROMOVIDA] mtf_presencial_5m (ETH/USDT) Slot 2",
+  "ttm_squeeze_eth_1h.py": {
+    "comentario": "🚀🧩 TTM Squeeze Tendencial ETH 1H (Slot 2 · PF 1.52 · OOS PF 1.67 · WFO 4/5 · MC DD 7.28%)",
+    "arbitro_sugerido": "arbitro_ttm_squeeze_1h.py"
+  },
+  "ttm_squeeze_sol_4h.py": {
+    "comentario": "🚀🧩 TTM Squeeze Direccional SOL 4H (Slot 1 · PF 1.89 · OOS PF 2.10 · WFO 5/5 · MC DD 7.61%)",
+    "arbitro_sugerido": "arbitro_ttm_squeeze_4h.py"
+  }
 }
