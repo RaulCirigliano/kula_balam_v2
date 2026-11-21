@@ -8,5 +8,14 @@
   "min_strategy_shadow_resolved": 8,
   "min_prune_days": 28,
   "min_prune_evals": 100,
-  "weekly_snapshot_interval_days": 7
+  "weekly_snapshot_interval_days": 7,
+  "parallel_presencial_shadow_enabled": true,
+  "parallel_presencial_risk_usd": 2.5,
+  "parallel_presencial_targets": [
+    {"strategy": "fractal_squeeze_15m", "symbol": "ETH/USDT", "timeframe": "15m"},
+    {"strategy": "mtf_presencial_15m", "symbol": "ETH/USDT", "timeframe": "15m"},
+    {"strategy": "mtf_presencial_15m", "symbol": "SOL/USDT", "timeframe": "15m"},
+    {"strategy": "mtf_presencial_5m", "symbol": "ETH/USDT", "timeframe": "5m"},
+    {"strategy": "mtf_presencial_5m", "symbol": "SOL/USDT", "timeframe": "5m"}
+  ]
 }

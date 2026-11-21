@@ -354,3 +354,284 @@ def test_lanzar_todo_stable_mode_helpers(tmp_path):
     cmd_stable = build_uvicorn_command(py_exe, "backend.main:app", 18767, stable_mode=True, reload_dir="backend", reload_excludes=("venv",))
     assert "--reload" in cmd_dev and "--reload-dir" in cmd_dev
     assert "--reload" not in cmd_stable and "--reload-dir" not in cmd_stable
+
+
+def test_shadow_trade_deduplication_isolates_eval_paralela_from_ai_veto(tmp_path):
+    db_file = str(tmp_path / "dedup_shadow.sqlite3")
+    ledger = LedgerStore(db_path=db_file, initial_vault={"USDT": 500.0})
+
+    veto_id = ledger.open_shadow_trade(
+        symbol="ETH/USDT",
+        side="SHORT",
+        qty=0.1,
+        entry_price=2000.0,
+        sl_price=2030.0,
+        tp_price=1940.0,
+        initial_sl_pct=1.5,
+        initial_tp_pct=3.0,
+        strategy="fractal_squeeze_15m",
+        arbiter_verdict="VETO_ARBITRO_IA",
+        arbiter_reason="Veto IA de prueba",
+        deduplicate=True,
+    )
+    eval_id = ledger.open_shadow_trade(
+        symbol="ETH/USDT",
+        side="SHORT",
+        qty=0.1,
+        entry_price=2000.0,
+        sl_price=2030.0,
+        tp_price=1940.0,
+        initial_sl_pct=1.5,
+        initial_tp_pct=3.0,
+        strategy="fractal_squeeze_15m",
+        arbiter_verdict="EVAL_PARALELA",
+        arbiter_reason="Evaluación paralela virtual [15m]",
+        deduplicate=True,
+    )
+    eval_dup_id = ledger.open_shadow_trade(
+        symbol="ETH/USDT",
+        side="SHORT",
+        qty=0.1,
+        entry_price=2000.0,
+        sl_price=2030.0,
+        tp_price=1940.0,
+        initial_sl_pct=1.5,
+        initial_tp_pct=3.0,
+        strategy="fractal_squeeze_15m",
+        arbiter_verdict="EVAL_PARALELA",
+        arbiter_reason="Segunda llamada mismo símbolo/veredicto",
+        deduplicate=True,
+    )
+
+    assert veto_id != eval_id
+    assert eval_dup_id == eval_id
+    open_rows = ledger.get_open_shadow_trades(symbol="ETH/USDT")
+    assert len(open_rows) == 2
+    assert {r["arbiter_verdict"] for r in open_rows} == {"VETO_ARBITRO_IA", "EVAL_PARALELA"}
+
+
+def test_parallel_presencial_shadow_eval_and_report_isolation(tmp_path, monkeypatch):
+    from unittest.mock import patch
+    from backend.daemon import TraderDaemon
+    from backend.execution.paper_broker import PaperBrokerAdapter
+
+    db_file, state_file, cfg_file, _ = _setup_isolated_env(tmp_path, monkeypatch)
+    monkeypatch.setenv("TRADING_OLLAMA_CSV_PATH", str(tmp_path / "trades.csv"))
+    monkeypatch.setenv("MACRO_BIAS_BUFFER_PATH", str(tmp_path / "macro_bias.json"))
+    cfg_data = json.loads(cfg_file.read_text(encoding="utf-8"))
+    cfg_data["parallel_presencial_shadow_enabled"] = True
+    cfg_data["parallel_presencial_risk_usd"] = 2.5
+    cfg_data["parallel_presencial_targets"] = [
+        {"strategy": "fractal_squeeze_15m", "symbol": "ETH/USDT", "timeframe": "15m"},
+        {"strategy": "mtf_presencial_15m", "symbol": "ETH/USDT", "timeframe": "15m"},
+        {"strategy": "mtf_presencial_5m", "symbol": "ETH/USDT", "timeframe": "5m"},
+    ]
+    cfg_file.write_text(json.dumps(cfg_data), encoding="utf-8")
+
+    broker = PaperBrokerAdapter(initial_vault_usd=500.0, db_path=db_file, fee_pct=0.10)
+    daemon = TraderDaemon(broker=broker)
+    daemon.strategy = "auto"
+    daemon.scalping_active = False
+
+    def _fake_analysis(**kwargs):
+        sid = kwargs.get("strategy")
+        if sid == "fractal_squeeze_15m":
+            return {
+                "signal": "VENDER",
+                "reason": "Squeeze bajista 15m",
+                "signal_candle_ts": 1795199400,
+                "data_age_s": 5,
+                "indicators": {"live_price": 2000.0},
+                "strategy_metrics": {
+                    "candidate_eligible": True,
+                    "side": "SHORT",
+                    "current_price": 2000.0,
+                    "sl_price": 2030.0,
+                    "tp_price": 1940.0,
+                    "sl_gross_pct": 1.5,
+                    "tp_gross_pct": 3.0,
+                    "filter_failures": [],
+                    "presencial_telemetry": "Fractal Squeeze 15m OK",
+                },
+            }
+        if sid == "mtf_presencial_15m":
+            return {
+                "signal": "COMPRAR",
+                "reason": "Pullback MTF 15m",
+                "signal_candle_ts": 1795199400,
+                "data_age_s": 4,
+                "indicators": {"live_price": 2000.0},
+                "strategy_metrics": {
+                    "candidate_eligible": True,
+                    "side": "LONG",
+                    "current_price": 2000.0,
+                    "sl_price": 1970.0,
+                    "tp_price": 2060.0,
+                    "sl_gross_pct": 1.5,
+                    "tp_gross_pct": 3.0,
+                    "filter_failures": [],
+                    "presencial_telemetry": "MTF Presencial 15m OK",
+                },
+            }
+        return {
+            "signal": "MANTENER",
+            "reason": "Sin gatillo 5m",
+            "signal_candle_ts": 1795199400,
+            "data_age_s": 2,
+            "indicators": {"live_price": 2000.0},
+            "strategy_metrics": {
+                "candidate_eligible": False,
+                "current_price": 2000.0,
+                "filter_failures": ["Sin confluencia MACD 5m"],
+                "presencial_telemetry": "En espera 5m",
+            },
+        }
+
+    with patch("backend.main.get_analysis", side_effect=_fake_analysis):
+        # 1795199400 es múltiplo exacto de 900s y 300s
+        n1 = daemon._run_parallel_presencial_shadow_eval(force=False, now_ts=1795199400.0)
+        # +60s: misma vela en 5m y 15m -> deduplica
+        n2 = daemon._run_parallel_presencial_shadow_eval(force=False, now_ts=1795199460.0)
+        # +300s: nueva vela de 5m, misma vela de 15m -> evalúa solo target 5m
+        n3 = daemon._run_parallel_presencial_shadow_eval(force=False, now_ts=1795199700.0)
+        # force=True: re-evalúa todos
+        n4 = daemon._run_parallel_presencial_shadow_eval(force=True, now_ts=1795199700.0)
+
+    assert n1 == 3
+    assert n2 == 0
+    assert n3 == 1
+    assert n4 == 3
+    assert broker.fetch_positions() == []
+    assert broker.vault_balances["USDT"] == pytest.approx(500.0)
+
+    # Cerrar virtuales por SL/TP sin tocar trades reales ni Edge del Árbitro IA
+    closed_virt = broker.ledger.update_and_close_shadow_trades(
+        symbol="ETH/USDT", current_price=1935.0, high_price=2005.0, low_price=1935.0
+    )
+    assert len(closed_virt) == 2
+
+    # Agregar 1 veto real de Árbitro IA y 7 cierres virtuales extra para disparar veredicto virtual CONSERVAR (>= 8)
+    now_sql = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect(db_file)
+    try:
+        conn.execute(
+            """
+            INSERT INTO shadow_trades (
+                id, symbol, side, status, qty, entry_price, exit_price, sl_price, tp_price,
+                initial_sl_pct, initial_tp_pct, virtual_pnl_usd, virtual_pnl_pct, outcome,
+                strategy, arbiter_verdict, arbiter_reason, opened_at, closed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "sh-ia-veto-1",
+                "SOL/USDT",
+                "LONG",
+                "CLOSED",
+                1.0,
+                100.0,
+                98.0,
+                98.0,
+                105.0,
+                2.0,
+                5.0,
+                -10.0,
+                -2.0,
+                "SAVED_SL",
+                "ttm_squeeze_sol_4h",
+                "VETO_ARBITRO_IA",
+                "Volatilidad extrema",
+                now_sql,
+                now_sql,
+            ),
+        )
+        for idx in range(7):
+            pnl = 6.0 if idx % 2 == 0 else -2.0
+            exit_px = 1940.0 if pnl > 0 else 2030.0
+            outcome = "MISSED_TP" if pnl > 0 else "SAVED_SL"
+            conn.execute(
+                """
+                INSERT INTO shadow_trades (
+                    id, symbol, side, status, qty, entry_price, exit_price, sl_price, tp_price,
+                    initial_sl_pct, initial_tp_pct, virtual_pnl_usd, virtual_pnl_pct, outcome,
+                    strategy, arbiter_verdict, arbiter_reason, opened_at, closed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    f"sh-eval-extra-{idx}",
+                    "ETH/USDT",
+                    "SHORT",
+                    "CLOSED",
+                    0.05,
+                    2000.0,
+                    exit_px,
+                    2030.0,
+                    1940.0,
+                    1.5,
+                    3.0,
+                    pnl,
+                    3.0 if pnl > 0 else -1.5,
+                    outcome,
+                    "fractal_squeeze_15m",
+                    "EVAL_PARALELA",
+                    "Evaluación paralela virtual [15m]",
+                    now_sql,
+                    now_sql,
+                ),
+            )
+        conn.commit()
+        sig_rows = conn.execute("SELECT raw_response FROM signals").fetchall()
+        assert len(sig_rows) == 7
+        assert all(json.loads(r[0])["stage"] == "parallel_shadow" for r in sig_rows)
+        assert conn.execute("SELECT COUNT(*) FROM trades").fetchone()[0] == 0
+    finally:
+        conn.close()
+
+    report = build_campaign_report(
+        db_path=db_file,
+        since_iso="2026-11-21T00:00:00Z",
+        daemon_state_path=str(state_file),
+        config_path=str(cfg_file),
+        now_utc=datetime.now(timezone.utc) + timedelta(minutes=1),
+    )
+
+    # Aislamiento estricto: 0 impacto en VAULT_USDT real y Edge IA contiene solo el veto VETO_ARBITRO_IA (+10.0)
+    assert report["summary"]["trades_closed"] == 0
+    assert report["summary"]["net_pnl_usd"] == 0.0
+    assert report["summary"]["shadow"]["resolved"] == 1
+    assert report["summary"]["shadow"]["net_arbiter_edge_usd"] == pytest.approx(10.0)
+
+    ps = report["summary"]["parallel_shadow"]
+    assert ps["closed"] == 9
+    assert ps["fees_usd"] > 0.0
+    assert ps["profit_factor"] > 1.2
+
+    pres_by_id = {x["strategy_id"]: x for x in report["presencial_strategies"]}
+    assert pres_by_id["fractal_squeeze_15m"]["virtual_closed"] == 8
+    assert pres_by_id["fractal_squeeze_15m"]["virtual_fees_usd"] > 0.0
+    assert pres_by_id["fractal_squeeze_15m"]["verdict"] == "CONSERVAR"
+    assert "[Eval Virtual Paralela]" in pres_by_id["fractal_squeeze_15m"]["verdict_reason"]
+    assert pres_by_id["mtf_presencial_15m"]["virtual_closed"] == 1
+    assert "mtf_presencial_5m" in pres_by_id
+
+    txt = auditar(db_path=db_file, since_iso="2026-11-21")
+    assert "Total Señales Vetadas por Árbitro IA: 1" in txt
+    assert "Evaluaciones: 0 | Candidatas habilitadas: 0" in txt
+    assert "Eval Paralela Virtual (15m/5m sin slot): 9 cerrados" in txt
+
+
+def test_kula_cava_sol_1h_and_nine_auto_strategies_watchdog_green():
+    from backend.health_watchdog import HealthWatchdog
+
+    repo_root = Path(__file__).resolve().parents[1]
+    state_path = repo_root / "backend" / "config" / "daemon_state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    allowed = list(state.get("allowed_strategies") or [])
+
+    assert len(allowed) == 9
+    assert "kula_cava_sol_1h" in allowed
+
+    probe = HealthWatchdog().probe_active_strategies(allowed, force=True)
+    assert probe["status"] == "GREEN"
+    assert probe["checked"] == 9
+    assert probe["passed"] == 9
+    assert probe["failures"] == []

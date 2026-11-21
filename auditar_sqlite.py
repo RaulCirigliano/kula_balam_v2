@@ -263,7 +263,8 @@ def auditar(db_path=None, since_iso=None, save_snapshot=False):
                     SUM(CASE WHEN outcome = 'SAVED_SL' THEN ABS(virtual_pnl_usd) ELSE 0.0 END) as saved_dd_usd,
                     SUM(CASE WHEN outcome = 'MISSED_TP' THEN virtual_pnl_usd ELSE 0.0 END) as missed_gain_usd,
                     SUM(CASE WHEN outcome = 'EXPIRED' THEN virtual_pnl_usd ELSE 0.0 END) as expired_pnl_usd
-                FROM shadow_trades;
+                FROM shadow_trades
+                WHERE COALESCE(arbiter_verdict, '') != 'EVAL_PARALELA';
             """)
             st_row = cursor.fetchone()
             tot_v = (st_row['total_vetoed'] or 0) if st_row else 0
@@ -372,6 +373,9 @@ def auditar(db_path=None, since_iso=None, save_snapshot=False):
 
             for srow in sig_24h:
                 payload = parse_payload(srow["raw_response"])
+                if payload.get("stage") == "parallel_shadow":
+                    total_evals_24h -= 1
+                    continue
                 is_elig = bool(payload.get("eligible")) or (str(srow["signal"]).upper() in ("COMPRAR", "VENDER") and payload.get("stage") != "gate")
                 if is_elig and payload.get("stage") != "gate":
                     total_cands_24h += 1

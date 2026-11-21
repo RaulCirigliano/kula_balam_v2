@@ -2518,10 +2518,10 @@ class LedgerStore:
                     existing = conn.execute(
                         """
                         SELECT id FROM shadow_trades
-                        WHERE status = 'OPEN' AND symbol = ? AND strategy = ? AND side = ?
+                        WHERE status = 'OPEN' AND symbol = ? AND strategy = ? AND side = ? AND COALESCE(arbiter_verdict, '') = ?
                         LIMIT 1
                         """,
-                        (symbol, strategy, norm_side),
+                        (symbol, strategy, norm_side, str(arbiter_verdict or "")),
                     ).fetchone()
                     if existing:
                         return str(existing["id"])

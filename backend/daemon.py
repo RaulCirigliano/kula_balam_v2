@@ -98,6 +98,7 @@ class TraderDaemon:
         self.started_at = 0.0
         self._last_watchdog_ts = 0.0
         self._last_campaign_snapshot_check_ts = 0.0
+        self._parallel_shadow_last_bucket: Dict[Tuple[str, str, str], int] = {}
         self.last_signal = "INACTIVO"
         self.last_reason = "El agente de fondo no ha sido iniciado."
         self.last_error: Optional[str] = None
@@ -504,6 +505,221 @@ class TraderDaemon:
             data_age_s=int((res or {}).get("data_age_s") or 0),
             payload=payload,
         )
+
+    def _record_shadow_vetoes(
+        self,
+        metrics_dict: Dict[str, Any],
+        default_symbol: str,
+        default_strategy: str,
+        fallback_price: float,
+    ) -> int:
+        """Persiste en shadow_trades vetos del Árbitro IA manteniendo arbiter_verdict != EVAL_PARALELA."""
+        shadow_cands = metrics_dict.get("shadow_veto_candidates") or (
+            [metrics_dict["shadow_veto_candidate"]]
+            if isinstance(metrics_dict.get("shadow_veto_candidate"), dict)
+            else []
+        )
+        ledger_ref = getattr(self.broker, "ledger", None)
+        if not shadow_cands or not ledger_ref or not hasattr(ledger_ref, "open_shadow_trade"):
+            return 0
+        try:
+            bal_map = self.broker.fetch_balances() if hasattr(self.broker, "fetch_balances") else {}
+            sym_ccy = symbol_to_currency(default_symbol)
+            op_usd = float(bal_map.get(sym_ccy) or 0.0)
+        except Exception:
+            op_usd = 0.0
+        ref_notional = op_usd if op_usd >= 10.0 else 100.0
+        opened = 0
+        for sc in shadow_cands:
+            if not isinstance(sc, dict):
+                continue
+            sc_entry = float(sc.get("entry_price") or fallback_price or 0.0)
+            sc_sl = float(sc.get("sl_price") or 0.0)
+            sc_tp = float(sc.get("tp_price") or 0.0)
+            if sc_entry <= 0 or sc_sl <= 0 or sc_tp <= 0:
+                continue
+            sc_qty = round(ref_notional / sc_entry, 6)
+            ledger_ref.open_shadow_trade(
+                symbol=str(sc.get("symbol") or default_symbol),
+                side=str(sc.get("side") or "LONG"),
+                qty=sc_qty,
+                entry_price=sc_entry,
+                sl_price=sc_sl,
+                tp_price=sc_tp,
+                initial_sl_pct=float(sc.get("initial_sl_pct") or 1.0),
+                initial_tp_pct=float(sc.get("initial_tp_pct") or 2.0),
+                strategy=str(sc.get("strategy") or default_strategy),
+                arbiter_verdict=str(sc.get("arbiter_verdict") or "VETO_ARBITRO_IA"),
+                arbiter_reason=str(sc.get("arbiter_reason") or "Veto Árbitro IA"),
+                deduplicate=True,
+            )
+            opened += 1
+        return opened
+
+    def _run_parallel_presencial_shadow_eval(
+        self,
+        force: bool = False,
+        now_ts: Optional[float] = None,
+    ) -> int:
+        """
+        Evaluación paralela 100% virtual (arbiter_verdict='EVAL_PARALELA') para fórmulas de
+        `operador_presente/` en su temporalidad nativa (15m/5m), sin abrir posiciones reales en
+        `trades`, sin bloquear slots ni alterar `VAULT_USDT` ni mezclar Edge del Árbitro IA.
+        """
+        from starlette.requests import Request
+        from backend.campaign_audit import load_campaign_config
+        from backend.rejection_funnel import (
+            build_signal_payload,
+            classify_rejection_tags,
+            formula_fired,
+            normalize_signal_for_ledger,
+        )
+        import backend.main as main_mod
+
+        cfg = load_campaign_config()
+        if not force:
+            if not cfg.get("parallel_presencial_shadow_enabled", True):
+                return 0
+            if self.strategy != "auto" or getattr(self, "scalping_active", False):
+                return 0
+
+        targets = cfg.get("parallel_presencial_targets") or [
+            {"strategy": "fractal_squeeze_15m", "symbol": "ETH/USDT", "timeframe": "15m"},
+            {"strategy": "mtf_presencial_15m", "symbol": "ETH/USDT", "timeframe": "15m"},
+            {"strategy": "mtf_presencial_15m", "symbol": "SOL/USDT", "timeframe": "15m"},
+            {"strategy": "mtf_presencial_5m", "symbol": "ETH/USDT", "timeframe": "5m"},
+            {"strategy": "mtf_presencial_5m", "symbol": "SOL/USDT", "timeframe": "5m"},
+        ]
+        now_val = float(now_ts if now_ts is not None else time.time())
+        risk_usd = float(cfg.get("parallel_presencial_risk_usd", 2.5))
+        ledger_ref = getattr(self.broker, "ledger", None)
+        tf_sec_map = {"5m": 300, "15m": 900, "1h": 3600}
+        evaluated = 0
+
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/market/analysis",
+            "query_string": b"",
+            "headers": [(b"host", b"127.0.0.1")],
+            "client": ("127.0.0.1", 12345),
+        }
+        fake_request = Request(scope)
+
+        for item in targets:
+            if not isinstance(item, dict):
+                continue
+            strat_id = str(item.get("strategy") or "").strip()
+            sym = str(item.get("symbol") or "").strip()
+            tf = str(item.get("timeframe") or "15m").strip().lower()
+            if not strat_id or not sym:
+                continue
+
+            tf_sec = tf_sec_map.get(tf, 900)
+            cur_bucket = int(now_val) // tf_sec
+            bkey = (strat_id, sym, tf)
+            if not force and self._parallel_shadow_last_bucket.get(bkey) == cur_bucket:
+                continue
+            self._parallel_shadow_last_bucket[bkey] = cur_bucket
+
+            try:
+                res = main_mod.get_analysis(
+                    request=fake_request,
+                    symbol=sym,
+                    timeframe=tf,
+                    strategy=strat_id,
+                    allowed_strategies=[strat_id],
+                    engine=self.engine,
+                    model=self.model,
+                    tp=self.tp,
+                    sl=self.sl,
+                    risk=self.risk,
+                    fee=self.fee,
+                    spread=self.spread,
+                    min_profit_pct=self.min_profit_pct,
+                )
+                evaluated += 1
+                if not isinstance(res, dict):
+                    continue
+
+                metrics = res.get("strategy_metrics") or {}
+                ind = res.get("indicators") or {}
+                eligible = bool(metrics.get("candidate_eligible"))
+                side_raw = str(
+                    metrics.get("side")
+                    or metrics.get("signal_side")
+                    or res.get("signal")
+                    or ""
+                ).upper()
+                side = (
+                    "SHORT"
+                    if side_raw in ("SHORT", "SELL", "VENDER")
+                    else ("LONG" if side_raw in ("LONG", "BUY", "COMPRAR") else None)
+                )
+                failures = list(metrics.get("filter_failures") or [])
+                entry_px = float(metrics.get("current_price") or ind.get("live_price") or 0.0)
+                texts = [res.get("reason")] + failures + [metrics.get("presencial_telemetry")]
+                tags = [] if eligible else classify_rejection_tags(texts)
+                fired = eligible or formula_fired(texts, False)
+
+                payload = build_signal_payload(
+                    stage="parallel_shadow",
+                    strategy=strat_id,
+                    tags=tags,
+                    eligible=eligible,
+                    side=side,
+                    per_strategy={strat_id: {"eligible": eligible, "fired": fired, "tags": tags}},
+                )
+                sig_val = (
+                    ("VENDER" if side == "SHORT" else "COMPRAR")
+                    if eligible and side in ("LONG", "SHORT")
+                    else "MANTENER"
+                )
+                norm_sig, _ = normalize_signal_for_ledger(sig_val)
+                candle_ts = int(res.get("signal_candle_ts") or (cur_bucket * tf_sec))
+                self._record_signal_row(
+                    symbol=sym,
+                    timeframe=tf,
+                    signal=norm_sig,
+                    reason=str(metrics.get("presencial_telemetry") or res.get("reason") or ""),
+                    price=entry_px,
+                    candle_ts=candle_ts,
+                    data_age_s=int(res.get("data_age_s") or 0),
+                    payload=payload,
+                )
+
+                if eligible and entry_px > 0 and side in ("LONG", "SHORT"):
+                    if ledger_ref and hasattr(ledger_ref, "open_shadow_trade"):
+                        sl_pct = float(metrics.get("sl_gross_pct") or self.sl or 1.2)
+                        tp_pct = float(metrics.get("tp_gross_pct") or self.tp or 2.8)
+                        sl_px = float(metrics.get("sl_price") or 0.0)
+                        tp_px = float(metrics.get("tp_price") or 0.0)
+                        if sl_px <= 0:
+                            sl_px = entry_px * (1.0 - sl_pct / 100.0) if side == "LONG" else entry_px * (1.0 + sl_pct / 100.0)
+                        if tp_px <= 0:
+                            tp_px = entry_px * (1.0 + tp_pct / 100.0) if side == "LONG" else entry_px * (1.0 - tp_pct / 100.0)
+                        sl_dist = abs(entry_px - sl_px)
+                        qty = round(min(100.0 / entry_px, risk_usd / sl_dist), 6) if sl_dist > 0 else round(100.0 / entry_px, 6)
+                        if qty > 0 and sl_px > 0 and tp_px > 0:
+                            ledger_ref.open_shadow_trade(
+                                symbol=sym,
+                                side=side,
+                                qty=qty,
+                                entry_price=entry_px,
+                                sl_price=sl_px,
+                                tp_price=tp_px,
+                                initial_sl_pct=sl_pct,
+                                initial_tp_pct=tp_pct,
+                                strategy=strat_id,
+                                arbiter_verdict="EVAL_PARALELA",
+                                arbiter_reason=f"Evaluación paralela virtual [{tf}] (sin slot)",
+                                deduplicate=True,
+                            )
+                elif not eligible:
+                    self._record_shadow_vetoes(metrics, sym, strat_id, entry_px)
+            except Exception as _e_target:
+                logger.debug(f"[Eval Paralela] Error evaluando {strat_id} {sym} [{tf}]: {_e_target}")
+        return evaluated
 
     def ensure_guardian_running(self) -> bool:
         """Garantiza que el hilo guardián esté corriendo en segundo plano si hay posiciones abiertas."""
@@ -2348,41 +2564,7 @@ class TraderDaemon:
                 )
                 # Registrar en shadow_trades todo veto de arbitro_ia / custom_brain_filter (Sobreextensión, RVOL, etc.)
                 if signal == "MANTENER":
-                    shadow_cands = metrics_dict.get("shadow_veto_candidates") or (
-                        [metrics_dict["shadow_veto_candidate"]] if isinstance(metrics_dict.get("shadow_veto_candidate"), dict) else []
-                    )
-                    ledger_ref = getattr(self.broker, "ledger", None)
-                    if shadow_cands and ledger_ref and hasattr(ledger_ref, "open_shadow_trade"):
-                        try:
-                            bal_map = self.broker.fetch_balances() if hasattr(self.broker, "fetch_balances") else {}
-                            sym_ccy = symbol_to_currency(active_symbol)
-                            op_usd = float(bal_map.get(sym_ccy) or 0.0)
-                        except Exception:
-                            op_usd = 0.0
-                        ref_notional = op_usd if op_usd >= 10.0 else 100.0
-                        for sc in shadow_cands:
-                            if not isinstance(sc, dict):
-                                continue
-                            sc_entry = float(sc.get("entry_price") or cur_price or 0.0)
-                            sc_sl = float(sc.get("sl_price") or 0.0)
-                            sc_tp = float(sc.get("tp_price") or 0.0)
-                            if sc_entry <= 0 or sc_sl <= 0 or sc_tp <= 0:
-                                continue
-                            sc_qty = round(ref_notional / sc_entry, 6)
-                            ledger_ref.open_shadow_trade(
-                                symbol=str(sc.get("symbol") or active_symbol),
-                                side=str(sc.get("side") or "LONG"),
-                                qty=sc_qty,
-                                entry_price=sc_entry,
-                                sl_price=sc_sl,
-                                tp_price=sc_tp,
-                                initial_sl_pct=float(sc.get("initial_sl_pct") or 1.0),
-                                initial_tp_pct=float(sc.get("initial_tp_pct") or 2.0),
-                                strategy=str(sc.get("strategy") or effective_strategy),
-                                arbiter_verdict=str(sc.get("arbiter_verdict") or "VETO_ARBITRO_IA"),
-                                arbiter_reason=str(sc.get("arbiter_reason") or "Veto Árbitro IA"),
-                                deduplicate=True,
-                            )
+                    self._record_shadow_vetoes(metrics_dict, active_symbol, effective_strategy, cur_price)
             self._write_contexto_macro_file(active_symbol, cur_price, res, effective_timeframe=effective_timeframe)
 
             # Actualizar telemetría de mercado en vivo por símbolo (RSI, ATR)
@@ -3063,6 +3245,11 @@ class TraderDaemon:
                         self._wakeup_event.clear()
                     # _execute_cycle() ya invoca _check_open_positions_protections al inicio del ciclo
                     self._execute_cycle()
+                    if self.is_running and self.strategy == "auto" and not getattr(self, "scalping_active", False):
+                        try:
+                            self._run_parallel_presencial_shadow_eval()
+                        except Exception as _e_ps:
+                            logger.debug(f"Aviso en evaluación paralela presencial shadow: {_e_ps}")
                 else:
                     open_positions = self.broker.fetch_positions()
                     if open_positions:

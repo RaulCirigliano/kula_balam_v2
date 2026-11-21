@@ -196,6 +196,19 @@ def _empty_strategy_bucket(strategy_id: str, group: str, meta: Optional[Dict[str
         "shadow_expired_pnl_usd": 0.0,
         "net_arbiter_edge_usd": 0.0,
         "shadow_reasons": {},
+        "virtual_open": 0,
+        "virtual_closed": 0,
+        "virtual_wins": 0,
+        "virtual_losses": 0,
+        "virtual_expired": 0,
+        "virtual_win_rate_pct": 0.0,
+        "virtual_gross_profit_usd": 0.0,
+        "virtual_gross_loss_usd": 0.0,
+        "virtual_net_pnl_usd": 0.0,
+        "virtual_fees_usd": 0.0,
+        "virtual_profit_factor": 0.0,
+        "virtual_realized_rr": 0.0,
+        "virtual_max_drawdown_usd": 0.0,
         "verdict": "MUESTRA_INSUFICIENTE",
         "verdict_reason": "",
     }
@@ -225,18 +238,78 @@ def _evaluate_verdict(stats: Dict[str, Any], days_elapsed: float, cfg: Dict[str,
     if shadow_res >= min_shadow and edge_ia < 0.0:
         return "CALIBRAR", f"{shadow_res} vetos resueltos con Edge IA negativo (-${abs(edge_ia):.2f})"
 
-    if days_elapsed >= min_prune_days and elig == 0 and closed == 0 and evals >= min_prune_evals:
+    v_closed = int(stats.get("virtual_closed") or 0)
+    if str(stats.get("group") or "") == "operador_presente" and v_closed >= min_trades:
+        v_pf = float(stats.get("virtual_profit_factor") or 0.0)
+        v_net = float(stats.get("virtual_net_pnl_usd") or 0.0)
+        if v_pf >= 1.20 and v_net > 0.0:
+            return "CONSERVAR", f"[Eval Virtual Paralela] {v_closed} virtuales cerrados, PF={v_pf:.2f} >= 1.20 y PnL=+${v_net:.2f}"
+        if v_pf < 0.80:
+            return "PODAR", f"[Eval Virtual Paralela] {v_closed} virtuales cerrados con PF={v_pf:.2f} < 0.80 (PnL=${v_net:.2f})"
+        return "CALIBRAR", f"[Eval Virtual Paralela] {v_closed} virtuales cerrados con rendimiento marginal (PF={v_pf:.2f}, PnL=${v_net:.2f})"
+
+    if days_elapsed >= min_prune_days and elig == 0 and closed == 0 and v_closed == 0 and evals >= min_prune_evals:
         return "PODAR", f"0 candidatas y 0 trades tras {days_elapsed:.1f}d ({evals} velas evaluadas)"
 
     return (
         "MUESTRA_INSUFICIENTE",
-        f"Muestra en curso ({closed}/{min_trades} trades cerrados · {shadow_res} vetos resueltos · {days_elapsed:.1f}d)",
+        f"Muestra en curso ({closed}/{min_trades} reales · {v_closed}/{min_trades} virtuales · {shadow_res} vetos · {days_elapsed:.1f}d)",
     )
+
+
+def _compute_series_metrics(events: List[Tuple[float, float]]) -> Dict[str, Any]:
+    """Calcula wins, losses, WR, PF, avg win/loss, R:R realizado, MaxDD, fees y PnL sobre una serie ordenada."""
+    wins = losses = be = 0
+    win_pnls: List[float] = []
+    loss_pnls: List[float] = []
+    equity = peak = max_dd = total_fees = net_total = 0.0
+    for pnl, fees in events:
+        total_fees += fees
+        net_total += pnl
+        if pnl > 1e-6:
+            wins += 1
+            win_pnls.append(pnl)
+        elif pnl < -1e-6:
+            losses += 1
+            loss_pnls.append(pnl)
+        else:
+            be += 1
+        equity += pnl
+        if equity > peak:
+            peak = equity
+        dd = peak - equity
+        if dd > max_dd:
+            max_dd = dd
+
+    decided = wins + losses
+    gp = sum(win_pnls)
+    gl = abs(sum(loss_pnls))
+    avg_w = (gp / len(win_pnls)) if win_pnls else 0.0
+    avg_l = (gl / len(loss_pnls)) if loss_pnls else 0.0
+    n = len(events)
+    return {
+        "closed": n,
+        "wins": wins,
+        "losses": losses,
+        "breakevens": be,
+        "win_rate_pct": round((wins / decided) * 100.0, 2) if decided > 0 else 0.0,
+        "gross_profit_usd": round(gp, 4),
+        "gross_loss_usd": round(gl, 4),
+        "net_pnl_usd": round(net_total, 4),
+        "total_fees_usd": round(total_fees, 4),
+        "profit_factor": round(gp / gl, 4) if gl > 1e-9 else (99.0 if gp > 1e-9 else 0.0),
+        "avg_win_usd": round(avg_w, 4),
+        "avg_loss_usd": round(avg_l, 4),
+        "realized_rr": round(avg_w / avg_l, 4) if avg_l > 1e-9 else 0.0,
+        "expectancy_usd": round(net_total / n, 4) if n > 0 else 0.0,
+        "max_drawdown_usd": round(max_dd, 4),
+    }
 
 
 def _finalize_strategy_stats(
     stats: Dict[str, Any],
     closed_rows: List[sqlite3.Row],
+    closed_virtual_rows: List[sqlite3.Row],
     days_elapsed: float,
     cfg: Dict[str, Any],
 ) -> None:
@@ -245,37 +318,13 @@ def _finalize_strategy_stats(
             closed_rows,
             key=lambda r: (str(r["closed_at"] or r["opened_at"] or ""), str(r["opened_at"] or ""), str(r["id"] or "")),
         )
-        win_pnls: List[float] = []
-        loss_pnls: List[float] = []
         td_vals: List[float] = []
         cf_vals: List[float] = []
-        equity = 0.0
-        peak = 0.0
-        max_dd = 0.0
-        total_fees = float(stats["total_fees_usd"])
-        net_total = 0.0
-
+        real_events: List[Tuple[float, float]] = []
         for r in closed_sorted:
             pnl = float(r["realized_pnl"] or 0.0)
             fees = float(r["total_fees"] or 0.0)
-            total_fees += fees
-            net_total += pnl
-            if pnl > 1e-6:
-                stats["wins"] += 1
-                win_pnls.append(pnl)
-            elif pnl < -1e-6:
-                stats["losses"] += 1
-                loss_pnls.append(pnl)
-            else:
-                stats["breakevens"] += 1
-
-            equity += pnl
-            if equity > peak:
-                peak = equity
-            dd = peak - equity
-            if dd > max_dd:
-                max_dd = dd
-
+            real_events.append((pnl, fees))
             ex_key = _classify_exit_reason(r["exit_reason"])
             stats["exit_reasons"][ex_key]["count"] += 1
             stats["exit_reasons"][ex_key]["net_pnl_usd"] = round(
@@ -286,30 +335,61 @@ def _finalize_strategy_stats(
             if r["counterfactual_diff"] is not None:
                 cf_vals.append(float(r["counterfactual_diff"] or 0.0))
 
-        decided = stats["wins"] + stats["losses"]
-        gross_profit = sum(win_pnls)
-        gross_loss = abs(sum(loss_pnls))
-        avg_win = (gross_profit / len(win_pnls)) if win_pnls else 0.0
-        avg_loss = (gross_loss / len(loss_pnls)) if loss_pnls else 0.0
-
-        stats["trades_closed"] = len(closed_sorted)
-        stats["win_rate_pct"] = round((stats["wins"] / decided) * 100.0, 2) if decided > 0 else 0.0
-        stats["gross_profit_usd"] = round(gross_profit, 4)
-        stats["gross_loss_usd"] = round(gross_loss, 4)
-        stats["net_pnl_usd"] = round(net_total, 4)
-        stats["total_fees_usd"] = round(total_fees, 4)
-        stats["profit_factor"] = (
-            round(gross_profit / gross_loss, 4)
-            if gross_loss > 1e-9
-            else (99.0 if gross_profit > 1e-9 else 0.0)
-        )
-        stats["avg_win_usd"] = round(avg_win, 4)
-        stats["avg_loss_usd"] = round(avg_loss, 4)
-        stats["realized_rr"] = round(avg_win / avg_loss, 4) if avg_loss > 1e-9 else 0.0
-        stats["expectancy_usd"] = round(net_total / len(closed_sorted), 4)
-        stats["max_drawdown_usd"] = round(max_dd, 4)
+        m_real = _compute_series_metrics(real_events)
+        stats["trades_closed"] = m_real["closed"]
+        stats["wins"] = m_real["wins"]
+        stats["losses"] = m_real["losses"]
+        stats["breakevens"] = m_real["breakevens"]
+        stats["win_rate_pct"] = m_real["win_rate_pct"]
+        stats["gross_profit_usd"] = m_real["gross_profit_usd"]
+        stats["gross_loss_usd"] = m_real["gross_loss_usd"]
+        stats["net_pnl_usd"] = m_real["net_pnl_usd"]
+        stats["total_fees_usd"] = round(float(stats["total_fees_usd"]) + m_real["total_fees_usd"], 4)
+        stats["profit_factor"] = m_real["profit_factor"]
+        stats["avg_win_usd"] = m_real["avg_win_usd"]
+        stats["avg_loss_usd"] = m_real["avg_loss_usd"]
+        stats["realized_rr"] = m_real["realized_rr"]
+        stats["expectancy_usd"] = m_real["expectancy_usd"]
+        stats["max_drawdown_usd"] = m_real["max_drawdown_usd"]
         stats["avg_time_decay_hours"] = round(sum(td_vals) / len(td_vals), 2) if td_vals else 0.0
         stats["avg_counterfactual_diff"] = round(sum(cf_vals) / len(cf_vals), 4) if cf_vals else 0.0
+
+    if closed_virtual_rows:
+        virt_sorted = sorted(
+            closed_virtual_rows,
+            key=lambda r: (str(r["closed_at"] or r["opened_at"] or ""), str(r["opened_at"] or ""), str(r["id"] or "")),
+        )
+        virt_events: List[Tuple[float, float]] = []
+        v_expired = 0
+        for vr in virt_sorted:
+            sym = str(vr["symbol"] or "")
+            qty = float(vr["qty"] or 0.0)
+            entry_px = float(vr["entry_price"] or 0.0)
+            fee_rt = (0.0026 if "/" in sym else 0.0006) * abs(entry_px * qty)
+            outcome_u = str(vr["outcome"] or "").upper()
+            vpnl = float(vr["virtual_pnl_usd"] or 0.0)
+            if outcome_u == "MISSED_TP":
+                gross = abs(vpnl)
+            elif outcome_u == "SAVED_SL":
+                gross = -abs(vpnl)
+            else:
+                gross = vpnl
+                v_expired += 1
+            virt_events.append((gross - fee_rt, fee_rt))
+
+        m_virt = _compute_series_metrics(virt_events)
+        stats["virtual_closed"] = m_virt["closed"]
+        stats["virtual_wins"] = m_virt["wins"]
+        stats["virtual_losses"] = m_virt["losses"]
+        stats["virtual_expired"] = v_expired
+        stats["virtual_win_rate_pct"] = m_virt["win_rate_pct"]
+        stats["virtual_gross_profit_usd"] = m_virt["gross_profit_usd"]
+        stats["virtual_gross_loss_usd"] = m_virt["gross_loss_usd"]
+        stats["virtual_net_pnl_usd"] = m_virt["net_pnl_usd"]
+        stats["virtual_fees_usd"] = m_virt["total_fees_usd"]
+        stats["virtual_profit_factor"] = m_virt["profit_factor"]
+        stats["virtual_realized_rr"] = m_virt["realized_rr"]
+        stats["virtual_max_drawdown_usd"] = m_virt["max_drawdown_usd"]
 
     stats["saved_dd_usd"] = round(stats["shadow_saved_dd_usd"], 4)
     stats["shadow_saved_dd_usd"] = round(stats["shadow_saved_dd_usd"], 4)
@@ -393,6 +473,7 @@ def build_campaign_report(
 
     signal_coverage: List[Dict[str, Any]] = []
     closed_trades_by_sid: Dict[str, List[sqlite3.Row]] = defaultdict(list)
+    closed_virtual_by_sid: Dict[str, List[sqlite3.Row]] = defaultdict(list)
     shadow_reasons_global: Dict[str, Dict[str, Any]] = {}
     risk_events: Dict[str, int] = {}
     forced_tf_alerts: List[str] = []
@@ -503,11 +584,12 @@ def build_campaign_report(
                     else:
                         closed_trades_by_sid[sid].append(trow)
 
-            # 3. Shadow testing (vetos Árbitro IA)
+            # 3. Shadow testing (vetos Árbitro IA) vs Evaluación Paralela Virtual (EVAL_PARALELA)
             if _table_exists(cursor, "shadow_trades"):
                 cursor.execute(
                     """
-                    SELECT id, status, outcome, virtual_pnl_usd, strategy, arbiter_reason, opened_at, closed_at
+                    SELECT id, symbol, qty, entry_price, status, outcome, virtual_pnl_usd,
+                           strategy, arbiter_verdict, arbiter_reason, opened_at, closed_at
                     FROM shadow_trades
                     WHERE (status = 'OPEN' AND opened_at >= ?)
                        OR (status = 'CLOSED' AND COALESCE(closed_at, opened_at) >= ?);
@@ -517,8 +599,16 @@ def build_campaign_report(
                 for sh in cursor.fetchall():
                     sid = str(sh["strategy"] or "").strip() or "sin_estrategia"
                     b = _get_or_create_bucket(sid)
-                    reason_lbl = str(sh["arbiter_reason"] or "Sin motivo").strip() or "Sin motivo"
                     status_u = str(sh["status"] or "").upper()
+                    verdict_u = str(sh["arbiter_verdict"] or "").upper()
+                    if verdict_u == "EVAL_PARALELA":
+                        if status_u == "OPEN":
+                            b["virtual_open"] += 1
+                        elif status_u == "CLOSED":
+                            closed_virtual_by_sid[sid].append(sh)
+                        continue
+
+                    reason_lbl = str(sh["arbiter_reason"] or "Sin motivo").strip() or "Sin motivo"
                     outcome_u = str(sh["outcome"] or "").upper()
                     vpnl = float(sh["virtual_pnl_usd"] or 0.0)
 
@@ -606,7 +696,13 @@ def build_campaign_report(
 
     # Finalizar estadísticas por estrategia
     for sid, b in buckets.items():
-        _finalize_strategy_stats(b, closed_trades_by_sid.get(sid, []), days_elapsed, cfg)
+        _finalize_strategy_stats(
+            b,
+            closed_trades_by_sid.get(sid, []),
+            closed_virtual_by_sid.get(sid, []),
+            days_elapsed,
+            cfg,
+        )
 
     auto_list = [buckets[s] for s in auto_ids if s in buckets]
     presencial_list = [buckets[s] for s in sorted(presencial_catalog.keys()) if s in buckets and s not in set(auto_ids)]
@@ -630,6 +726,31 @@ def build_campaign_report(
     total_summary = _summarize_group(all_rows)
     auto_summary = _summarize_group(auto_list)
     presencial_summary = _summarize_group(presencial_list)
+
+    ps_open = sum(int(x.get("virtual_open") or 0) for x in all_rows)
+    ps_closed = sum(int(x.get("virtual_closed") or 0) for x in all_rows)
+    ps_wins = sum(int(x.get("virtual_wins") or 0) for x in all_rows)
+    ps_losses = sum(int(x.get("virtual_losses") or 0) for x in all_rows)
+    ps_expired = sum(int(x.get("virtual_expired") or 0) for x in all_rows)
+    ps_gp = sum(float(x.get("virtual_gross_profit_usd") or 0.0) for x in all_rows)
+    ps_gl = sum(float(x.get("virtual_gross_loss_usd") or 0.0) for x in all_rows)
+    ps_net = sum(float(x.get("virtual_net_pnl_usd") or 0.0) for x in all_rows)
+    ps_fees = sum(float(x.get("virtual_fees_usd") or 0.0) for x in all_rows)
+    ps_decided = ps_wins + ps_losses
+    parallel_shadow_summary = {
+        "open": ps_open,
+        "closed": ps_closed,
+        "virtual_resolved": ps_closed,
+        "wins": ps_wins,
+        "losses": ps_losses,
+        "expired": ps_expired,
+        "win_rate_pct": round((ps_wins / ps_decided) * 100.0, 2) if ps_decided > 0 else 0.0,
+        "gross_profit_usd": round(ps_gp, 4),
+        "gross_loss_usd": round(ps_gl, 4),
+        "net_pnl_usd": round(ps_net, 4),
+        "fees_usd": round(ps_fees, 4),
+        "profit_factor": round(ps_gp / ps_gl, 4) if ps_gl > 1e-9 else (99.0 if ps_gp > 1e-9 else 0.0),
+    }
 
     shadow_totals["saved_dd_usd"] = round(shadow_totals["saved_dd_usd"], 4)
     shadow_totals["missed_gain_usd"] = round(shadow_totals["missed_gain_usd"], 4)
@@ -681,6 +802,7 @@ def build_campaign_report(
             "auto": auto_summary,
             "presencial": presencial_summary,
             "shadow": shadow_totals,
+            "parallel_shadow": parallel_shadow_summary,
             "exit_reasons": global_exits,
         },
         "auto_strategies": auto_list,
@@ -696,22 +818,30 @@ def build_campaign_report(
     }
 
 
-def _format_strategy_table(title: str, rows: List[Dict[str, Any]]) -> List[str]:
+def _format_strategy_table(title: str, rows: List[Dict[str, Any]], show_virtual: bool = False) -> List[str]:
     lines = [title]
     if not rows:
         lines.append("  (Sin estrategias registradas en este bloque)")
         return lines
+    tr_hdr = "Tr(V)" if show_virtual else "Tr"
+    pnl_hdr = "PnL Virt" if show_virtual else "PnL USD"
     header = (
-        f"  {'Estrategia':<33} | {'Velas':>5} | {'Crud':>4} | {'Cand':>4} | {'Tr':>3} | "
-        f"{'WR':>6} | {'PF':>5} | {'R:R':>4} | {'PnL USD':>9} | {'Edge IA':>8} | Dictamen"
+        f"  {'Estrategia':<33} | {'Velas':>5} | {'Crud':>4} | {'Cand':>4} | {tr_hdr:>5} | "
+        f"{'WR':>6} | {'PF':>5} | {'R:R':>4} | {pnl_hdr:>9} | {'Edge IA':>8} | Dictamen"
     )
     lines.append(header)
     lines.append("  " + "-" * (len(header) - 2))
     for r in rows:
+        use_v = bool(show_virtual and int(r.get("trades_closed") or 0) == 0 and (int(r.get("virtual_closed") or 0) > 0 or int(r.get("virtual_open") or 0) > 0))
+        tr_str = f"{int(r.get('virtual_closed') or 0)}V" if use_v else f"{int(r.get('trades_closed') or 0)}"
+        wr_val = float(r.get("virtual_win_rate_pct") if use_v else r.get("win_rate_pct") or 0.0)
+        pf_val = float(r.get("virtual_profit_factor") if use_v else r.get("profit_factor") or 0.0)
+        rr_val = float(r.get("virtual_realized_rr") if use_v else r.get("realized_rr") or 0.0)
+        pnl_val = float(r.get("virtual_net_pnl_usd") if use_v else r.get("net_pnl_usd") or 0.0)
         lines.append(
             f"  {r['strategy_id']:<33} | {r['evals']:>5} | {r['raw_fired']:>4} | {r['eligible']:>4} | "
-            f"{r['trades_closed']:>3} | {r['win_rate_pct']:>5.1f}% | {r['profit_factor']:>5.2f} | "
-            f"{r['realized_rr']:>4.2f} | {r['net_pnl_usd']:>+9.2f} | {r['net_arbiter_edge_usd']:>+8.2f} | {r['verdict']}"
+            f"{tr_str:>5} | {wr_val:>5.1f}% | {pf_val:>5.2f} | "
+            f"{rr_val:>4.2f} | {pnl_val:>+9.2f} | {r['net_arbiter_edge_usd']:>+8.2f} | {r['verdict']}"
         )
     return lines
 
@@ -721,6 +851,7 @@ def format_campaign_text(report: Dict[str, Any]) -> str:
     camp = report.get("campaign") or {}
     summ = report.get("summary") or {}
     sh = summ.get("shadow") or {}
+    ps = summ.get("parallel_shadow") or {}
     infra = report.get("infrastructure") or {}
     exits = summ.get("exit_reasons") or {}
 
@@ -733,14 +864,19 @@ def format_campaign_text(report: Dict[str, Any]) -> str:
     lines.append(
         f"  Meta Muestral Enfriamiento: {summ.get('resolved_events', 0)}/{summ.get('min_resolved_events', 15)} "
         f"eventos resueltos ({summ.get('progress_pct', 0):.1f}%) | "
-        f"PnL Neto: ${summ.get('net_pnl_usd', 0.0):+.2f} | PF Global: {summ.get('profit_factor', 0.0):.2f} | "
+        f"PnL Neto (Real VAULT): ${summ.get('net_pnl_usd', 0.0):+.2f} | PF Global: {summ.get('profit_factor', 0.0):.2f} | "
         f"Edge Árbitro IA: ${sh.get('net_arbiter_edge_usd', 0.0):+.2f}"
     )
+    if ps.get("closed", 0) > 0 or ps.get("open", 0) > 0:
+        lines.append(
+            f"  Eval Paralela Virtual (15m/5m sin slot): {ps.get('closed', 0)} cerrados ({ps.get('open', 0)} ab.) | "
+            f"WR={ps.get('win_rate_pct', 0.0):.1f}% | PF={ps.get('profit_factor', 0.0):.2f} | PnL Virt=${ps.get('net_pnl_usd', 0.0):+.2f}"
+        )
     lines.append("")
-    lines.extend(_format_strategy_table("  [A] BLOQUE AUTO (DAEMON DE FONDO)", report.get("auto_strategies") or []))
+    lines.extend(_format_strategy_table("  [A] BLOQUE AUTO (DAEMON DE FONDO · VAULT_USDT)", report.get("auto_strategies") or []))
     lines.append("")
     lines.extend(
-        _format_strategy_table("  [B] BLOQUE OPERADOR PRESENTE (catalogo/operador_presente/)", report.get("presencial_strategies") or [])
+        _format_strategy_table("  [B] BLOQUE OPERADOR PRESENTE (EVAL PARALELA VIRTUAL + SESIONES)", report.get("presencial_strategies") or [], show_virtual=True)
     )
     if report.get("other_strategies"):
         lines.append("")

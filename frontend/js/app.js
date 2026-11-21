@@ -10349,12 +10349,23 @@ function _campaignVerdictBadge(verdict) {
     return '<span class="campaign-verdict-pill campaign-verdict-muestra">EN MUESTRA</span>';
 }
 
-function _renderCampaignTableRows(rows) {
+function _renderCampaignTableRows(rows, isPresencial = false) {
     if (!Array.isArray(rows) || rows.length === 0) {
         return '<tr><td colspan="11" style="text-align:center;color:#94a3b8;">Sin estrategias registradas en este bloque</td></tr>';
     }
     return rows.map((r) => {
-        const pnl = Number(r.net_pnl_usd || 0);
+        const useVirtual = Boolean(
+            isPresencial
+            && Number(r.trades_closed || 0) === 0
+            && (Number(r.virtual_closed || 0) > 0 || Number(r.virtual_open || 0) > 0)
+        );
+        const pnl = Number((useVirtual ? r.virtual_net_pnl_usd : r.net_pnl_usd) || 0);
+        const wr = Number((useVirtual ? r.virtual_win_rate_pct : r.win_rate_pct) || 0);
+        const pf = Number((useVirtual ? r.virtual_profit_factor : r.profit_factor) || 0);
+        const rr = Number((useVirtual ? r.virtual_realized_rr : r.realized_rr) || 0);
+        const trCell = useVirtual
+            ? `<span style="color:#67e8f9;font-weight:700;">[V] ${Number(r.virtual_closed || 0)}</span> <span style="color:#64748b;">(${Number(r.virtual_open || 0)} ab.)</span>`
+            : `${Number(r.trades_closed || 0)} <span style="color:#64748b;">(${Number(r.trades_open || 0)} ab.)</span>`;
         const edge = Number(r.net_arbiter_edge_usd || 0);
         const pnlColor = pnl > 0 ? '#34d399' : (pnl < 0 ? '#f87171' : '#cbd5e1');
         const edgeColor = edge > 0 ? '#34d399' : (edge < 0 ? '#f87171' : '#cbd5e1');
@@ -10368,10 +10379,10 @@ function _renderCampaignTableRows(rows) {
                 <td>${Number(r.evals || 0)}</td>
                 <td>${Number(r.raw_fired || 0)}</td>
                 <td>${Number(r.eligible || 0)}</td>
-                <td>${Number(r.trades_closed || 0)} <span style="color:#64748b;">(${Number(r.trades_open || 0)} ab.)</span></td>
-                <td>${Number(r.win_rate_pct || 0).toFixed(1)}%</td>
-                <td>${Number(r.profit_factor || 0).toFixed(2)}</td>
-                <td>${Number(r.realized_rr || 0).toFixed(2)}</td>
+                <td>${trCell}</td>
+                <td>${wr.toFixed(1)}%</td>
+                <td>${pf.toFixed(2)}</td>
+                <td>${rr.toFixed(2)}</td>
                 <td style="color:${pnlColor};font-weight:700;">${pnlTxt}</td>
                 <td style="color:${edgeColor};font-weight:700;">${edgeTxt}</td>
                 <td>${_campaignVerdictBadge(r.verdict)}</td>
@@ -10387,6 +10398,7 @@ window.renderCampaignAuditModal = function(data) {
     const camp = report.campaign || {};
     const summ = report.summary || {};
     const sh = summ.shadow || {};
+    const ps = summ.parallel_shadow || {};
     const infra = report.infrastructure || {};
     const exits = summ.exit_reasons || {};
     const sinceInput = document.getElementById('campaignSinceInput');
@@ -10401,6 +10413,7 @@ window.renderCampaignAuditModal = function(data) {
     const pct = Math.min(100, Math.max(0, Number(summ.progress_pct || 0)));
     const netPnl = Number(summ.net_pnl_usd || 0);
     const edgeIa = Number(sh.net_arbiter_edge_usd || 0);
+    const psNet = Number(ps.net_pnl_usd || 0);
     const riskEvCount = Object.values(infra.risk_events || {}).reduce((a, b) => a + Number(b || 0), 0);
     const forcedCount = Number(infra.forced_tf_alerts_count || 0);
 
@@ -10435,7 +10448,7 @@ window.renderCampaignAuditModal = function(data) {
 
         <div class="campaign-summary-grid">
             <div class="campaign-kpi-card">
-                <div class="campaign-kpi-label">PnL Neto Campaña</div>
+                <div class="campaign-kpi-label">PnL Neto Campaña (VAULT)</div>
                 <div class="campaign-kpi-value" style="color:${netPnl >= 0 ? '#34d399' : '#f87171'};">${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)} USD</div>
                 <div class="campaign-kpi-sub">${Number(summ.trades_closed || 0)} cerrados · PF ${Number(summ.profit_factor || 0).toFixed(2)} · WR ${Number(summ.win_rate_pct || 0).toFixed(1)}%</div>
             </div>
@@ -10443,6 +10456,11 @@ window.renderCampaignAuditModal = function(data) {
                 <div class="campaign-kpi-label">Edge Árbitro IA (Shadow)</div>
                 <div class="campaign-kpi-value" style="color:${edgeIa >= 0 ? '#34d399' : '#f87171'};">${edgeIa >= 0 ? '+' : ''}$${edgeIa.toFixed(2)} USD</div>
                 <div class="campaign-kpi-sub">${Number(sh.vetoed_total || 0)} vetos (${Number(sh.saved_sl || 0)} SL ahorrados / ${Number(sh.missed_tp || 0)} TP)</div>
+            </div>
+            <div class="campaign-kpi-card" style="border-color: rgba(34, 211, 238, 0.45);">
+                <div class="campaign-kpi-label" style="color:#67e8f9;">Eval Paralela Virtual (15m/5m)</div>
+                <div class="campaign-kpi-value" style="color:${psNet >= 0 ? '#34d399' : '#f87171'};">${psNet >= 0 ? '+' : ''}$${psNet.toFixed(2)} USD</div>
+                <div class="campaign-kpi-sub">${Number(ps.closed || 0)} cerrados (${Number(ps.open || 0)} ab.) · PF ${Number(ps.profit_factor || 0).toFixed(2)} · WR ${Number(ps.win_rate_pct || 0).toFixed(1)}%</div>
             </div>
             <div class="campaign-kpi-card">
                 <div class="campaign-kpi-label">Puntos de Fuga (Salidas)</div>
@@ -10457,21 +10475,21 @@ window.renderCampaignAuditModal = function(data) {
         </div>
 
         <div>
-            <div class="campaign-section-title"><span>⚡ Bloque Auto [${escapeHtml(camp.daemon_timeframe || '4h')}] (Fórmulas Autónomas)</span><span style="font-size:10px;color:#94a3b8;">${(report.auto_strategies || []).length} fórmulas</span></div>
+            <div class="campaign-section-title"><span>⚡ Bloque Auto [${escapeHtml(camp.daemon_timeframe || '4h')}] (Fórmulas Autónomas · VAULT_USDT)</span><span style="font-size:10px;color:#94a3b8;">${(report.auto_strategies || []).length} fórmulas</span></div>
             <div class="campaign-table-wrap">
                 <table class="campaign-table">
                     <thead><tr><th>Estrategia</th><th>Velas</th><th>Crudas</th><th>Cand.</th><th>Trades</th><th>WR</th><th>PF</th><th>R:R</th><th>PnL Neto</th><th>Edge IA</th><th>Dictamen</th></tr></thead>
-                    <tbody>${_renderCampaignTableRows(report.auto_strategies || [])}</tbody>
+                    <tbody>${_renderCampaignTableRows(report.auto_strategies || [], false)}</tbody>
                 </table>
             </div>
         </div>
 
         <div>
-            <div class="campaign-section-title"><span>🎯 Bloque Presencial (catalogo/operador_presente/)</span><span style="font-size:10px;color:#94a3b8;">${(report.presencial_strategies || []).length} fórmulas</span></div>
+            <div class="campaign-section-title"><span>🎯 Bloque Presencial (Eval Paralela Virtual + Sesiones)</span><span style="font-size:10px;color:#94a3b8;">${(report.presencial_strategies || []).length} fórmulas · [V]=Virtual sin slot</span></div>
             <div class="campaign-table-wrap">
                 <table class="campaign-table">
-                    <thead><tr><th>Estrategia</th><th>Velas</th><th>Crudas</th><th>Cand.</th><th>Trades</th><th>WR</th><th>PF</th><th>R:R</th><th>PnL Neto</th><th>Edge IA</th><th>Dictamen</th></tr></thead>
-                    <tbody>${_renderCampaignTableRows(report.presencial_strategies || [])}</tbody>
+                    <thead><tr><th>Estrategia</th><th>Velas</th><th>Crudas</th><th>Cand.</th><th>Trades / [V]</th><th>WR</th><th>PF</th><th>R:R</th><th>PnL Neto / Virt</th><th>Edge IA</th><th>Dictamen</th></tr></thead>
+                    <tbody>${_renderCampaignTableRows(report.presencial_strategies || [], true)}</tbody>
                 </table>
             </div>
         </div>
