@@ -2519,6 +2519,59 @@ def run_ledger_audit(request: Request, x_api_token: Optional[str] = Header(None)
     }
 
 
+@app.get("/api/audit/campaign")
+def get_campaign_audit(
+    since: Optional[str] = Query(None),
+    include_presencial: bool = Query(True),
+):
+    """Devuelve la auditoría cuantitativa read-only de la campaña (auto vs operador_presente)."""
+    from backend.campaign_audit import build_campaign_report, format_campaign_text
+
+    report = build_campaign_report(
+        since_iso=since,
+        include_presencial=include_presencial,
+    )
+    return {
+        "status": "ok",
+        "report": report,
+        "text_summary": format_campaign_text(report),
+    }
+
+
+@app.get("/api/audit/campaign/snapshots")
+def get_campaign_snapshots():
+    """Lista los snapshots históricos guardados en data/audit_snapshots/ para comparación entre semanas."""
+    from backend.campaign_audit import list_campaign_snapshots
+
+    return {
+        "status": "ok",
+        "snapshots": list_campaign_snapshots(),
+    }
+
+
+@app.post("/api/audit/campaign/snapshot")
+def create_campaign_snapshot(
+    request: Request,
+    since: Optional[str] = Query(None),
+    x_api_token: Optional[str] = Header(None),
+):
+    """Guarda manualmente un snapshot JSON/TXT de campaña en data/audit_snapshots/."""
+    verify_auth_token(request, x_api_token)
+    from backend.campaign_audit import list_campaign_snapshots, save_campaign_snapshot
+
+    snap = save_campaign_snapshot(since_iso=since, trigger="ui_manual")
+    return {
+        "status": "ok",
+        "snapshot": {
+            "filename_json": snap["filename_json"],
+            "filename_txt": snap["filename_txt"],
+            "created_at_utc": snap["created_at_utc"],
+            "trigger": snap["trigger"],
+        },
+        "snapshots": list_campaign_snapshots(),
+    }
+
+
 @app.post("/api/ledger/reset_circuit_breaker")
 def reset_ledger_circuit_breaker(
     request: Request,

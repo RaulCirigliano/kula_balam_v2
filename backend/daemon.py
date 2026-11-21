@@ -97,6 +97,7 @@ class TraderDaemon:
         self.last_cycle_ts = 0.0
         self.started_at = 0.0
         self._last_watchdog_ts = 0.0
+        self._last_campaign_snapshot_check_ts = 0.0
         self.last_signal = "INACTIVO"
         self.last_reason = "El agente de fondo no ha sido iniciado."
         self.last_error: Optional[str] = None
@@ -3083,6 +3084,17 @@ class TraderDaemon:
                     get_health_watchdog().evaluate(self, force_probe=True, notify_on_red=True)
             except Exception as _e_wd:
                 logger.debug(f"Aviso en ciclo watchdog determinista: {_e_wd}")
+
+            # Snapshot semanal automático de campaña (check cada 1h, emisión cada >= 7 días, 0 tokens)
+            try:
+                now_snap = time.time()
+                if self.is_running and self.cycle_count >= 1 and (now_snap - getattr(self, "_last_campaign_snapshot_check_ts", 0.0)) >= 3600.0:
+                    self._last_campaign_snapshot_check_ts = now_snap
+                    from backend.campaign_audit import maybe_write_weekly_snapshot
+
+                    maybe_write_weekly_snapshot(db_path=getattr(getattr(self, "ledger", None), "db_path", None))
+            except Exception as _e_snap:
+                logger.debug(f"Aviso en snapshot semanal de campaña: {_e_snap}")
 
             # Relojito sincronizado al cierre exacto de vela (+3s asentamiento) con pulso rápido (<= 5s) si hay posiciones
             try:

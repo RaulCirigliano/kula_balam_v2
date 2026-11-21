@@ -5,9 +5,11 @@ Inspecciona directamente trading_ledger.sqlite3 (partida doble, trades, bóveda)
 Copia automáticamente el informe al portapapeles para pegar en Gemini con Ctrl+V.
 """
 
+import argparse
 import os
 import sqlite3
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 ARG_TZ = timezone(timedelta(hours=-3))
 
@@ -42,7 +44,7 @@ if not DB_PATH or not os.path.exists(DB_PATH):
     if not DB_PATH:
         DB_PATH = DEFAULT_DB_CANDIDATES[0]
 
-def auditar(db_path=None):
+def auditar(db_path=None, since_iso=None, save_snapshot=False):
     target_db = db_path or os.getenv("TRADING_LEDGER_DB_PATH") or DB_PATH
     lineas = []
     def log(msg=""):
@@ -322,7 +324,7 @@ def auditar(db_path=None):
             cursor.execute(
                 """
                 SELECT symbol, timeframe, COUNT(*) as evals,
-                       SUM(CASE WHEN signal IN ('COMPRAR', 'SHORT') THEN 1 ELSE 0 END) as candidates
+                       SUM(CASE WHEN signal IN ('COMPRAR', 'VENDER') THEN 1 ELSE 0 END) as candidates
                 FROM signals
                 WHERE created_at >= datetime('now', '-24 hours')
                 GROUP BY symbol, timeframe
@@ -370,7 +372,7 @@ def auditar(db_path=None):
 
             for srow in sig_24h:
                 payload = parse_payload(srow["raw_response"])
-                is_elig = bool(payload.get("eligible")) or (str(srow["signal"]).upper() in ("COMPRAR", "SHORT") and payload.get("stage") != "gate")
+                is_elig = bool(payload.get("eligible")) or (str(srow["signal"]).upper() in ("COMPRAR", "VENDER") and payload.get("stage") != "gate")
                 if is_elig and payload.get("stage") != "gate":
                     total_cands_24h += 1
                     continue
@@ -499,6 +501,20 @@ def auditar(db_path=None):
             log(f"  (Aviso procesando Embudo de Rechazos / Redundancia: {funnel_err})")
             log()
 
+        # 5d. Evaluación de Campaña (Auto vs Operador Presente, Puntos de Fuga y Dictámenes)
+        try:
+            from backend.campaign_audit import build_campaign_report, format_campaign_text
+
+            camp_report = build_campaign_report(
+                db_path=target_db,
+                since_iso=since_iso,
+                include_presencial=True,
+            )
+            log(format_campaign_text(camp_report))
+        except Exception as camp_err:
+            log(f"  (Aviso procesando Auditoría de Campaña: {camp_err})")
+            log()
+
         # 6. Directiva de Auditoría y Mejora Continua para Cualquier IA Auditora
         log("=" * 75)
         log("🧠 DIRECTIVA DE AUDITORÍA Y MEJORA CONTINUA (PARA CUALQUIER IA AUDITORA / CIO / LLM):")
@@ -515,29 +531,43 @@ def auditar(db_path=None):
         conn.close()
 
     texto_completo = "\n".join(lineas)
+    if save_snapshot:
+        try:
+            from backend.campaign_audit import save_campaign_snapshot
+
+            snap_res = save_campaign_snapshot(
+                db_path=target_db,
+                since_iso=since_iso,
+                trigger="cli_snapshot",
+            )
+            print(f"📸 [SNAPSHOT CAMPAÑA GUARDADO]: {snap_res['path_json']} | {snap_res['path_txt']}")
+        except Exception as snap_err:
+            print(f"⚠️ No se pudo guardar el snapshot de campaña: {snap_err}")
+
     if db_path is not None:
         return texto_completo
 
-    # 1. Guardar informe histórico en /home/raul/Escritorio/informes_auditoria con fecha como primera parte del título
-    informes_dir = "/home/raul/Escritorio/informes_auditoria"
+    # 1. Guardar informe histórico en escritorio portable (Linux Escritorio / Windows Desktop)
+    home_dir = Path.home()
+    desktop_dir = home_dir / "Escritorio" if (home_dir / "Escritorio").exists() else (home_dir / "Desktop")
     informe_hist_path = None
-    try:
-        os.makedirs(informes_dir, exist_ok=True)
-        informe_hist_path = os.path.join(informes_dir, f"{timestamp_slug}_auditoria_kula_balam.txt")
-        with open(informe_hist_path, "w", encoding="utf-8") as f:
-            f.write(texto_completo)
-    except Exception as err:
-        pass
+    if desktop_dir.exists():
+        try:
+            informes_dir = desktop_dir / "informes_auditoria"
+            informes_dir.mkdir(parents=True, exist_ok=True)
+            hist_file = informes_dir / f"{timestamp_slug}_auditoria_kula_balam.txt"
+            hist_file.write_text(texto_completo, encoding="utf-8")
+            informe_hist_path = str(hist_file)
+        except Exception:
+            pass
 
-    # 2. Guardar también en 'ultimo_reporte_boveda.txt' (frontend y escritorio) para acceso directo y UI
+    # 2. Guardar también en 'ultimo_reporte_boveda.txt' (frontend y escritorio portable) para acceso directo y UI
     try:
-        frontend_txt = os.path.join(PROJECT_ROOT, "frontend", "ultimo_reporte_boveda.txt")
-        desktop_txt = "/home/raul/Escritorio/ultimo_reporte_boveda.txt"
-        with open(frontend_txt, "w", encoding="utf-8") as f:
-            f.write(texto_completo)
-        with open(desktop_txt, "w", encoding="utf-8") as f:
-            f.write(texto_completo)
-    except Exception as err:
+        frontend_txt = Path(PROJECT_ROOT) / "frontend" / "ultimo_reporte_boveda.txt"
+        frontend_txt.write_text(texto_completo, encoding="utf-8")
+        if desktop_dir.exists():
+            (desktop_dir / "ultimo_reporte_boveda.txt").write_text(texto_completo, encoding="utf-8")
+    except Exception:
         pass
 
     # 3. Copiar automáticamente todo el informe al portapapeles del sistema
@@ -558,5 +588,11 @@ def auditar(db_path=None):
 
     return texto_completo
 
+
 if __name__ == "__main__":
-    auditar()
+    parser = argparse.ArgumentParser(description="Auditor Forense SQLite + Campaña Kula Balam")
+    parser.add_argument("--since", dest="since_iso", default=None, help="Fecha/ISO de inicio de campaña (ej. 2026-11-21)")
+    parser.add_argument("--snapshot", action="store_true", help="Guarda snapshot JSON/TXT en data/audit_snapshots/")
+    parser.add_argument("--db", dest="db_path", default=None, help="Ruta opcional a trading_ledger.sqlite3")
+    args = parser.parse_args()
+    auditar(db_path=args.db_path, since_iso=args.since_iso, save_snapshot=bool(args.snapshot))

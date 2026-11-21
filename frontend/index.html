@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kula Balam - Dashboard Cuantitativo</title>
-    <link rel="stylesheet" href="css/style.css?v=20261110_sem">
+    <link rel="stylesheet" href="css/style.css?v=20261121_camp">
     <link rel="stylesheet" href="css/ecosystem-theme.css?v=20261031_scroll2">
     <!-- Tailwind CSS compilado (build documentado en CONTEXTO.md Secc. 2 y docs/auditorias/GUIA_Y_REGISTRO_DE_AUDITORIAS.md). Debe ir DESPUÉS de style.css: el CDN anterior inyectaba su <style> al final del head y esa precedencia se conserva. -->
     <link rel="stylesheet" href="css/tailwind.css?v=20261031_scroll2">
@@ -110,10 +110,11 @@
                 </div>
             </div>
 
-            <!-- Botones de Vista: Trading / Inversores -->
+            <!-- Botones de Vista: Trading / Inversores / Campaña -->
             <div class="flex items-center bg-gray-900 rounded-lg p-0.5 border border-gray-700 ml-2 shadow-inner">
                 <button id="navTradingBtn" type="button" class="px-3 py-1 text-xs font-bold rounded bg-blue-600 text-white transition cursor-pointer">📈 Trading</button>
                 <button id="navInvestorsBtn" type="button" class="px-3 py-1 text-xs font-bold rounded text-gray-400 hover:text-white transition cursor-pointer">👥 Inversores</button>
+                <button id="btnOpenCampaignAudit" type="button" onclick="window.openCampaignAuditModal && window.openCampaignAuditModal()" class="px-3 py-1 text-xs font-bold rounded text-cyan-300 hover:text-white transition cursor-pointer" title="Evaluación de campaña (2-4 semanas): Scorecard Auto vs Presencial y Shadow IA">📊 Auditoría de Campaña</button>
             </div>
 
             <!-- Reloj en Vivo y Pulso de Red (Ticks Fluidos sin F5) -->
@@ -2118,7 +2119,7 @@
 
     <script src="js/trading_guards.js?v=5"></script>
     <script src="js/ui_components.js?v=20261019_ui"></script>
-    <script src="js/app.js?v=20261117_bg1h"></script>
+    <script src="js/app.js?v=20261121_camp"></script>
     <script src="js/cio_cockpit.js?v=1"></script>
     <script>
         // Controlador interactivo ultra-estable para el menú desplegable de Terminales & Páginas del Ecosistema
@@ -2261,6 +2262,46 @@
                 </span>
                 <button type="button" onclick="window.closeStrategyManagerModal()" class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white font-bold rounded-lg border border-gray-700 shadow transition cursor-pointer">
                     ✕ Cerrar Ventana
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 📊 MODAL: AUDITORÍA DE CAMPAÑA (2–4 SEMANAS: AUTO vs PRESENCIAL)          -->
+    <!-- ========================================================================= -->
+    <div id="campaignAuditModal" onclick="if (event.target === this && window.closeCampaignAuditModal) window.closeCampaignAuditModal();" class="hidden fixed inset-0 z-[100000] p-3 sm:p-5 flex items-start justify-center overflow-y-auto" style="position: fixed; inset: 0; z-index: 100000; background-color: rgba(0, 0, 0, 0.88); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 20px 12px; align-items: flex-start; justify-content: center;">
+        <div class="bg-gray-950 border border-cyan-500/60 rounded-2xl w-full shadow-2xl flex flex-col" style="max-width: 1120px; max-height: calc(100vh - 40px); height: calc(100vh - 40px); overflow: hidden; position: relative; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.9), 0 0 25px rgba(6,182,212,0.3);" onclick="event.stopPropagation()">
+            <div class="p-4 bg-gray-900/95 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3 shrink-0" style="flex-shrink: 0;">
+                <div>
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <span>📊 Auditoría de Campaña (2–4 Semanas)</span>
+                        <span class="text-[10px] bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-700 font-mono">0 Tokens · Solo Lectura</span>
+                    </h2>
+                    <p class="text-xs text-gray-400">Evaluación empírica separada entre Auto [4h] y Operador Presente, con Edge IA (Shadow) y dictamen objetivo.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="campaignSinceInput" class="text-[11px] text-gray-400 font-mono">Desde:</label>
+                    <input id="campaignSinceInput" type="date" onchange="window.refreshCampaignAudit && window.refreshCampaignAudit()" class="bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 font-mono" />
+                    <button type="button" onclick="window.refreshCampaignAudit && window.refreshCampaignAudit()" class="campaign-btn-secondary">🔄 Actualizar</button>
+                    <button type="button" id="btnCloseCampaignAudit" onclick="window.closeCampaignAuditModal && window.closeCampaignAuditModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-950/80 hover:bg-red-900 text-red-200 hover:text-white border border-red-700/80 hover:border-red-500 font-bold text-xs shadow-md transition cursor-pointer" title="Cerrar ventana">
+                        <span class="text-base font-extrabold leading-none">✕</span>
+                        <span class="font-mono">CERRAR</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="campaignAuditContent" class="p-4 overflow-y-auto space-y-4 text-xs" style="flex: 1 1 auto; min-height: 0; overflow-y: auto;">
+                <div class="text-center py-8 text-gray-400">Cargando auditoría cuantitativa de campaña...</div>
+            </div>
+
+            <div class="p-3 bg-gray-900/90 border-t border-gray-800 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400 shrink-0" style="flex-shrink: 0;">
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btnSaveCampaignSnapshot" onclick="window.saveCampaignSnapshotNow && window.saveCampaignSnapshotNow()" class="campaign-btn-primary">💾 Guardar Snapshot</button>
+                    <button type="button" id="btnCopyCampaignSummary" onclick="window.copyCampaignAuditSummary && window.copyCampaignAuditSummary()" class="campaign-btn-secondary">📋 Copiar Resumen para Auditoría IA</button>
+                </div>
+                <button type="button" onclick="window.closeCampaignAuditModal && window.closeCampaignAuditModal()" class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white font-bold rounded-lg border border-gray-700 shadow transition cursor-pointer">
+                    ✕ Cerrar
                 </button>
             </div>
         </div>

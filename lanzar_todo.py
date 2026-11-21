@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Inicia y supervisa los servicios locales de Kula Balam y Monitor del Mercado."""
 
+import json
 import os
 import signal
 import socket
@@ -11,9 +12,66 @@ import urllib.error
 import urllib.request
 import webbrowser
 from pathlib import Path
+from typing import Mapping, Optional, Sequence
 
 
 TRADING_ROOT = Path(__file__).resolve().parent
+
+
+def is_stable_mode(
+    argv: Optional[Sequence[str]] = None,
+    env: Optional[Mapping[str, str]] = None,
+) -> bool:
+    """True si se solicita modo estable 24/7 (`--stable` o `KULA_STABLE_MODE=1`)."""
+    args = list(argv) if argv is not None else sys.argv[1:]
+    if "--stable" in args:
+        return True
+    env_map = env if env is not None else os.environ
+    return str(env_map.get("KULA_STABLE_MODE", "")).strip().lower() in ("1", "true", "yes", "on")
+
+
+def should_start_ollama(trading_root: Path, stable_mode: bool) -> bool:
+    """En modo estable omite `ollama serve` si el daemon usa el motor determinista `antigravity_operador`."""
+    if not stable_mode:
+        return True
+    state_file = Path(trading_root) / "backend" / "config" / "daemon_state.json"
+    if not state_file.exists():
+        return True
+    try:
+        cfg = json.loads(state_file.read_text(encoding="utf-8"))
+        if isinstance(cfg, dict) and str(cfg.get("engine") or "").strip().lower() == "antigravity_operador":
+            return False
+    except Exception:
+        return True
+    return True
+
+
+def build_uvicorn_command(
+    python_exe: Path,
+    app_target: str,
+    port: int,
+    stable_mode: bool,
+    reload_dir: Optional[str] = None,
+    reload_excludes: Optional[Sequence[str]] = None,
+) -> list[str]:
+    """Construye el comando uvicorn, omitiendo `--reload` en modo estable."""
+    cmd = [
+        str(python_exe),
+        "-m",
+        "uvicorn",
+        app_target,
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(int(port)),
+    ]
+    if not stable_mode:
+        cmd.append("--reload")
+        if reload_dir:
+            cmd.extend(["--reload-dir", reload_dir])
+        for ex in reload_excludes or ():
+            cmd.extend(["--reload-exclude", ex])
+    return cmd
 
 
 def _resolve_monitor_root() -> Path:
@@ -218,31 +276,26 @@ def main() -> int:
                 f"No se encontró Monitor del Mercado en {MONITOR_ROOT}. "
                 "Define MONITOR_PROJECT_DIR si está en otra ubicación."
             )
-        ensure_ollama_running()
+        stable = is_stable_mode()
+        if stable:
+            print("🛡️ Modo estable 24/7 activo (--reload desactivado).", flush=True)
+        if should_start_ollama(TRADING_ROOT, stable):
+            ensure_ollama_running()
+        else:
+            print("⚡ Motor determinista antigravity_operador activo: omitiendo ollama serve en modo estable.", flush=True)
         ensure_free_ports()
 
         trading_python = python_for(TRADING_ROOT)
         monitor_python = python_for(MONITOR_ROOT)
         backend = start_child(
-            [
-                str(trading_python),
-                "-m",
-                "uvicorn",
+            build_uvicorn_command(
+                trading_python,
                 "backend.main:app",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                "18767",
-                "--reload",
-                "--reload-dir",
-                "backend",
-                "--reload-exclude",
-                "venv",
-                "--reload-exclude",
-                "*.sqlite3",
-                "--reload-exclude",
-                "*.csv",
-            ],
+                18767,
+                stable_mode=stable,
+                reload_dir="backend",
+                reload_excludes=("venv", "*.sqlite3", "*.csv"),
+            ),
             TRADING_ROOT,
             "backend Kula Balam",
         )
@@ -257,17 +310,12 @@ def main() -> int:
             "Monitor del Mercado",
         )
         lab = start_child(
-            [
-                str(trading_python),
-                "-m",
-                "uvicorn",
+            build_uvicorn_command(
+                trading_python,
                 "server:app",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                "8000",
-                "--reload",
-            ],
+                8000,
+                stable_mode=stable,
+            ),
             TRADING_ROOT / "backtest_lab",
             "Backtest Lab",
         )

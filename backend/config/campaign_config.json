@@ -1,0 +1,12 @@
+{
+  "campaign_name": "Enfriamiento Kula Balam v2 (Auto 4H + Presencial 15M ETH)",
+  "since_iso": "2026-11-21T00:00:00Z",
+  "target_weeks": 4,
+  "target_days": 28,
+  "min_resolved_events": 15,
+  "min_strategy_trades": 8,
+  "min_strategy_shadow_resolved": 8,
+  "min_prune_days": 28,
+  "min_prune_evals": 100,
+  "weekly_snapshot_interval_days": 7
+}

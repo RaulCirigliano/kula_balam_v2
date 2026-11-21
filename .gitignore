@@ -25,3 +25,4 @@ backend/config/daemon_state.json
 .guias_historicas/
 .guias/
 scratch/
+data/audit_snapshots/

@@ -10337,6 +10337,256 @@ window.toggleStrategyActive = async function(strategyId, isChecked) {
 };
 
 // ==============================================================================
+// 📊 AUDITORÍA DE CAMPAÑA (2–4 SEMANAS: AUTO vs OPERADOR PRESENTE)
+// ==============================================================================
+window._lastCampaignAuditText = '';
+
+function _campaignVerdictBadge(verdict) {
+    const v = String(verdict || 'MUESTRA_INSUFICIENTE').toUpperCase();
+    if (v === 'CONSERVAR') return '<span class="campaign-verdict-pill campaign-verdict-conservar">CONSERVAR</span>';
+    if (v === 'CALIBRAR') return '<span class="campaign-verdict-pill campaign-verdict-calibrar">CALIBRAR</span>';
+    if (v === 'PODAR') return '<span class="campaign-verdict-pill campaign-verdict-podar">PODAR</span>';
+    return '<span class="campaign-verdict-pill campaign-verdict-muestra">EN MUESTRA</span>';
+}
+
+function _renderCampaignTableRows(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+        return '<tr><td colspan="11" style="text-align:center;color:#94a3b8;">Sin estrategias registradas en este bloque</td></tr>';
+    }
+    return rows.map((r) => {
+        const pnl = Number(r.net_pnl_usd || 0);
+        const edge = Number(r.net_arbiter_edge_usd || 0);
+        const pnlColor = pnl > 0 ? '#34d399' : (pnl < 0 ? '#f87171' : '#cbd5e1');
+        const edgeColor = edge > 0 ? '#34d399' : (edge < 0 ? '#f87171' : '#cbd5e1');
+        const pnlTxt = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+        const edgeTxt = `${edge >= 0 ? '+' : ''}$${edge.toFixed(2)}`;
+        const titleReason = escapeHtml(r.verdict_reason || '');
+        const tfTag = r.timeframe ? `<span style="color:#64748b;">[${escapeHtml(r.timeframe)}]</span>` : '';
+        return `
+            <tr title="${titleReason}">
+                <td style="font-weight:700;color:#f8fafc;">${escapeHtml(r.strategy_id)} ${tfTag}</td>
+                <td>${Number(r.evals || 0)}</td>
+                <td>${Number(r.raw_fired || 0)}</td>
+                <td>${Number(r.eligible || 0)}</td>
+                <td>${Number(r.trades_closed || 0)} <span style="color:#64748b;">(${Number(r.trades_open || 0)} ab.)</span></td>
+                <td>${Number(r.win_rate_pct || 0).toFixed(1)}%</td>
+                <td>${Number(r.profit_factor || 0).toFixed(2)}</td>
+                <td>${Number(r.realized_rr || 0).toFixed(2)}</td>
+                <td style="color:${pnlColor};font-weight:700;">${pnlTxt}</td>
+                <td style="color:${edgeColor};font-weight:700;">${edgeTxt}</td>
+                <td>${_campaignVerdictBadge(r.verdict)}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.renderCampaignAuditModal = function(data) {
+    const container = document.getElementById('campaignAuditContent');
+    if (!container) return;
+    const report = data?.report || {};
+    const camp = report.campaign || {};
+    const summ = report.summary || {};
+    const sh = summ.shadow || {};
+    const infra = report.infrastructure || {};
+    const exits = summ.exit_reasons || {};
+    const sinceInput = document.getElementById('campaignSinceInput');
+    if (sinceInput && !sinceInput.value && camp.since_iso) {
+        sinceInput.value = String(camp.since_iso).slice(0, 10);
+    }
+
+    const days = Number(summ.days_elapsed || 0);
+    const targetDays = Number(summ.target_days || 28);
+    const resolved = Number(summ.resolved_events || 0);
+    const minRes = Number(summ.min_resolved_events || 15);
+    const pct = Math.min(100, Math.max(0, Number(summ.progress_pct || 0)));
+    const netPnl = Number(summ.net_pnl_usd || 0);
+    const edgeIa = Number(sh.net_arbiter_edge_usd || 0);
+    const riskEvCount = Object.values(infra.risk_events || {}).reduce((a, b) => a + Number(b || 0), 0);
+    const forcedCount = Number(infra.forced_tf_alerts_count || 0);
+
+    const exitSummary = ['TP', 'SL', 'BREAKEVEN', 'TRAILING', 'TIME_MANUAL'].map((k) => {
+        const it = exits[k] || {};
+        const val = Number(it.net_pnl_usd || 0);
+        return `${k}: ${Number(it.count || 0)} (${val >= 0 ? '+' : ''}$${val.toFixed(2)})`;
+    }).join(' · ');
+
+    const shadowRowsHtml = (report.shadow_by_reason || []).slice(0, 8).map((sr) => {
+        const ed = Number(sr.edge_usd || 0);
+        return `<div class="campaign-snapshot-item">
+            <span>${escapeHtml(sr.reason)}</span>
+            <span>${Number(sr.vetoed || 0)} vetos · SL=${Number(sr.saved_sl || 0)} / TP=${Number(sr.missed_tp || 0)} / Exp=${Number(sr.expired || 0)} · Edge: <strong style="color:${ed >= 0 ? '#34d399' : '#f87171'}">${ed >= 0 ? '+' : ''}$${ed.toFixed(2)}</strong></span>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="campaign-meta-bar">
+            <div>
+                <div style="font-weight:800;color:#67e8f9;font-size:12px;">${escapeHtml(camp.name || 'Campaña de Enfriamiento')}</div>
+                <div style="font-size:10.5px;color:#94a3b8;margin-top:2px;">Desde ${escapeHtml(camp.since_iso || '')} · Modo daemon: ${escapeHtml(camp.daemon_mode || 'auto')} [${escapeHtml(camp.daemon_timeframe || '4h')}] · Regla de enfriamiento ${summ.cooling_complete ? 'COMPLETA' : 'ACTIVA'}</div>
+            </div>
+            <div style="min-width:210px;flex:0 1 260px;">
+                <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#cbd5e1;font-weight:700;">
+                    <span>Día ${days.toFixed(1)} / ${targetDays}</span>
+                    <span>Eventos resueltos: ${resolved} / ${minRes} (${pct.toFixed(0)}%)</span>
+                </div>
+                <div class="campaign-progress-track"><div class="campaign-progress-fill" style="width:${pct}%"></div></div>
+            </div>
+        </div>
+
+        <div class="campaign-summary-grid">
+            <div class="campaign-kpi-card">
+                <div class="campaign-kpi-label">PnL Neto Campaña</div>
+                <div class="campaign-kpi-value" style="color:${netPnl >= 0 ? '#34d399' : '#f87171'};">${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)} USD</div>
+                <div class="campaign-kpi-sub">${Number(summ.trades_closed || 0)} cerrados · PF ${Number(summ.profit_factor || 0).toFixed(2)} · WR ${Number(summ.win_rate_pct || 0).toFixed(1)}%</div>
+            </div>
+            <div class="campaign-kpi-card">
+                <div class="campaign-kpi-label">Edge Árbitro IA (Shadow)</div>
+                <div class="campaign-kpi-value" style="color:${edgeIa >= 0 ? '#34d399' : '#f87171'};">${edgeIa >= 0 ? '+' : ''}$${edgeIa.toFixed(2)} USD</div>
+                <div class="campaign-kpi-sub">${Number(sh.vetoed_total || 0)} vetos (${Number(sh.saved_sl || 0)} SL ahorrados / ${Number(sh.missed_tp || 0)} TP)</div>
+            </div>
+            <div class="campaign-kpi-card">
+                <div class="campaign-kpi-label">Puntos de Fuga (Salidas)</div>
+                <div class="campaign-kpi-value" style="font-size:12px;">${Number(summ.total_fees_usd || 0) > 0 ? `Fees $${Number(summ.total_fees_usd).toFixed(2)}` : 'Sin salidas aún'}</div>
+                <div class="campaign-kpi-sub">${escapeHtml(exitSummary)}</div>
+            </div>
+            <div class="campaign-kpi-card">
+                <div class="campaign-kpi-label">Salud Infraestructura</div>
+                <div class="campaign-kpi-value" style="color:${forcedCount === 0 && riskEvCount === 0 ? '#34d399' : '#fcd34d'};">${forcedCount === 0 && riskEvCount === 0 ? 'OK · Sin alertas' : `${forcedCount} TF / ${riskEvCount} Risk`}</div>
+                <div class="campaign-kpi-sub">Alertas TF forzada: ${forcedCount} · RiskEvents: ${riskEvCount}</div>
+            </div>
+        </div>
+
+        <div>
+            <div class="campaign-section-title"><span>⚡ Bloque Auto [${escapeHtml(camp.daemon_timeframe || '4h')}] (Fórmulas Autónomas)</span><span style="font-size:10px;color:#94a3b8;">${(report.auto_strategies || []).length} fórmulas</span></div>
+            <div class="campaign-table-wrap">
+                <table class="campaign-table">
+                    <thead><tr><th>Estrategia</th><th>Velas</th><th>Crudas</th><th>Cand.</th><th>Trades</th><th>WR</th><th>PF</th><th>R:R</th><th>PnL Neto</th><th>Edge IA</th><th>Dictamen</th></tr></thead>
+                    <tbody>${_renderCampaignTableRows(report.auto_strategies || [])}</tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <div class="campaign-section-title"><span>🎯 Bloque Presencial (catalogo/operador_presente/)</span><span style="font-size:10px;color:#94a3b8;">${(report.presencial_strategies || []).length} fórmulas</span></div>
+            <div class="campaign-table-wrap">
+                <table class="campaign-table">
+                    <thead><tr><th>Estrategia</th><th>Velas</th><th>Crudas</th><th>Cand.</th><th>Trades</th><th>WR</th><th>PF</th><th>R:R</th><th>PnL Neto</th><th>Edge IA</th><th>Dictamen</th></tr></thead>
+                    <tbody>${_renderCampaignTableRows(report.presencial_strategies || [])}</tbody>
+                </table>
+            </div>
+        </div>
+
+        ${shadowRowsHtml ? `<div><div class="campaign-section-title"><span>👻 Desglose Shadow Testing por Motivo de Veto</span></div><div style="display:flex;flex-direction:column;gap:5px;">${shadowRowsHtml}</div></div>` : ''}
+
+        <div>
+            <div class="campaign-section-title"><span>📸 Snapshots Históricos Guardados (data/audit_snapshots/)</span></div>
+            <div id="campaignSnapshotsList" style="display:flex;flex-direction:column;gap:5px;">
+                <div style="color:#94a3b8;font-size:11px;">Cargando historial de snapshots...</div>
+            </div>
+        </div>
+    `;
+};
+
+window.renderCampaignSnapshotsList = function(snapshots) {
+    const listEl = document.getElementById('campaignSnapshotsList');
+    if (!listEl) return;
+    if (!Array.isArray(snapshots) || snapshots.length === 0) {
+        listEl.innerHTML = '<div class="campaign-snapshot-item"><span>Aún no hay snapshots guardados. Hacé clic en "💾 Guardar Snapshot" cada domingo.</span></div>';
+        return;
+    }
+    listEl.innerHTML = snapshots.slice(0, 10).map((s) => {
+        const pnl = Number(s.net_pnl_usd || 0);
+        const edge = Number(s.net_arbiter_edge_usd || 0);
+        return `<div class="campaign-snapshot-item">
+            <span><strong>${escapeHtml(s.filename)}</strong> (${escapeHtml(s.trigger || 'manual')})</span>
+            <span>Día ${Number(s.days_elapsed || 0).toFixed(1)} · Resueltos=${Number(s.resolved_events || 0)} · PnL=${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} · Edge IA=${edge >= 0 ? '+' : ''}$${edge.toFixed(2)}</span>
+        </div>`;
+    }).join('');
+};
+
+window.refreshCampaignAudit = async function() {
+    const container = document.getElementById('campaignAuditContent');
+    const sinceInput = document.getElementById('campaignSinceInput');
+    const sinceVal = sinceInput && sinceInput.value ? sinceInput.value.trim() : '';
+    const qs = sinceVal ? `?since=${encodeURIComponent(sinceVal)}` : '';
+    try {
+        const [repRes, snapRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/api/audit/campaign${qs}`),
+            fetch(`${API_BASE_URL}/api/audit/campaign/snapshots`),
+        ]);
+        if (!repRes.ok) throw new Error('Error consultando /api/audit/campaign');
+        const repData = await repRes.json();
+        window._lastCampaignAuditText = String(repData.text_summary || '');
+        window.renderCampaignAuditModal(repData);
+        if (snapRes.ok) {
+            const snapData = await snapRes.json();
+            window.renderCampaignSnapshotsList(snapData.snapshots || []);
+        }
+    } catch (err) {
+        if (container) {
+            container.innerHTML = `<div style="padding:12px;border:1px solid #ef4444;border-radius:8px;color:#fecaca;">⚠️ ${escapeHtml(err.message)}</div>`;
+        }
+    }
+};
+
+window.saveCampaignSnapshotNow = async function() {
+    const sinceInput = document.getElementById('campaignSinceInput');
+    const sinceVal = sinceInput && sinceInput.value ? sinceInput.value.trim() : '';
+    const qs = sinceVal ? `?since=${encodeURIComponent(sinceVal)}` : '';
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/audit/campaign/snapshot${qs}`, {
+            method: 'POST',
+            headers: apiAuthHeaders(),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'No se pudo guardar el snapshot');
+        window.renderCampaignSnapshotsList(data.snapshots || []);
+        if (window.UIFeedback && typeof window.UIFeedback.toast === 'function') {
+            window.UIFeedback.toast(`Snapshot guardado: ${data.snapshot?.filename_json || 'OK'}`, { type: 'success' });
+        }
+    } catch (err) {
+        if (window.UIFeedback && typeof window.UIFeedback.toast === 'function') {
+            window.UIFeedback.toast(`Error snapshot: ${err.message}`, { type: 'error' });
+        }
+    }
+};
+
+window.copyCampaignAuditSummary = async function() {
+    const txt = window._lastCampaignAuditText || '';
+    if (!txt) return;
+    try {
+        await navigator.clipboard.writeText(txt);
+        if (window.UIFeedback && typeof window.UIFeedback.toast === 'function') {
+            window.UIFeedback.toast('Resumen de campaña copiado al portapapeles.', { type: 'success' });
+        }
+    } catch (_) {}
+};
+
+window.openCampaignAuditModal = function() {
+    const modal = document.getElementById('campaignAuditModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    window.refreshCampaignAudit();
+};
+
+window.closeCampaignAuditModal = function() {
+    const modal = document.getElementById('campaignAuditModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+};
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+        const campModal = document.getElementById('campaignAuditModal');
+        if (campModal && (!campModal.classList.contains('hidden') || campModal.style.display === 'flex')) {
+            window.closeCampaignAuditModal();
+        }
+    }
+});
+
+// ==============================================================================
 // // TODO(FASE5):
 // - Slippage dinámico y spread en Paper Trading: simular peor ejecución en órdenes de mercado (0.05% de slippage mínimo + spread del orderbook).
 // - Soporte multi-posición: transicionar portfolio.position a portfolio.positions (array indexado por symbol) con límites de exposición por activo y global.
