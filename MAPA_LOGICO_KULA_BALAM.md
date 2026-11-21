@@ -62,17 +62,18 @@ flowchart TD
 
 ### 1.2 Recorrido Paso a Paso en el Código Fuente
 
-1. **Latido del Ciclo (`backend/daemon.py` líneas 2399-2440):**
+1. **Latido del Ciclo y Aislamiento de Temporalidad (`backend/daemon.py` líneas 3240-3317):**
    - El bucle `_run_loop()` despierta periódicamente según la temporalidad activa y la existencia de posiciones abiertas (`_compute_next_wakeup_delay()`).
-   - Invoca a `_execute_cycle()` (línea 1641).
+   - El modo autónomo de fondo (`strategy = "auto"`) opera aislado en **`4h`**; las temporalidades rápidas (`5m`/`15m`) quedan reservadas exclusivamente para sesiones de `operador_presente/` y para la evaluación paralela virtual (`EVAL_PARALELA`).
+   - Invoca a `_execute_cycle()` (línea 2102) y, inmediatamente después en modo `auto` sin sesión presencial activa, ejecuta `_run_parallel_presencial_shadow_eval()` (línea 559).
 
-2. **Inspección de Radar y Posiciones Vigentes (`backend/daemon.py` líneas 1645-1680):**
+2. **Inspección de Radar y Posiciones Vigentes (`backend/daemon.py` líneas 2102-2175):**
    - Llama a `_check_radar_for_autorouting()` para evaluar si ingresó una oportunidad de alta convicción en `buzon_radar.json`.
-   - Consulta las posiciones abiertas en la base de datos a través de `broker.fetch_positions()`.
+   - Consulta las posiciones abiertas en la base de datos a través de `broker.fetch_positions()` y actualiza cierres SL/TP/expiración 24h de `shadow_trades` (tanto vetos del Árbitro IA como simulaciones `EVAL_PARALELA`).
    - Si el mercado de un activo en cartera está cerrado según `backend/estrategias/registry.py:is_asset_market_open()`, se marca en hibernación para evitar liquidaciones fuera de rueda.
 
-3. **Guardián de Protecciones Activas (`backend/daemon.py` líneas 853-1640):**
-   - Evalúa el Trailing Stop adaptativo, la activación de Breakeven real (`be_armed`), el peluqueo parcial (TP1 al 50% en estrategias Ruiz/Cava) y el decaimiento temporal (`time_decay_status`: tightening a las 8h y 16h sin avance).
+3. **Guardián de Protecciones Activas (`backend/daemon.py` líneas 1306-1820):**
+   - `_check_open_positions_protections()` evalúa el Trailing Stop adaptativo, la activación de Breakeven real (`be_armed`), el peluqueo parcial (TP1 al 50% en estrategias Ruiz/Cava) y el decaimiento temporal (`time_decay_status`: tightening a las 8h y 16h sin avance).
    - Si una posición toca Stop Loss o Take Profit, `self.broker.flatten()` la liquida inmediatamente y finaliza la rama para ese activo.
 
 4. **Selección de Activos Operables (`backend/selectors.py` y `backend/daemon.py` líneas 1715-1775):**
@@ -148,8 +149,13 @@ flowchart TD
 13. **Ejecución y Asiento Contable (`backend/execution/paper_broker.py` y `backend/db/ledger.py`):**
     - `PaperBrokerAdapter.place_entry()` transfiere el capital Just-In-Time (JIT) desde la cuenta `VAULT_USDT` hacia `OP_USDT`.
     - Registra el débito por comisiones devengadas en `FEES_EXPENSE_USDT`.
-    - Inserta el registro del trade en la tabla `trades` de `trading_ledger.sqlite3` bajo estándar ACID con WAL habilitado.
+    - Inserta el registro del trade en la tabla `trades` de `trading_ledger.sqlite3` bajo estándar ACID con WAL habilitado (protegido por el índice único `one_open_trade_per_symbol`).
     - `PaperBrokerAdapter.place_protection()` coloca las órdenes virtuales de Stop Loss y Take Profit.
+
+14. **Evaluación Paralela Virtual de Presencial (`backend/daemon.py:559-722` y `backend/db/ledger.py:2518-2526`):**
+    - Tras cada ciclo de `auto`, `_run_parallel_presencial_shadow_eval()` evalúa una vez por vela (deduplicación por bucket temporal en `_parallel_shadow_last_bucket`) los objetivos configurados en `backend/config/campaign_config.json` (`fractal_squeeze_15m`, `mtf_presencial_15m`, `mtf_presencial_5m`).
+    - Registra telemetría en `signals` con `stage = "parallel_shadow"` y, ante señal elegible, abre una posición 100% virtual en `shadow_trades` con `arbiter_verdict = "EVAL_PARALELA"`, deduplicada por `(symbol, strategy, side, arbiter_verdict)`.
+    - No escribe en `trades`, no ocupa slots de `one_open_trade_per_symbol`, no altera `VAULT_USDT` y queda estrictamente segregada del Edge del Árbitro IA (`VETO_ARBITRO_IA` / `AHORA_NO`).
 
 ---
 
@@ -164,9 +170,13 @@ Esta sección mapea los archivos exactos y rangos de líneas que gobiernan los p
 ├── 📄 backend/main.py:710-725          ──> Ingesta Canónica de Directivas (_shared_brain_directives)
 ├── 📄 backend/news_collector.py        ──> Colector RSS On-Demand (Monitor 8520 / TTL 300s)
 ├── 📄 backend/arbiter_funnel.py        ──> Embudo de Arbitraje On-Demand (Veto AHORA_NO & Fail-Open)
-├── 📄 backend/daemon.py:1115-1250      ──> Llave Adaptativa IA: Modo Holgado vs. Modo Comprimido
+├── 📄 backend/daemon.py:1560-1820      ──> Llave Adaptativa IA: Modo Holgado vs. Modo Comprimido y Contrafáctico
+├── 📄 backend/daemon.py:559-722        ──> Evaluación Paralela Virtual (EVAL_PARALELA) para Presencial 15m/5m
 ├── 📄 backend/radar_inbox.py:54-150    ──> Lectura, TTL y Deduplicación de buzon_radar.json
 ├── 📄 backend/macro_bias_buffer.py     ──> Almacén de Sesgos Macro con Latencia de Absorción
+├── 📄 backend/campaign_audit.py        ──> Auditoría Cuantitativa de Campaña (0 tokens, read-only SQLite)
+├── 📄 backend/health_watchdog.py       ──> Semáforo de Salud y Auto-test Sintético de Fórmulas (0 tokens)
+├── 📄 backend/rejection_funnel.py      ──> Normalizador de Señales y Embudo de Rechazos 24H/30D
 ├── 📄 backend/config/directivas_cio.md ──> Doctrina Canónica del CIO (Tríada Kula & Rol Balam)
 └── 📄 AGENTS.md                        ──> Directivas Globales del Ecosistema
 ```
@@ -192,8 +202,8 @@ Esta sección mapea los archivos exactos y rangos de líneas que gobiernan los p
   - `antigravity_operador`: Opera de manera cuantitativa autónoma guiado por las métricas de las estrategias, pero acatando cualquier veto macro o de régimen de volatilidad.
 
 ### 2.3 Llave Adaptativa del Trailing Stop (Modo Holgado vs. Comprimido)
-- **Archivo:** [`backend/daemon.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/daemon.py#L1115-L1250)
-- **Líneas:** 1115 a 1250
+- **Archivo:** [`backend/daemon.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/daemon.py#L1560-L1820)
+- **Líneas:** 1560 a 1820 (telemetría `counterfactual_diff` en líneas 1667-1816)
 - **Mecánica Cuantitativa:**
   - **Distancias por Escalón:**
     - Pico $\ge +8.0\%$: Holgado $1.20\%$, Comprimido $0.80\%$.
@@ -215,7 +225,7 @@ Esta sección mapea los archivos exactos y rangos de líneas que gobiernan los p
 - **Buffer de Sesgo con Latencia de Absorción:** [`backend/macro_bias_buffer.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/macro_bias_buffer.py#L75-L145) (Líneas 75-145).
   - Gestiona `backend/config/macro_bias_buffer.json`.
   - Concede una ventana de absorción de 2.5 horas para permitir que el mercado asimile noticias sin forzar ejecuciones en pleno pico de volatilidad de apertura. Si no recibe confluencia técnica en ese plazo, descarta la señal en silencio (`DISCARDED_EXPIRED`).
-- **Resolución Unificada de Directivas:** [`backend/main.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/main.py#L1530-L1615) (Líneas 1530-1615) en `_resolve_active_macro_directive()`.
+- **Resolución Unificada de Directivas:** [`backend/main.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/main.py#L1512-L1615) (Líneas 1512-1615) en `_resolve_active_macro_directive()`.
 
 ### 2.5 Árbitro Informativo On-Demand, Índices Institucionales ($0.00) y Vector de Impacto
 - **Archivos:** [`backend/news_collector.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/news_collector.py) y [`backend/arbiter_funnel.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/arbiter_funnel.py)
@@ -302,7 +312,36 @@ Función central: `audit_candlestick_confluence()` ([`backend/candlestick_audito
 
 ## 4. Catálogo de Fórmulas Matemáticas (`backend/estrategias/`)
 
-El sistema organiza sus modelos cuantitativos en tres grupos dentro de [`backend/estrategias/registry.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/registry.py#L35-L65):
+### 4.0 Cartera Activa en Producción (`auto [4h]` · 9 Fórmulas Certificadas sobre `VAULT_USDT`)
+
+Configurada en [`backend/config/daemon_state.json`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/config/daemon_state.json) y verificada por el auto-test sintético de `backend/health_watchdog.py` (`9/9 OK`):
+
+| # | Estrategia ID | Archivo de Implementación | Activo / TF Nativo | Enfoque |
+| :-: | :--- | :--- | :--- | :--- |
+| 1 | **`kula_balam_cava_ruiz`** | [`kula_balam_cava_ruiz.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/kula_balam_cava_ruiz.py) | Multi-activo / 1H–4H | Tríada 1D-1H-5M + Fibo 0.50–0.75 + doctrina de parqué Cava. |
+| 2 | **`1_donchian_breakout_sol_4h`** | [`1_donchian_breakout_sol_4h.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/principal/1_donchian_breakout_sol_4h.py) | `SOL/USDT` · `4h` | Ruptura Donchian estructural calibrada para SOL en 4H. |
+| 3 | **`2_squeeze_dual_eth_4h`** | [`2_squeeze_dual_eth_4h.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/principal/2_squeeze_dual_eth_4h.py) | `ETH/USDT` · `4h` | Squeeze de volatilidad dual (Long/Short) sobre ETH 4H. |
+| 4 | **`donchian_breakout_1h`** | [`donchian_breakout_1h.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/donchian_breakout_1h.py) | Cripto 4H / TradFi 1D | Ruptura Donchian causal con salida desacoplada `MID_EXIT`. |
+| 5 | **`cava_fallo_macd_eurusd_1h_slot1`** | [`cava_fallo_macd_eurusd_1h_slot1.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/principal/cava_fallo_macd_eurusd_1h_slot1.py) | `EURUSD=X` · `1h` | Fallo de MACD / agotamiento Cava dedicado al slot Forex. |
+| 6 | **`kula_cava_eth_1h`** | [`kula_cava_eth_1h.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/principal/kula_cava_eth_1h.py) | `ETH/USDT` · `1h` | Variante Kula Cava & Ruiz certificada sobre ETH 1H. |
+| 7 | **`kula_cava_sol_1h`** | [`kula_cava_sol_1h.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/principal/kula_cava_sol_1h.py) | `SOL/USDT` · `1h` | Variante Kula Cava & Ruiz certificada sobre SOL 1H (promovida a `auto` en campaña). |
+| 8 | **`ttm_squeeze_eth_1h`** | [`ttm_squeeze_eth_1h.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/principal/ttm_squeeze_eth_1h.py) | `ETH/USDT` · `1h` | Compresión TTM Squeeze (BB dentro de Keltner) + momentum sobre ETH 1H. |
+| 9 | **`ttm_squeeze_sol_4h`** | [`ttm_squeeze_sol_4h.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/principal/ttm_squeeze_sol_4h.py) | `SOL/USDT` · `4h` | Compresión TTM Squeeze + desahogo direccional sobre SOL 4H. |
+
+### 4.0b Catálogo de Operador Presencial (`backend/estrategias/catalogo/operador_presente/`)
+
+Fórmulas destinadas a sesiones activas del operador y/o **Evaluación Paralela Virtual (`EVAL_PARALELA`)** sin consumo de slots de `auto`:
+
+| Estrategia ID | Archivo de Implementación | Activo / TF Nativo | Modo en Campaña |
+| :--- | :--- | :--- | :--- |
+| **`fractal_squeeze_15m`** | [`fractal_squeeze_15m.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/operador_presente/fractal_squeeze_15m.py) | `ETH/USDT` · `15m` (filtro `1h`) | Sesión Presencial (Londres/NY) + `EVAL_PARALELA` virtual. |
+| **`mtf_presencial_15m`** | [`mtf_presencial_15m.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/operador_presente/mtf_presencial_15m.py) | `ETH/USDT`, `SOL/USDT` · `15m` | Sesión Presencial + `EVAL_PARALELA` virtual. |
+| **`mtf_presencial_5m`** | [`mtf_presencial_5m.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/operador_presente/mtf_presencial_5m.py) | `ETH/USDT`, `SOL/USDT` · `5m` | Sesión Presencial + `EVAL_PARALELA` virtual. |
+| **`cava_fallo_macd_eurusd_1h`** | [`cava_fallo_macd_eurusd_1h.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalogo/operador_presente/cava_fallo_macd_eurusd_1h.py) | `EURUSD=X` · `1h` | Presencial Forex (cubierta en `auto` vía `_slot1`). |
+
+### 4.0c Catálogo Base y Laboratorio (`backend/estrategias/registry.py`)
+
+El registro maestro ([`backend/estrategias/registry.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/registry.py#L35-L65)) mantiene además el inventario completo de estrategias base, de fondeo y de laboratorio:
 
 | Estrategia ID | Archivo de Implementación | Categoría | Filosofía Matemática y Reglas Principales |
 | :--- | :--- | :--- | :--- |
@@ -356,27 +395,33 @@ Esta tabla resume qué archivo y líneas exactas se deben abrir cuando se requie
 
 | Acción Deseada | Archivo Exacto a Modificar | Rango de Líneas / Parámetro Concreto |
 | :--- | :--- | :--- |
-| **a) Modificar los activos que patrulla el bot en 4H / 1D** | [`backend/daemon.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/daemon.py#L30-L36)<br/>[`backend/estrategias/donchian_breakout_1h.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/donchian_breakout_1h.py#L60-L63) | **`backend/daemon.py` (Líneas 30-36):**<br/>`DONCHIAN_CRYPTO_WHITELIST = ("SOL/USDT", "ETH/USDT")`<br/>`DONCHIAN_TRADFI_WHITELIST = ("AAPL", "AMD", "AVGO", "META", "MSFT")`<br/>`DONCHIAN_WHITELIST_TIMEFRAMES`<br/>*Y en `donchian_breakout_1h.py` (Línea 60):* `activos_recomendados`. |
+| **a) Modificar los activos que patrulla el bot en 4H / 1D** | [`backend/daemon.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/daemon.py#L47-L56)<br/>[`backend/estrategias/donchian_breakout_1h.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/donchian_breakout_1h.py#L60-L63) | **`backend/daemon.py` (Líneas 47-56):**<br/>`DONCHIAN_CRYPTO_WHITELIST = ("SOL/USDT", "ETH/USDT")`<br/>`DONCHIAN_TRADFI_WHITELIST = ("AAPL", "AMD", "AVGO", "META", "MSFT")`<br/>`DONCHIAN_WHITELIST_TIMEFRAMES`<br/>*Y en `donchian_breakout_1h.py` (Línea 60):* `activos_recomendados`. |
 | **b) Modificar una regla del Portero Balam (Fibo o ATR)** | [`backend/kula_rules.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/kula_rules.py#L90-L215)<br/>[`backend/estrategias/kula_balam_cava_ruiz.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/kula_balam_cava_ruiz.py#L63-L75) | **`backend/kula_rules.py`:**<br/>- Regla 0 (1D Macro): Líneas 90-112.<br/>- Regla 1 (Filtro 1H EMA 50): Líneas 114-126.<br/>- Regla 2 (Alineación EMA 21/89): Líneas 128-142.<br/>- **Regla 3 (Fibo 0.50-0.75): Líneas 144-184**.<br/>- **Regla 4 (Expansión ATR > SMA): Líneas 186-215**.<br/>*En `kula_balam_cava_ruiz.py`:* `fibo_golden_zone_min`, `fibo_golden_zone_max`. |
 | **c) Ajustar multiplicadores de Stop Loss / Take Profit / R:R** | [`backend/quant_risk.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/quant_risk.py#L411-L435)<br/>[`backend/daemon.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/daemon.py#L2120-L2180) | **`backend/quant_risk.py`:**<br/>- Línea 411: `MIN_NET_RR = 1.5`<br/>- Línea 412: `TARGET_NET_RR = 2.0`<br/>- Línea 413: `SL_ATR_NOISE_MULTIPLIER = 1.35` (calibrado para Donchian SL 1.40x)<br/>- Línea 419: `VAULT_PROTECTION_FLOOR_USDT = 800.0`<br/>*En `daemon.py` (Líneas 2120-2180):* Niveles de TP y SL asignados por estrategia antes de emitir la orden. |
 | **d) Modificar el arbitraje de noticias y directivas macro** | [`backend/news_collector.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/news_collector.py)<br/>[`backend/arbiter_funnel.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/arbiter_funnel.py)<br/>[`backend/radar_inbox.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/radar_inbox.py#L18-L30) | **`backend/news_collector.py` & `arbiter_funnel.py`:**<br/>- TTL de caché noticias: 300s.<br/>- Choques universales y palabras veto (`UNIVERSAL_SHOCK_KEYWORDS`).<br/>- Veredicto `AHORA_NO` desvía a `shadow_trades`.<br/>**`backend/radar_inbox.py`:**<br/>- TTL 72h y deduplicación 6h. |
-| **e) Cambiar el Informe de Auditoría Forense** | [`auditar_sqlite.py`](file:///home/raul/Escritorio/proyectos/kula_balam/auditar_sqlite.py#L15-L330) | **`auditar_sqlite.py`:**<br/>- Formateo de precios y fechas: Líneas 15-28.<br/>- Balances y Bóveda: Líneas 68-94.<br/>- Posiciones abiertas y Decaimiento temporal: Líneas 96-147.<br/>- Historial de cerradas y clasificación contable `EMPATE / BE` (`abs(pnl) <= 1e-6`): Líneas 149-173.<br/>- Telemetría IA y Análisis Contrafáctico (What-If): Líneas 175-212.<br/>- Scorecard de efectividad con desglose W/L/BE: Líneas 214-250.<br/>- **Auditoría Shadow Testing Permanente (Tabla #19 `shadow_trades`):** Visualización obligatoria con $0.00 / 0 vetos cuando está vacía (Líneas 252-275).<br/>- Rutas de guardado en disco y copia al portapapeles con Tkinter: Líneas 276-330. |
+| **e) Cambiar el Informe de Auditoría Forense** | [`auditar_sqlite.py`](file:///home/raul/Escritorio/proyectos/kula_balam/auditar_sqlite.py#L1-L602) | **`auditar_sqlite.py` (602 líneas):**<br/>- Sección `5b` (Líneas 252-295): Auditoría Shadow Testing IA (excluye `EVAL_PARALELA`).<br/>- Sección `5c` (Líneas 296-508): Cobertura 24H (`COMPRAR`/`VENDER`), Embudo de Rechazos 24H (excluye `stage="parallel_shadow"`) y Detector de Redundancia 30D.<br/>- Bloque de Campaña (Líneas 510-530): Invoca `build_campaign_report()` y `format_campaign_text()`. |
 | **f) Calibrar el Laboratorio Cuantitativo (`backtest_lab/`)** | [`backtest_lab/server.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backtest_lab/server.py#L240-L845)<br/>[`backtest_lab/web/index.html`](file:///home/raul/Escritorio/proyectos/kula_balam/backtest_lab/web/index.html#L275-L520)<br/>[`backtest_lab/core/metrics.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backtest_lab/core/metrics.py#L75-L250)<br/>[`backtest_lab/core/wfo_rolling.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backtest_lab/core/wfo_rolling.py) | **`backtest_lab/server.py`:**<br/>- Catálogo unificado: `GET /api/lab/estrategias_unificadas`.<br/>- Walk-Forward Deslizante: `POST /api/lab/evaluar_wfo_rolling`.<br/>- Promoción con compuerta Monte Carlo $DD_{95\%} \le 8.0\%$: `POST /api/promover_a_produccion`.<br/>**`backtest_lab/core/wfo_rolling.py`:**<br/>- `run_rolling_wfo` (5 ventanas deslizantes, $WFE \ge 0.50$) y mesetas de robustez `compute_plateau_robust_score`.<br/>**`backtest_lab/core/metrics.py`:**<br/>- Desglose `w_l_be`, Sortino ratio, bootstrapping Monte Carlo vectorizado y suficiencia muestral. |
 | **g) Extender el Gancho de Cerebro en Catálogo (`custom_brain_filter`)** | [`backend/estrategias/catalog_adapter.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/estrategias/catalog_adapter.py#L216-L238) | **`backend/estrategias/catalog_adapter.py` (Líneas 216-238):**<br/>- Soporte dinámico para `custom_brain_filter(df_eval, idx, side_norm, entry_px, sl_px, tp_px)` con fallback seguro a `arbitro_ia()` si no está definida en la estrategia. |
+| **h) Configurar Campaña de Evaluación y `EVAL_PARALELA`** | [`backend/config/campaign_config.json`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/config/campaign_config.json)<br/>[`backend/campaign_audit.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/campaign_audit.py#L435-L1013) | **`campaign_config.json`:** `since_iso`, `min_resolved_events`, `parallel_presencial_shadow_enabled`, `parallel_presencial_risk_usd` y `parallel_presencial_targets`.<br/>**`campaign_audit.py`:** `build_campaign_report()` (línea 435), `format_campaign_text()` (línea 849), `save_campaign_snapshot()` (línea 907) y `maybe_write_weekly_snapshot()` (línea 980). |
+| **i) Auditar Semáforo de Salud y Embudo de Rechazos** | [`backend/health_watchdog.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/health_watchdog.py#L86-L165)<br/>[`backend/rejection_funnel.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/rejection_funnel.py) | **`health_watchdog.py`:** `HealthWatchdog.probe_active_strategies()` (línea 96), expuesto en `GET /api/health/semaforo` (`backend/main.py:3199`).<br/>**`rejection_funnel.py`:** taxonomía de bloqueos, normalización de señales y `forced_timeframe_warnings()`. |
 
 ---
 
 ## 6. Puertos de Red y Servicios Locales (`lanzar_todo.py`)
 
-Para referencia operativa rápida, los cuatro servicios orquestados concurrentemente por `lanzar_todo.py` son:
+Para referencia operativa rápida, los servicios orquestados concurrentemente por [`lanzar_todo.py`](file:///home/raul/Escritorio/proyectos/kula_balam/lanzar_todo.py) son:
 
 | Servicio | Puerto Local | Proceso / Comando de Arranque | Rol en el Ecosistema |
 | :--- | :--- | :--- | :--- |
-| **Backend Kula Balam** | `18767` | `uvicorn backend.main:app --port 18767` | API REST, WebSocket, Daemon ejecutor, Ledger SQLite. |
+| **Backend Kula Balam** | `18767` | `uvicorn backend.main:app --port 18767` *(sin `--reload` en `--stable`)* | API REST, WebSocket, Daemon ejecutor, Ledger SQLite. |
 | **Frontend Kula Balam** | `18087` | `python -m http.server 18087 --directory frontend` | Cockpit visual de operaciones y telemetría de cuentas. |
 | **Monitor del Mercado** | `8520` | `python main.py --dashboard --port 8520` | Escáner CIO, noticias institucionales, despacho al radar. |
 | **Backtest Lab** | `8000` | `python -m uvicorn server:app --port 8000` *(desde `backtest_lab/`)* | Laboratorio de simulación cuantitativa y validación walk-forward en 3 Estaciones. |
-| **Ollama Local** | `11434` | `ollama serve` | Servidor local de LLM (opcional/desacoplado). |
+| **Ollama Local** | `11434` | `ollama serve` *(omitido en `--stable` si `engine != "ollama"`)* | Servidor local de LLM (opcional/desacoplado). |
+
+- **Modo Estable 24/7 (`lanzar_todo.py --stable` o `KULA_STABLE_MODE=1`):**
+  - Helpers verificados en [`lanzar_todo.py`](file:///home/raul/Escritorio/proyectos/kula_balam/lanzar_todo.py#L21-L65): `is_stable_mode()` (línea 21), `should_start_ollama()` (línea 33) y `build_uvicorn_command()` (línea 49).
+  - En modo estable desactiva `--reload` en Uvicorn (evita reinicios inesperados del daemon ante escrituras de archivos) y no levanta `ollama serve` cuando `daemon_state.json` usa `antigravity_operador`.
 
 ---
 
@@ -485,4 +530,37 @@ flowchart LR
 
 Para garantizar la estabilidad del sistema y evitar regresiones en producción:
 1. **Archivos Protegidos:** `backend/kula_rules.py`, `backend/daemon.py` y `backtest_lab/estrategias_ganadoras.json` permanecen inmutables ante cambios en el laboratorio.
-2. **Contratos de Datos Compartidos:** Las carpetas `backtest_lab/data/datos_historicos/`, `backtest_lab/data/derivados/` y los metadatos JSON son consumidos por `backend/verificador_evolutivo.py`, `backend/derivatives_flow.py` y `backend/estrategias/config_manager.py`. Sus rutas y firmas de retorno están blindadas por la suite completa de **275 tests automatizados**.
+2. **Contratos de Datos Compartidos:** Las carpetas `backtest_lab/data/datos_historicos/`, `backtest_lab/data/derivados/` y los metadatos JSON son consumidos por `backend/verificador_evolutivo.py`, `backend/derivatives_flow.py` y `backend/estrategias/config_manager.py`. Sus rutas y firmas de retorno están blindadas por la suite automatizada de **296 tests en `pytest`** y **14 tests de frontend JS** (`node --test tests/frontend_trading_guards.test.cjs`).
+
+---
+
+## 8. Observabilidad, Semáforo de Salud, Embudo de Rechazos y Auditoría de Campaña
+
+Capa de auditoría determinista de **0 tokens LLM** (solo lectura sobre `trading_ledger.sqlite3` y sondas sintéticas en memoria) diseñada para evaluar campañas de 2 a 4 semanas sin violar la regla de enfriamiento.
+
+### 8.1 Semáforo de Salud y Watchdog Sintético (`backend/health_watchdog.py`)
+- **Endpoint:** `GET /api/health/semaforo` (con parámetro opcional `?probe=true` en [`backend/main.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/main.py#L3199)).
+- **Luces monitoreadas:**
+  - `kula_motor`: estado de ejecución del daemon, modo (`auto`/`manual`) y antigüedad del último ciclo.
+  - `guardian_sl`: vigilancia activa sobre posiciones abiertas.
+  - `formulas_sintetico`: `HealthWatchdog.probe_active_strategies()` ([`backend/health_watchdog.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/health_watchdog.py#L96-L165)) ejecuta una prueba sintética en memoria (0 tokens, sin red) sobre todas las estrategias activas (`9/9 OK` en `auto`) validando salidas finitas (`tp_gross_pct`, `sl_gross_pct`, `net_rr`).
+  - `balam_puente`: estado de feeds RSS del Monitor del Mercado (`8520`) y vigencia del buffer macro.
+- **Badge de Temporalidad en UI:** `formatSemaforoTimeframeBadge()` en `frontend/js/trading_guards.js` muestra la temporalidad real del daemon (`4h` en fondo vs. `5m`/`15m` en Sesión Presencial).
+
+### 8.2 Embudo de Rechazos 24H y Detector de Redundancia 30D (`backend/rejection_funnel.py`)
+- Normaliza todas las señales hacia el contrato `CHECK` de `signals` (`COMPRAR`, `VENDER`, `MANTENER`, `ERROR`) corrigiendo el conteo de candidatas bajistas (`VENDER`).
+- En [`auditar_sqlite.py`](file:///home/raul/Escritorio/proyectos/kula_balam/auditar_sqlite.py#L296-L508) (Sección `5c`):
+  - **Cobertura 24H:** reporta velas evaluadas y candidatas (`COMPRAR`/`VENDER`) por símbolo y timeframe.
+  - **Acumulado de Bloqueos 24H:** clasifica rechazos por motivo (`Fibo`, `SinConfluencia`, `VetoIA`, etc.) excluyendo `stage = "parallel_shadow"` para no contaminar el embudo de `auto`.
+  - **Alertas de Temporalidad Forzada:** `forced_timeframe_warnings()` detecta cualquier desvío de `auto` fuera de `4h`/`1d`.
+
+### 8.3 Auditoría de Campaña y Evaluación Paralela Virtual (`backend/campaign_audit.py`)
+- **Configuración:** [`backend/config/campaign_config.json`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/config/campaign_config.json) define la ventana (`since_iso`), el horizonte (`target_weeks: 4`, `min_resolved_events: 15`) y los 5 objetivos de `EVAL_PARALELA` (`fractal_squeeze_15m` en `ETH/USDT 15m`; `mtf_presencial_15m` y `mtf_presencial_5m` en `ETH/USDT` y `SOL/USDT`).
+- **Endpoints FastAPI ([`backend/main.py`](file:///home/raul/Escritorio/proyectos/kula_balam/backend/main.py#L2522-L2560)):**
+  - `GET /api/audit/campaign` — calcula el reporte completo vía `build_campaign_report()`.
+  - `POST /api/audit/campaign/snapshot` — persiste snapshot portable `.json` + `.txt` en `audit_snapshots/`.
+  - `GET /api/audit/campaign/snapshots` — lista el histórico de snapshots semanales y manuales (`maybe_write_weekly_snapshot()` emite automáticamente 1 snapshot cada 7 días).
+- **Aislamiento Contable y Dictámenes:**
+  - **Bloque Auto (`VAULT_USDT`):** mide trades reales/paper cerrados, `PF`, `R:R` realizado, `MaxDD`, `exit_reasons` (`TP`, `SL`, `BREAKEVEN`, `TRAILING`, `TIME_MANUAL`) y vetos del Árbitro IA (`summary.shadow.net_arbiter_edge_usd`).
+  - **Bloque Presencial (`EVAL_PARALELA`):** evalúa en paralelo las estrategias de `operador_presente/` descontando fricción taker ida y vuelta (`0.26%` en cripto, `0.06%` en FX), reportado en `summary.parallel_shadow` y en la columna `[V]` del modal `#campaignAuditModal` (`frontend/js/app.js`), sin mezclar sus resultados ni con `VAULT_USDT` ni con el Edge del Árbitro IA.
+  - **Dictámenes Automáticos:** `CONSERVAR` ($\ge 8$ cierres, $PF \ge 1.20$ y $PnL > 0$), `PODAR` ($PF < 0.80$ o inactividad prolongada), `CALIBRAR` (rendimiento marginal o Edge IA negativo con $\ge 8$ vetos) y `MUESTRA_INSUFICIENTE`.
