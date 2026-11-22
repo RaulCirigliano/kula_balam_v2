@@ -2572,6 +2572,64 @@ def create_campaign_snapshot(
     }
 
 
+class TriadaExecuteSimRequest(BaseModel):
+    symbol: str
+    timeframe: str = "5m"
+    direction_mode: str = "dual"
+    risk_pct: float = 0.5
+    target_rr: float = 2.0
+
+
+@app.get("/api/triada/evaluate")
+def api_triada_evaluate(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("5m"),
+    direction_mode: str = Query("dual"),
+    risk_pct: float = Query(0.5, ge=0.1, le=2.0),
+    target_rr: float = Query(2.0, ge=1.5, le=5.0),
+):
+    """
+    Evalúa los 5 puntos reales de la Tríada (evaluate_kula_trigger + check_universal_wick_veto
+    + audit_candlestick_confluence) y precalcula el plan de ejecución asistida protegida (0 tokens).
+    """
+    from backend.daemon import get_trader_daemon
+    from backend.triada_service import evaluate_triada_snapshot
+
+    return evaluate_triada_snapshot(
+        symbol=symbol,
+        timeframe=timeframe,
+        direction_mode=direction_mode,
+        risk_pct=risk_pct,
+        target_rr=target_rr,
+        broker=get_trader_daemon().broker,
+    )
+
+
+@app.post("/api/triada/execute-sim")
+def api_triada_execute_sim(
+    request: Request,
+    payload: TriadaExecuteSimRequest,
+    x_api_token: Optional[str] = Header(None),
+):
+    """
+    Ejecuta disparo manual asistido de la Tríada en seguimiento virtual aislado
+    (`shadow_trades` con `strategy='manual_triada'` y `arbiter_verdict='MANUAL_TRIADA'`),
+    sin tocar VAULT_USDT ni bloquear `one_open_trade_per_symbol` de `auto`.
+    """
+    verify_auth_token(request, x_api_token)
+    from backend.daemon import get_trader_daemon
+    from backend.triada_service import execute_triada_simulation
+
+    return execute_triada_simulation(
+        symbol=payload.symbol,
+        timeframe=payload.timeframe,
+        direction_mode=payload.direction_mode,
+        risk_pct=payload.risk_pct,
+        target_rr=payload.target_rr,
+        broker=get_trader_daemon().broker,
+    )
+
+
 @app.post("/api/ledger/reset_circuit_breaker")
 def reset_ledger_circuit_breaker(
     request: Request,

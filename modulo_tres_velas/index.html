@@ -14,6 +14,8 @@
   <script src="kula-chart-engine.js"></script>
   <!-- Cockpit Cuantitativo Avanzado TradingView Pro (Herramientas, Replay, Paper & Auditor Forense) -->
   <script src="cockpit.js"></script>
+  <!-- Overlays de los 5 Puntos de la Tríada y Ejecución Asistida Protegida (Simulación Aislada) -->
+  <script src="triada_overlay.js?v=20261122_1"></script>
   <style>
     body {
       background-color: #06090e;
@@ -1249,6 +1251,7 @@
               <span id="legend-ema-1h" class="text-purple-400 font-semibold">EMA 20: ---</span>
               <span id="legend-vwap-1h" class="text-yellow-500 font-semibold">VWAP: ---</span>
               <span id="legend-bands-1h" class="text-yellow-700">Bandas: --- / ---</span>
+              <span id="legend-triada-1h" class="text-amber-300 font-semibold"></span>
             </div>
           </div>
 
@@ -1595,6 +1598,14 @@
               </span>
               <span class="text-[9px] text-emerald-400 font-mono">Toma Parcial + BE</span>
             </label>
+
+            <label class="flex items-center justify-between cursor-pointer p-1.5 rounded-lg bg-slate-950/60 border border-amber-800/50 hover:bg-slate-800/40">
+              <span class="flex items-center gap-1.5">
+                <input type="checkbox" id="chkTriadaOverlays" checked onchange="toggleTriadaOverlays(this.checked)" class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0">
+                <span>Mostrar 5 Puntos Tríada en Velas</span>
+              </span>
+              <span class="text-[9px] text-amber-300 font-mono">EMA · Fibo · ATR</span>
+            </label>
           </div>
 
           <!-- Botón de Evaluación Instantánea -->
@@ -1657,6 +1668,59 @@
           <!-- Dictamen y Fundamento del Operador (Completamente Desplegado) -->
           <div id="brainReasonBox" class="p-2.5 rounded-lg bg-black/60 border border-slate-800/90 text-[10.5px] text-gray-300 leading-snug font-mono italic">
             Presiona "Evaluar Gatillo" para consultar el análisis del motor en vivo.
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== TARJETA 2B: EJECUCIÓN ASISTIDA PROTEGIDA (SIMULACIÓN AISLADA) ==================== -->
+      <div id="triadaExecCard" class="sidebar-card border-emerald-700/50 bg-gradient-to-b from-slate-900/95 to-emerald-950/20">
+        <div class="sidebar-header border-emerald-700/50 text-emerald-300">
+          <span class="flex items-center gap-1.5">
+            <span>🛡️</span> Ejecución Asistida (Simulación)
+          </span>
+          <span id="triadaExecStatusBadge" class="text-[9px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-bold">SIN EVALUAR</span>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <!-- Resumen visual de los 5 puntos + veto de mecha -->
+          <div id="triadaRulesSummaryPills" class="flex flex-wrap gap-1"></div>
+
+          <!-- Niveles Pre-Calculados vía quant_risk.py -->
+          <div class="p-2 rounded-lg bg-slate-950/80 border border-slate-800 space-y-1 font-mono text-[10.5px]">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Dirección:</span>
+              <span id="triadaExecSide" class="font-bold text-slate-200">--</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Entrada Estimada:</span>
+              <span id="triadaExecEntry" class="font-bold text-cyan-300">$--</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Stop Loss Técnico:</span>
+              <span id="triadaExecSl" class="font-bold text-rose-400">$--</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Take Profit (R:R ≥ 1:2):</span>
+              <span id="triadaExecTp" class="font-bold text-emerald-400">$--</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Tamaño (quant_risk):</span>
+              <span id="triadaExecQty" class="font-bold text-slate-100">--</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] pt-0.5 border-t border-slate-800/80">
+              <span class="text-slate-500">Presupuesto Riesgo:</span>
+              <span id="triadaExecRisk" class="text-amber-300 font-bold">0.50%</span>
+            </div>
+          </div>
+
+          <button type="button" id="btnExecuteTriadaSim" onclick="ejecutarGatilloTriadaSim()" disabled class="w-full py-2 px-3 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 cursor-not-allowed">
+            <span>⚡</span> Ejecutar Gatillo (Simulación)
+          </button>
+
+          <div id="triadaExecBlockReasons" class="hidden p-2 rounded-lg bg-rose-950/35 border border-rose-800/50 text-[10px] text-rose-200 font-mono leading-snug space-y-0.5"></div>
+
+          <div class="text-[9.5px] text-slate-400 font-mono leading-tight">
+            🔒 Aislado en <code class="text-cyan-300">MANUAL_TRIADA</code> (<code class="text-slate-300">shadow_trades</code>): 0% impacto en <code class="text-slate-300">VAULT_USDT</code>, campaña <code class="text-slate-300">auto</code> ni Edge del Árbitro IA.
           </div>
         </div>
       </div>
@@ -3567,6 +3631,9 @@
             if (entry.target === atrContainer && atrChart) atrChart.resize(width, height);
           }
         }
+        if (window.TriadaOverlayEngine && typeof window.TriadaOverlayEngine.redrawBands === 'function') {
+          window.TriadaOverlayEngine.redrawBands();
+        }
       });
       [container1D, volContainer1D, container1H, volContainer1H, container5M, volContainer5M, rsiContainer, atrContainer].forEach(c => {
         if (c) resizeObserver.observe(c);
@@ -5374,19 +5441,60 @@
       evaluarEstrategiaEnVivo();
     }
 
-    // A. Evaluar Estrategia Cuantitativa en Vivo vía /api/market/analysis
+    function toggleTriadaOverlays(isChecked) {
+      if (window.TriadaOverlayEngine && typeof window.TriadaOverlayEngine.setVisible === 'function') {
+        window.TriadaOverlayEngine.setVisible(Boolean(isChecked));
+      }
+    }
+
+    async function ejecutarGatilloTriadaSim() {
+      if (window.TriadaOverlayEngine && typeof window.TriadaOverlayEngine.executeSimulatedTrigger === 'function') {
+        return await window.TriadaOverlayEngine.executeSimulatedTrigger(BACKEND_BASE);
+      }
+      return null;
+    }
+
+    // A. Evaluar Estrategia Cuantitativa en Vivo vía /api/market/analysis + /api/triada/evaluate
     async function evaluarEstrategiaEnVivo() {
       const btn = document.getElementById('btnEvaluarEstrategia');
       if (btn) btn.innerHTML = `<span>⏳</span> Evaluando Mercado...`;
 
       const stratId = document.getElementById('strategySelect').value;
-      const symFormatted = currentSymbol.replace('USDT', '/USDT');
+      const dirModeEl = document.getElementById('directionModeSelect');
+      const dirMode = dirModeEl ? dirModeEl.value : 'dual';
+      const rrEl = document.getElementById('inputRr');
+      const targetRr = rrEl ? Math.max(2.0, parseFloat(rrEl.value) || 2.0) : 2.0;
+      const symFormatted = window.TriadaOverlayEngine
+        ? window.TriadaOverlayEngine.normalizeTriadaSymbol(currentSymbol)
+        : currentSymbol.replace('USDT', '/USDT');
       const url = `${BACKEND_BASE}/api/market/analysis?symbol=${encodeURIComponent(symFormatted)}&timeframe=${encodeURIComponent(currentTriggerTf)}&engine=antigravity_operador&strategy=${encodeURIComponent(stratId)}`;
+      const triadaUrl = `${BACKEND_BASE}/api/triada/evaluate?symbol=${encodeURIComponent(symFormatted)}&timeframe=${encodeURIComponent(currentTriggerTf)}&direction_mode=${encodeURIComponent(dirMode)}&risk_pct=0.5&target_rr=${encodeURIComponent(targetRr)}`;
 
       try {
-        const resp = await fetch(url);
+        const [resp, triadaResp] = await Promise.all([
+          fetch(url),
+          fetch(triadaUrl).catch(() => null),
+        ]);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
+
+        if (triadaResp && triadaResp.ok && window.TriadaOverlayEngine) {
+          try {
+            const triadaData = await triadaResp.json();
+            const chkOv = document.getElementById('chkTriadaOverlays');
+            if (chkOv) window.TriadaOverlayEngine.setVisible(chkOv.checked);
+            window.TriadaOverlayEngine.renderAll(triadaData, {
+              chart1D,
+              chart1H,
+              chart5M,
+              series1D,
+              series1H,
+              series5M,
+            });
+          } catch (eTriada) {
+            console.warn('Error renderizando overlays de la Tríada:', eTriada);
+          }
+        }
 
         // 1. Decisión del Cerebro
         const badgeSig = document.getElementById('brainSignalBadge');

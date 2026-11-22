@@ -489,6 +489,14 @@ def build_campaign_report(
         "expired_pnl_usd": 0.0,
         "net_arbiter_edge_usd": 0.0,
     }
+    manual_triada_summary = {
+        "open": 0,
+        "closed": 0,
+        "wins": 0,
+        "losses": 0,
+        "expired": 0,
+        "net_pnl_usd": 0.0,
+    }
 
     if os.path.exists(target_db):
         conn = sqlite3.connect(target_db, timeout=5.0)
@@ -597,10 +605,28 @@ def build_campaign_report(
                     (since_sql, since_sql),
                 )
                 for sh in cursor.fetchall():
-                    sid = str(sh["strategy"] or "").strip() or "sin_estrategia"
-                    b = _get_or_create_bucket(sid)
                     status_u = str(sh["status"] or "").upper()
                     verdict_u = str(sh["arbiter_verdict"] or "").upper()
+                    if verdict_u == "MANUAL_TRIADA":
+                        if status_u == "OPEN":
+                            manual_triada_summary["open"] += 1
+                        elif status_u == "CLOSED":
+                            manual_triada_summary["closed"] += 1
+                            vpnl_m = float(sh["virtual_pnl_usd"] or 0.0)
+                            out_m = str(sh["outcome"] or "").upper()
+                            if out_m == "EXPIRED":
+                                manual_triada_summary["expired"] += 1
+                            elif vpnl_m > 1e-6:
+                                manual_triada_summary["wins"] += 1
+                            elif vpnl_m < -1e-6:
+                                manual_triada_summary["losses"] += 1
+                            manual_triada_summary["net_pnl_usd"] = round(
+                                manual_triada_summary["net_pnl_usd"] + vpnl_m, 4
+                            )
+                        continue
+
+                    sid = str(sh["strategy"] or "").strip() or "sin_estrategia"
+                    b = _get_or_create_bucket(sid)
                     if verdict_u == "EVAL_PARALELA":
                         if status_u == "OPEN":
                             b["virtual_open"] += 1
@@ -803,6 +829,7 @@ def build_campaign_report(
             "presencial": presencial_summary,
             "shadow": shadow_totals,
             "parallel_shadow": parallel_shadow_summary,
+            "manual_triada": manual_triada_summary,
             "exit_reasons": global_exits,
         },
         "auto_strategies": auto_list,

@@ -264,7 +264,7 @@ def auditar(db_path=None, since_iso=None, save_snapshot=False):
                     SUM(CASE WHEN outcome = 'MISSED_TP' THEN virtual_pnl_usd ELSE 0.0 END) as missed_gain_usd,
                     SUM(CASE WHEN outcome = 'EXPIRED' THEN virtual_pnl_usd ELSE 0.0 END) as expired_pnl_usd
                 FROM shadow_trades
-                WHERE COALESCE(arbiter_verdict, '') != 'EVAL_PARALELA';
+                WHERE COALESCE(arbiter_verdict, '') NOT IN ('EVAL_PARALELA', 'MANUAL_TRIADA');
             """)
             st_row = cursor.fetchone()
             tot_v = (st_row['total_vetoed'] or 0) if st_row else 0
