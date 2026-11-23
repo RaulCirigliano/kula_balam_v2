@@ -62,18 +62,27 @@
     vwapSeries: { trigger: null, triggerUpper1: null, triggerLower1: null, triggerUpper2: null, triggerLower2: null },
     priceLines: { trigger: [] }, // Líneas de precio para trades activos/inspeccionados
     
-    // Capas e Indicadores Visibles (Predeterminado Limpio: Patrones y Demo TP/SL desmarcados)
-    layers: JSON.parse(localStorage.getItem('tv_chart_layers') || JSON.stringify({
-      candlePatterns: false,   // Patrones de velas: Martillo (Hammer), Soldados, Morning Star, etc. (Desmarcado por defecto)
-      candlePoc: true,         // POC de Compra Intrabarra (Mayor volumen comprador en zona Alta/Media/Baja)
-      vwap: true,              // VWAP de sesión y bandas +-1sigma, +-2sigma
-      ema: true,               // Medias Móviles: EMA 50 (Macro) y EMA 20 (Setup)
-      volumeProfile: true,     // Perfil de Volumen Horizontal (VPVR con POC/VAH/VAL)
-      volume: true,            // Histograma inferior de volumen en los 3 gráficos
-      tradeLines: false,       // Líneas de operaciones del bot / Demo TP (Desmarcado por defecto)
-      drawings: true,          // Zonas y cajas dibujadas por el usuario
-      heikinAshi: false        // Suavizado Heikin Ashi para filtrar ruido de velas
-    })),
+    // Capas e Indicadores Visibles (Predeterminado Limpio: Patrones históricos desmarcados por defecto para evitar ruido visual)
+    layers: (function () {
+      const defaults = {
+        candlePatterns: false,   // Patrones históricos en cada vela: desactivado por defecto para no tapar el gráfico
+        candlePoc: true,         // POC de Compra Intrabarra
+        vwap: true,              // VWAP de sesión y bandas +-1sigma, +-2sigma
+        ema: true,               // Medias Móviles: EMA 50 (Macro) y EMA 20 (Setup)
+        volumeProfile: true,     // Perfil de Volumen Horizontal (VPVR con POC/VAH/VAL)
+        volume: true,            // Histograma inferior de volumen en los 3 gráficos
+        tradeLines: false,       // Líneas de operaciones del bot / Demo TP
+        drawings: true,          // Zonas y cajas dibujadas por el usuario
+        heikinAshi: false        // Suavizado Heikin Ashi
+      };
+      try {
+        const saved = JSON.parse(localStorage.getItem('tv_chart_layers_v2') || 'null');
+        if (saved && typeof saved === 'object') {
+          return Object.assign({}, defaults, saved);
+        }
+      } catch (_) {}
+      return defaults;
+    })(),
     lastVolumeProfile: null,
     
     // Datos crudos
@@ -1503,7 +1512,7 @@
     } else {
       STATE.layers[layerKey] = !STATE.layers[layerKey];
     }
-    localStorage.setItem('tv_chart_layers', JSON.stringify(STATE.layers));
+    localStorage.setItem('tv_chart_layers_v2', JSON.stringify(STATE.layers));
     applyChartLayers();
     return STATE.layers[layerKey];
   };
@@ -1529,7 +1538,7 @@
     Object.keys(STATE.layers).forEach(k => {
       if (k !== 'heikinAshi') STATE.layers[k] = true;
     });
-    localStorage.setItem('tv_chart_layers', JSON.stringify(STATE.layers));
+    localStorage.setItem('tv_chart_layers_v2', JSON.stringify(STATE.layers));
     applyChartLayers();
   };
 
@@ -1537,12 +1546,12 @@
     Object.keys(STATE.layers).forEach(k => {
       if (k !== 'heikinAshi') STATE.layers[k] = false;
     });
-    localStorage.setItem('tv_chart_layers', JSON.stringify(STATE.layers));
+    localStorage.setItem('tv_chart_layers_v2', JSON.stringify(STATE.layers));
     applyChartLayers();
   };
 
   window.isLayerActive = function (layerKey) {
-    return STATE.layers && STATE.layers[layerKey] !== false;
+    return Boolean(STATE.layers && STATE.layers[layerKey] === true);
   };
 
   // =========================================================================

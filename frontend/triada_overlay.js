@@ -399,7 +399,7 @@
     const badgeEl = ensureOverlayEl(
       'chart-container-5m',
       'triada-atr-badge-5m',
-      'pointer-events-none absolute top-2 right-[76px] z-[6] flex flex-col items-end gap-1'
+      'pointer-events-none absolute top-11 left-2 z-[6] flex flex-col items-start gap-1'
     );
     if (!badgeEl) return;
     if (!state.visible || !desc || !desc.valid) {
@@ -424,8 +424,14 @@
 
   function applyTriadaMarkerOn5M(desc, ctx) {
     if (!ctx || !ctx.series5M || typeof ctx.series5M.setMarkers !== 'function') return;
+    const showHistoricalPatterns = Boolean(
+      typeof window !== 'undefined' &&
+      window.CockpitEngine &&
+      typeof window.CockpitEngine.isLayerActive === 'function' &&
+      window.CockpitEngine.isLayerActive('candlePatterns')
+    );
     const rawBase =
-      typeof window !== 'undefined' && window.lastCalculatedMarkers
+      showHistoricalPatterns && typeof window !== 'undefined' && window.lastCalculatedMarkers
         ? window.lastCalculatedMarkers.trigger
         : null;
     const baseMarkers = Array.isArray(rawBase) ? rawBase.slice() : [];
@@ -437,7 +443,7 @@
       return;
     }
 
-    // Anclar al tiempo real de la última vela visible del gráfico 5M para garantizar render exacto
+    // Anclar al tiempo real de la última vela visible del gráfico 5M para garantizar render exacto (sin duplicar si Patrones está activo)
     let anchorTime = desc.candleMarker.time;
     const candles5m = typeof window !== 'undefined' && Array.isArray(window._lastTrigger) ? window._lastTrigger : [];
     if (candles5m.length > 0) {
@@ -445,7 +451,8 @@
     }
     if (!anchorTime) return;
 
-    const merged = baseMarkers.concat([
+    const filteredBase = baseMarkers.filter((m) => Number(m.time) !== Number(anchorTime));
+    const merged = filteredBase.concat([
       {
         time: anchorTime,
         position: desc.candleMarker.position,
