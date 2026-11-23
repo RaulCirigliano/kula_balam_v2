@@ -15,12 +15,14 @@ Las ejecuciones asistidas se registran en seguimiento virtual aislado (`shadow_t
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import math
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
 from backend.candlestick_auditor import audit_candlestick_confluence
+from backend.indicators import compute_rvol_tod
 from backend.kula_rules import (
     check_universal_wick_veto,
     compute_atr,
@@ -214,6 +216,269 @@ def _resolve_vault_capital(broker: Any, symbol: str) -> Tuple[float, str]:
     return default_cap, currency
 
 
+def _evaluate_session_and_tf_guard(
+    symbol: str,
+    tf_norm: str,
+    now_utc: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """
+    Paso 1 del Protocolo Presencial:
+      - Ventanas horarias de liquidez institucional en ART (UTC-3):
+          * LONDRES_NY_AM: 09:30 - 13:30 ART
+          * NY_POWER_HOUR: 15:30 - 17:30 ART
+      - Zonas bloqueadas (blackout):
+          * LUNCH_LULL: 14:00 - 15:30 ART (chop sin dirección)
+          * FOREX_SUNDAY_TRAP: Domingo 18:00 - 21:00 ART en activos FX (=X)
+      - Piso de temporalidad en cripto presencial:
+          * En cripto (/USDT), 15m recomendado (5m permitido con advertencia; 1m/3m bloqueado por fricción 0.26% RT).
+    """
+    ref_utc = now_utc if now_utc is not None else datetime.now(timezone.utc)
+    if ref_utc.tzinfo is None:
+        ref_utc = ref_utc.replace(tzinfo=timezone.utc)
+    art_dt = ref_utc.astimezone(timezone(timedelta(hours=-3)))
+    hm = art_dt.hour * 60 + art_dt.minute
+    weekday = art_dt.weekday()  # 0=Mon .. 6=Sun
+
+    is_fx = "=X" in str(symbol or "").upper()
+    is_crypto = "/USDT" in str(symbol or "").upper() or str(symbol or "").upper().endswith("USDT")
+
+    window_code = "FUERA_VENTANA_PRIMARIA"
+    window_label = f"Sesión Libre ({art_dt.strftime('%H:%M')} ART)"
+    is_blackout = False
+    blackout_reason: Optional[str] = None
+
+    if is_fx and weekday == 6 and (18 * 60 <= hm < 21 * 60):
+        window_code = "FOREX_SUNDAY_TRAP"
+        window_label = "Apertura Dom. Forex (Spread Alto)"
+        is_blackout = True
+        blackout_reason = "Ventana bloqueada: apertura dominical Forex (18:00–21:00 ART) con spread ensanchado."
+    elif 9 * 60 + 30 <= hm <= 13 * 60 + 30:
+        window_code = "LONDRES_NY_AM"
+        window_label = "Londres / NY AM (09:30–13:30 ART)"
+    elif 14 * 60 <= hm < 15 * 60 + 30:
+        window_code = "LUNCH_LULL"
+        window_label = "Lunch Lull NY (14:00–15:30 ART)"
+        is_blackout = True
+        blackout_reason = "Ventana bloqueada: Lunch Lull NY (14:00–15:30 ART) — baja liquidez y falsas rupturas."
+    elif 15 * 60 + 30 <= hm <= 17 * 60 + 30:
+        window_code = "NY_POWER_HOUR"
+        window_label = "NY Power Hour (15:30–17:30 ART)"
+
+    tf_clean = str(tf_norm or "15m").lower()
+    tf_floor_ok = True
+    tf_warning: Optional[str] = None
+    if is_crypto:
+        if tf_clean in ("1m", "3m"):
+            tf_floor_ok = False
+            tf_warning = f"Temporalidad {tf_clean} bloqueada en cripto presencial (mínimo 15m recomendado por fricción 0.26% RT)."
+        elif tf_clean == "5m":
+            tf_warning = "Escala 5m con mayor ruido frente a comisión 0.26% RT (recomendado 15m presencial)."
+
+    return {
+        "art_time": art_dt.strftime("%H:%M"),
+        "window_code": window_code,
+        "window_label": window_label,
+        "is_primary_window": window_code in ("LONDRES_NY_AM", "NY_POWER_HOUR"),
+        "is_blackout": is_blackout,
+        "blackout_reason": blackout_reason,
+        "tf_norm": tf_clean,
+        "tf_floor_ok": tf_floor_ok,
+        "tf_recommended": "15m" if is_crypto else "1h",
+        "tf_warning": tf_warning,
+    }
+
+
+def _evaluate_setup_a_squeeze(
+    df_1h: Optional[pd.DataFrame],
+    df_tactical: Optional[pd.DataFrame],
+    side: str,
+    rule0_ok: bool,
+    rule1_ok: bool,
+    rule2_ok: bool,
+    px_dec: int,
+) -> Dict[str, Any]:
+    """
+    Paso 3 · Setup A — Ruptura tras Compresión 1H -> 15M (modelo fractal_squeeze_15m):
+      1. Estructura 1H alineada (Cierre vs EMA50 1H + Abanico EMA21/EMA89 1H) y 1D no roto en contra.
+      2. Compresión previa en marco táctico: Bollinger(20, 2.0) dentro de Keltner(20, 1.60*ATR14)
+         en al menos 1 de las últimas 4 velas cerradas previas.
+      3. Vela de ruptura cerrada por fuera de Keltner a favor de 1H con expansión ATR(14) > SMA(ATR, 20).
+    """
+    if df_tactical is None or len(df_tactical) < 25:
+        return {
+            "triggered": False,
+            "squeeze_recent": False,
+            "breakout_bar": False,
+            "atr_expanding": False,
+            "kc_upper": None,
+            "kc_lower": None,
+        }
+
+    is_long = str(side or "LONG").upper() in ("LONG", "BUY")
+    c = df_tactical["close"].astype(float)
+    o = df_tactical["open"].astype(float)
+
+    sma20 = c.rolling(20).mean()
+    std20 = c.rolling(20).std()
+    bbu = sma20 + 2.0 * std20
+    bbd = sma20 - 2.0 * std20
+
+    ema20 = compute_ema(c, 20)
+    atr14 = compute_atr(df_tactical, 14)
+    atr_sma20 = atr14.rolling(20, min_periods=5).mean()
+
+    kc_mult = 1.60
+    kcu = ema20 + kc_mult * atr14
+    kcd = ema20 - kc_mult * atr14
+
+    in_sq = ((bbu < kcu) & (bbd > kcd)).astype(int)
+    sq_recent_series = in_sq.shift(1).rolling(4, min_periods=1).max()
+
+    last_idx = df_tactical.index[-1]
+    sq_recent = bool(float(sq_recent_series.loc[last_idx] or 0.0) > 0)
+    c_last = float(c.loc[last_idx])
+    o_last = float(o.loc[last_idx])
+    kcu_last = float(kcu.loc[last_idx]) if not pd.isna(kcu.loc[last_idx]) else c_last
+    kcd_last = float(kcd.loc[last_idx]) if not pd.isna(kcd.loc[last_idx]) else c_last
+    atr_last = float(atr14.loc[last_idx]) if not pd.isna(atr14.loc[last_idx]) else 0.0
+    atr_sma_last = float(atr_sma20.loc[last_idx]) if not pd.isna(atr_sma20.loc[last_idx]) else 0.0
+
+    atr_expanding = bool(atr_last > 0 and atr_sma_last > 0 and atr_last >= atr_sma_last)
+    if is_long:
+        breakout_bar = bool(c_last > kcu_last and c_last > o_last)
+    else:
+        breakout_bar = bool(c_last < kcd_last and c_last < o_last)
+
+    structure_ok = bool(rule0_ok and rule1_ok and rule2_ok)
+    triggered = bool(structure_ok and sq_recent and breakout_bar and atr_expanding)
+
+    return {
+        "triggered": triggered,
+        "structure_ok": structure_ok,
+        "squeeze_recent": sq_recent,
+        "breakout_bar": breakout_bar,
+        "atr_expanding": atr_expanding,
+        "kc_upper": round(kcu_last, px_dec) if math.isfinite(kcu_last) else None,
+        "kc_lower": round(kcd_last, px_dec) if math.isfinite(kcd_last) else None,
+    }
+
+
+def _evaluate_rvol_bipolar_gate(
+    df_tactical: Optional[pd.DataFrame],
+    tf_norm: str,
+    symbol: str,
+    active_setup: str,
+    fallback_rvol: float = 1.0,
+) -> Dict[str, Any]:
+    """
+    Paso 4 — Confirmación con RVOL-TOD Bipolar (base 1.0x):
+      - En Forex (=X, sin volumen centralizado): exento automáticamente.
+      - Setup A (Ruptura Squeeze): exige RVOL-TOD >= 1.80x (barra verde alta institucional).
+      - Setup B (Pullback Fibo 0.50-0.75): exige RVOL-TOD >= 1.10x (barra verde sobre media horaria 1.0x;
+        rechaza barras rojas < 1.0x).
+    """
+    is_fx = "=X" in str(symbol or "").upper()
+    if is_fx:
+        return {
+            "rvol_tod": None,
+            "min_required": 0.0,
+            "ok": True,
+            "polarity": "FX_EXEMPT",
+            "label": "FX Exento (sin vol. centralizado)",
+        }
+
+    rvol_tod_val: Optional[float] = None
+    if df_tactical is not None and len(df_tactical) >= 5:
+        try:
+            s_rvol = compute_rvol_tod(df_tactical, timeframe=tf_norm, lookback_days=5)
+            if len(s_rvol) > 0 and s_rvol.iloc[-1] is not None and not pd.isna(s_rvol.iloc[-1]):
+                rvol_tod_val = round(float(s_rvol.iloc[-1]), 2)
+        except Exception:
+            rvol_tod_val = None
+
+    if rvol_tod_val is None:
+        rvol_tod_val = round(float(fallback_rvol or 1.0), 2)
+
+    if active_setup == "SETUP_A_SQUEEZE":
+        min_req = 1.80
+    else:
+        min_req = 1.10
+
+    ok = bool(rvol_tod_val >= min_req)
+    polarity = "GREEN_ABOVE_AVG" if rvol_tod_val >= 1.0 else "RED_BELOW_AVG"
+    return {
+        "rvol_tod": rvol_tod_val,
+        "min_required": min_req,
+        "ok": ok,
+        "polarity": polarity,
+        "label": f"{rvol_tod_val:.2f}x / req ≥ {min_req:.2f}x ({'Verde' if rvol_tod_val >= 1.0 else 'Rojo < 1.0x'})",
+    }
+
+
+def _check_daily_presencial_limits(
+    broker: Any,
+    now_utc: Optional[datetime] = None,
+    max_daily_trades: int = 2,
+    max_daily_sl: int = 2,
+) -> Dict[str, Any]:
+    """
+    Paso 5 — Cupo Duro de Sesión Presencial:
+      - Máximo 2 operaciones MANUAL_TRIADA por día.
+      - Máximo 2 SL en el día (-1.0% bóveda) -> stop diario hasta el día siguiente.
+    """
+    ref_utc = now_utc if now_utc is not None else datetime.now(timezone.utc)
+    if ref_utc.tzinfo is None:
+        ref_utc = ref_utc.replace(tzinfo=timezone.utc)
+    art_tz = timezone(timedelta(hours=-3))
+    art_now = ref_utc.astimezone(art_tz)
+    day_start_art = art_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # SQLite CURRENT_TIMESTAMP usa formato 'YYYY-MM-DD HH:MM:SS' en UTC
+    day_start_utc_sql = day_start_art.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    daily_trades = 0
+    daily_sl = 0
+    ledger = getattr(broker, "ledger", None) if broker is not None else None
+    conn_fn = (getattr(ledger, "_connect", None) or getattr(ledger, "_get_connection", None)) if ledger is not None else None
+    if callable(conn_fn):
+        try:
+            with conn_fn() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT outcome, status
+                    FROM shadow_trades
+                    WHERE arbiter_verdict = 'MANUAL_TRIADA'
+                      AND REPLACE(opened_at, 'T', ' ') >= ?
+                    """,
+                    (day_start_utc_sql,),
+                ).fetchall()
+                daily_trades = len(rows)
+                for r in rows:
+                    outcome = str(r["outcome"] if isinstance(r, dict) or hasattr(r, "keys") else r[0] or "").upper()
+                    if outcome == "SAVED_SL":
+                        daily_sl += 1
+        except Exception:
+            pass
+
+    quota_ok = daily_trades < max_daily_trades
+    sl_stop_ok = daily_sl < max_daily_sl
+    block_reason: Optional[str] = None
+    if not sl_stop_ok:
+        block_reason = f"Stop diario presencial activado ({daily_sl}/{max_daily_sl} SL hoy = -1.0% bóveda)."
+    elif not quota_ok:
+        block_reason = f"Cupo diario presencial alcanzado ({daily_trades}/{max_daily_trades} operaciones hoy)."
+
+    return {
+        "daily_trades_count": daily_trades,
+        "max_daily_trades": max_daily_trades,
+        "daily_sl_count": daily_sl,
+        "max_daily_sl": max_daily_sl,
+        "quota_ok": quota_ok,
+        "sl_stop_ok": sl_stop_ok,
+        "ok": bool(quota_ok and sl_stop_ok),
+        "block_reason": block_reason,
+    }
+
+
 def _build_execution_plan(
     *,
     symbol: str,
@@ -227,6 +492,7 @@ def _build_execution_plan(
     target_rr: float,
     broker: Any,
     px_dec: int,
+    presencial_protocol: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     is_long = str(side or "LONG").upper() in ("LONG", "BUY")
     costs = get_asset_friction_costs(symbol)
@@ -234,14 +500,26 @@ def _build_execution_plan(
     spread_pct = float(costs.get("spread_pct", 0.05))
     round_trip_cost = round((fee_pct + spread_pct) * 2.0, 4)
 
-    is_fx = "=X" in symbol.upper()
+    sym_up = symbol.upper()
+    is_fx = "=X" in sym_up
+    is_crypto = "/USDT" in sym_up or sym_up.endswith("USDT")
     tick_size = 0.0001 if is_fx else (0.0001 if cur_price < 1.0 else 0.01)
-    base_sl_pct = 0.15 if is_fx else 1.0
+    # Paso 5: en cripto presencial, SL >= max(1.2%, 1.8 * ATR%) para blindarse del 0.26% RT
+    atr_pct = ((atr_val / cur_price) * 100.0) if (cur_price > 0 and atr_val > 0) else 0.0
+    if is_fx:
+        base_sl_pct = 0.15
+    elif is_crypto:
+        base_sl_pct = max(1.20, round(1.8 * atr_pct, 4))
+    else:
+        base_sl_pct = max(1.00, round(1.5 * atr_pct, 4))
 
     # Stop Loss técnico: integra blindaje ATR de quant_risk.py + nivel de invalidación Fibo 0.75
     fibo_inv = fibo_info.get("invalidation_price")
     support_ref: Optional[float] = None
-    if fibo_inv is not None and cur_price > 0:
+    proto = presencial_protocol or {}
+    active_setup = str(proto.get("active_setup") or "SETUP_B_FIBO_PULLBACK")
+    # En Setup A (ruptura post-compresión) el precio rompe máximo/mínimo de Keltner; el stop técnico es por ATR/estructura
+    if active_setup != "SETUP_A_SQUEEZE" and fibo_inv is not None and cur_price > 0:
         if is_long and fibo_inv < cur_price:
             support_ref = float(fibo_inv)
         elif (not is_long) and fibo_inv > cur_price:
@@ -259,8 +537,11 @@ def _build_execution_plan(
     sl_gross_pct = float(guarded.get("sl_pct") or base_sl_pct)
     if sl_gross_pct <= 0 or not math.isfinite(sl_gross_pct):
         sl_gross_pct = base_sl_pct
-    # Cap prudente si Fibo 0.75 estaba muy alejado (>8%) para no romper coherencia táctica
-    sl_gross_pct = round(min(sl_gross_pct, 8.0), 4)
+    if is_crypto:
+        sl_gross_pct = max(1.20, sl_gross_pct)
+    # Paso 5: en acciones EE. UU. / CEDEARs cap <= 4.8% (evita veto 5.0% de entry_gate); en cripto cap <= 8.0%
+    max_sl_cap = 8.0 if is_crypto else (1.5 if is_fx else 4.8)
+    sl_gross_pct = round(min(sl_gross_pct, max_sl_cap), 4)
 
     sl_price = (
         round(cur_price * (1.0 - sl_gross_pct / 100.0), px_dec)
@@ -301,11 +582,26 @@ def _build_execution_plan(
     open_auto_pos = _find_open_auto_position(broker, symbol)
     active_manual_sim = _find_open_manual_shadow(broker, symbol)
 
+    setup_triggered = bool(proto.get("setup_triggered", trigger_res.get("triggered")))
+    rvol_gate = proto.get("rvol_gate") or {}
+    session_guard = proto.get("session_guard") or {}
+    daily_limits = proto.get("daily_limits") or {}
+
     block_reasons: List[str] = []
-    if not bool(trigger_res.get("triggered")):
+    if not setup_triggered:
         fails = trigger_res.get("failures") or []
-        summary_fail = "; ".join(str(x) for x in fails[:2]) if fails else "No se cumplen las reglas de la Tríada."
+        summary_fail = "; ".join(str(x) for x in fails[:2]) if fails else "No se activa Setup A (Squeeze 1H→15M) ni Setup B (Pullback Fibo 0.50–0.75)."
         block_reasons.append(f"Gatillo sin luz verde: {summary_fail}")
+    if setup_triggered and rvol_gate and not bool(rvol_gate.get("ok", True)):
+        block_reasons.append(
+            f"RVOL bipolar insuficiente ({rvol_gate.get('rvol_tod', 0.0):.2f}x < {rvol_gate.get('min_required', 1.1):.2f}x requerido para {proto.get('active_setup_label') or active_setup})."
+        )
+    if session_guard and not bool(session_guard.get("tf_floor_ok", True)):
+        block_reasons.append(str(session_guard.get("tf_warning") or "Temporalidad inferior al piso presencial permitido."))
+    if session_guard and bool(session_guard.get("is_blackout", False)):
+        block_reasons.append(str(session_guard.get("blackout_reason") or "Ventana horaria bloqueada por baja liquidez."))
+    if daily_limits and not bool(daily_limits.get("ok", True)):
+        block_reasons.append(str(daily_limits.get("block_reason") or "Cupo diario presencial alcanzado."))
     if wick_veto_reason:
         block_reasons.append(str(wick_veto_reason))
     if net_rr < 2.0:
@@ -321,6 +617,8 @@ def _build_execution_plan(
         "can_execute": len(block_reasons) == 0,
         "block_reasons": block_reasons,
         "side": "LONG" if is_long else "SHORT",
+        "active_setup": active_setup,
+        "active_setup_label": proto.get("active_setup_label") or active_setup,
         "entry_price": round(cur_price, px_dec),
         "sl_price": sl_price,
         "tp_price": tp_price,
@@ -356,10 +654,13 @@ def evaluate_triada_snapshot(
     df_1h: Optional[pd.DataFrame] = None,
     df_tactical: Optional[pd.DataFrame] = None,
     broker: Any = None,
+    now_utc: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """
-    Evalúa los 5 puntos de la Tríada Multitemporal y construye el plan de ejecución asistida
-    usando exclusivamente backend.kula_rules, backend.candlestick_auditor y backend.quant_risk.
+    Evalúa los 5 puntos de la Tríada Multitemporal + el Protocolo Presencial de 5 Pasos
+    (Ventana horaria y piso TF, Estructura 1H, Setup A Squeeze / Setup B Fibo, RVOL-TOD bipolar
+    y Cupo duro diario 2 ops / 2 SL) usando exclusivamente backend.kula_rules, backend.indicators,
+    backend.candlestick_auditor y backend.quant_risk (0 tokens LLM).
     """
     import backend.main as main_mod
 
@@ -475,6 +776,34 @@ def evaluate_triada_snapshot(
     rule3_ok = bool(rules.get("rule3_fibo_zone"))
     rule4_ok = bool(rules.get("rule4_atr_expansion_tactical"))
 
+    # 4B. Protocolo Presencial de 5 Pasos (Setup A Squeeze 1H->15M + Setup B Pullback Fibo + RVOL Bipolar + Sesión/Cupo)
+    session_guard = _evaluate_session_and_tf_guard(norm_symbol, tf_norm, now_utc=now_utc)
+    setup_a_info = _evaluate_setup_a_squeeze(
+        df_1h=df_1h,
+        df_tactical=df_tactical,
+        side=chosen_side,
+        rule0_ok=rule0_ok,
+        rule1_ok=rule1_ok,
+        rule2_ok=rule2_ok,
+        px_dec=px_dec,
+    )
+    setup_b_ok = bool(trigger_res.get("triggered"))
+    setup_a_ok = bool(setup_a_info.get("triggered"))
+    if setup_a_ok and setup_b_ok:
+        active_setup = "SETUP_AB_CONFLUENCE"
+        active_setup_label = "Setup A+B (Squeeze + Fibo 0.50–0.75)"
+    elif setup_a_ok:
+        active_setup = "SETUP_A_SQUEEZE"
+        active_setup_label = "Setup A (Ruptura Compresión 1H→15M)"
+    elif setup_b_ok:
+        active_setup = "SETUP_B_FIBO_PULLBACK"
+        active_setup_label = "Setup B (Pullback Zona Dorada Fibo)"
+    else:
+        active_setup = "NONE"
+        active_setup_label = "En espera de Setup A (Squeeze) o B (Fibo)"
+
+    setup_triggered = bool(setup_a_ok or setup_b_ok)
+
     fibo_info = _compute_swing_and_fibo(df_1h, chosen_side, px_dec)
     # Preservar exactitud de fibo_zone_min/max devuelto por evaluate_kula_trigger
     if metrics.get("fibo_zone_min"):
@@ -485,6 +814,32 @@ def evaluate_triada_snapshot(
     last_candle_ts = _to_epoch_sec(df_tactical["timestamp"].iloc[-1])
     pattern_name = str(candlestick_audit.get("pattern_name") or "NONE")
     rvol_val = float(candlestick_audit.get("rvol") or 1.0)
+    rvol_gate = _evaluate_rvol_bipolar_gate(
+        df_tactical=df_tactical,
+        tf_norm=tf_norm,
+        symbol=norm_symbol,
+        active_setup="SETUP_A_SQUEEZE" if (setup_a_ok and not setup_b_ok) else "SETUP_B_FIBO_PULLBACK",
+        fallback_rvol=rvol_val,
+    )
+    daily_limits = _check_daily_presencial_limits(broker_ref, now_utc=now_utc)
+
+    presencial_protocol = {
+        "session_guard": session_guard,
+        "structure_1h_aligned": bool(rule0_ok and rule1_ok and rule2_ok),
+        "active_setup": active_setup,
+        "active_setup_label": active_setup_label,
+        "setup_triggered": setup_triggered,
+        "setup_a_squeeze": setup_a_info,
+        "setup_b_fibo_pullback": {
+            "triggered": setup_b_ok,
+            "fibo_zone_ok": rule3_ok,
+            "atr_expansion_ok": rule4_ok,
+        },
+        "rvol_gate": rvol_gate,
+        "daily_limits": daily_limits,
+    }
+
+    rvol_display = float(rvol_gate.get("rvol_tod") if rvol_gate.get("rvol_tod") is not None else rvol_val)
     rsi_div = str(candlestick_audit.get("rsi_divergence") or "NONE")
     rsi_div_desc = str(candlestick_audit.get("rsi_divergence_desc") or "")
 
@@ -498,7 +853,7 @@ def evaluate_triada_snapshot(
         elif rsi_div == "BEARISH_DIV":
             div_tag = " · Div RSI-"
         pat_clean = pattern_name if pattern_name not in ("NONE", "NEUTRAL", "") else "Vela"
-        marker_text = f"{pat_clean} · RVOL {rvol_val:.2f}x{div_tag}"
+        marker_text = f"{pat_clean} · RVOL {rvol_display:.2f}x{div_tag}"
         marker_kind = "pattern"
 
     atr_val = float(metrics.get("atr_tactical") or ind.get("atr_14") or 0.0)
@@ -522,6 +877,7 @@ def evaluate_triada_snapshot(
         target_rr=target_rr,
         broker=broker_ref,
         px_dec=px_dec,
+        presencial_protocol=presencial_protocol,
     )
 
     overlays = {
@@ -563,7 +919,10 @@ def evaluate_triada_snapshot(
             "pattern_name": pattern_name,
             "pattern_desc": candlestick_audit.get("pattern_desc") or "",
             "win_rate": candlestick_audit.get("win_rate"),
-            "rvol": rvol_val,
+            "rvol": rvol_display,
+            "rvol_tod": rvol_gate.get("rvol_tod"),
+            "rvol_min_required": rvol_gate.get("min_required"),
+            "rvol_ok": rvol_gate.get("ok"),
             "rsi_divergence": rsi_div,
             "rsi_divergence_desc": rsi_div_desc,
             "last_candle_ts": last_candle_ts,
@@ -580,9 +939,10 @@ def evaluate_triada_snapshot(
         "evaluated_side": chosen_side,
         "current_price": round(cur_price, px_dec),
         "px_dec": px_dec,
-        "triggered": bool(trigger_res.get("triggered")) and (not wick_veto_active),
+        "triggered": bool(setup_triggered and rvol_gate.get("ok", True) and (not wick_veto_active)),
         "trigger": trigger_res,
         "candlestick_audit": candlestick_audit,
+        "presencial_protocol": presencial_protocol,
         "overlays": overlays,
         "execution_plan": execution_plan,
     }
@@ -598,11 +958,13 @@ def execute_triada_simulation(
     df_1h: Optional[pd.DataFrame] = None,
     df_tactical: Optional[pd.DataFrame] = None,
     broker: Any = None,
+    now_utc: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """
     Ejecuta el disparo manual asistido en seguimiento virtual aislado (`shadow_trades` con
     `strategy='manual_triada'` y `arbiter_verdict='MANUAL_TRIADA'`), revalidando en servidor
-    todas las compuertas (luz verde Tríada, R:R >= 2.0, sin veto de mecha y sin posición OPEN en auto).
+    todas las compuertas (luz verde Tríada / Setup A o B, RVOL bipolar, ventana de sesión,
+    cupo diario 2 ops / 2 SL, R:R >= 2.0, sin veto de mecha y sin posición OPEN en auto).
     """
     import backend.main as main_mod
 
@@ -624,6 +986,7 @@ def execute_triada_simulation(
         df_1h=df_1h,
         df_tactical=df_tactical,
         broker=broker_ref,
+        now_utc=now_utc,
     )
     if snap.get("status") != "ok":
         return {"status": "blocked", "executed": False, "reasons": [snap.get("error") or "Error de datos"], "snapshot": snap}

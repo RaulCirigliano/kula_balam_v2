@@ -1713,16 +1713,37 @@
         </div>
 
         <div class="space-y-2 text-xs">
-          <!-- Resumen visual de los 5 puntos + veto de mecha -->
+          <!-- Botón de activación rápida del Protocolo Presencial 15M (Volumen + RVOL Bipolar + 5 Puntos Tríada) -->
+          <button type="button" id="btnApplyPresencialPreset" onclick="aplicarPresetPresencial15m()" class="w-full py-1.5 px-2.5 rounded-lg bg-indigo-950/85 hover:bg-indigo-900 text-indigo-200 border border-indigo-500/60 font-mono font-bold text-[10.5px] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm" title="Configura el Gatillo en 15M, despliega Volumen + RVOL Bipolar (base 1.0x) y evalúa los 5 Pasos del Protocolo Presencial">
+            <span>🎯</span> Activar Vista Presencial 15M (Vol + RVOL Bipolar)
+          </button>
+
+          <!-- Resumen visual de los 5 puntos + Setup A/B + RVOL + Veto de Mecha -->
           <div id="triadaRulesSummaryPills" class="flex flex-wrap gap-1"></div>
 
-          <!-- Niveles Pre-Calculados vía quant_risk.py -->
+          <!-- Niveles Pre-Calculados vía quant_risk.py + Protocolo Presencial 5 Pasos -->
           <div class="p-2 rounded-lg bg-slate-950/80 border border-slate-800 space-y-1 font-mono text-[10.5px]">
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Dirección:</span>
               <span id="triadaExecSide" class="font-bold text-slate-200">--</span>
             </div>
             <div class="flex items-center justify-between">
+              <span class="text-slate-400">Setup Presencial:</span>
+              <span id="triadaExecSetup" class="font-bold text-amber-300 truncate max-w-[165px]">--</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">RVOL Bipolar (1.0x):</span>
+              <span id="triadaExecRvol" class="font-bold text-emerald-400">--</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Ventana / Escala:</span>
+              <span id="triadaExecSession" class="font-bold text-cyan-300 truncate max-w-[170px]">--</span>
+            </div>
+            <div class="flex items-center justify-between pb-0.5 border-b border-slate-800/80">
+              <span class="text-slate-400">Cupo Diario (-1.0%):</span>
+              <span id="triadaExecDailyQuota" class="font-bold text-emerald-300">0/2 ops · 0/2 SL</span>
+            </div>
+            <div class="flex items-center justify-between pt-0.5">
               <span class="text-slate-400">Entrada Estimada:</span>
               <span id="triadaExecEntry" class="font-bold text-cyan-300">$--</span>
             </div>
@@ -5571,6 +5592,41 @@
         return await window.TriadaOverlayEngine.executeSimulatedTrigger(BACKEND_BASE);
       }
       return null;
+    }
+
+    async function aplicarPresetPresencial15m() {
+      try {
+        const chkVol = document.getElementById('chkPanelVol');
+        if (chkVol && !chkVol.checked) {
+          chkVol.checked = true;
+          if (typeof toggleAuxPanel === 'function') toggleAuxPanel('panelVol', true);
+        }
+        const chkRvol = document.getElementById('chkPanelRvol');
+        if (chkRvol && !chkRvol.checked) {
+          chkRvol.checked = true;
+          if (typeof toggleAuxPanel === 'function') toggleAuxPanel('panelRvol', true);
+        }
+        const chkOv = document.getElementById('chkTriadaOverlays');
+        if (chkOv && !chkOv.checked) {
+          chkOv.checked = true;
+          toggleTriadaOverlays(true);
+        }
+        const rrEl = document.getElementById('inputRr');
+        if (rrEl && (parseFloat(rrEl.value) || 0) < 2.0) {
+          rrEl.value = '2.0';
+          const lblRr = document.getElementById('lblRrVal');
+          if (lblRr) lblRr.innerText = '1:2.0';
+        }
+        const tfSel = document.getElementById('triggerTimeframeSelect');
+        if (tfSel && tfSel.value !== '15m') {
+          tfSel.value = '15m';
+          await changeTriggerTimeframe('15m');
+        } else {
+          await evaluarEstrategiaEnVivo();
+        }
+      } catch (err) {
+        console.warn('Error aplicando preset presencial 15M:', err);
+      }
     }
 
     // A. Evaluar Estrategia Cuantitativa en Vivo vía /api/market/analysis + /api/triada/evaluate

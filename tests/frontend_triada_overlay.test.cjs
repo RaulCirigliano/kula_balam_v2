@@ -114,3 +114,58 @@ test('buildTriadaOverlayDescriptors maps all 5 points, red dotted Fibo 0.75 inva
   assert.equal(desc.executionCard.canExecute, false);
   assert.equal(desc.executionCard.simLines.length, 3);
 });
+
+test('buildTriadaOverlayDescriptors maps 5-step Presencial Protocol (Setup A/B, RVOL bipolar, session window, daily quota)', () => {
+  const snapshot = {
+    status: 'ok',
+    symbol: 'ETH/USDT',
+    timeframe: '15m',
+    evaluated_side: 'LONG',
+    px_dec: 2,
+    presencial_protocol: {
+      active_setup: 'SETUP_A_SQUEEZE',
+      active_setup_label: 'Setup A (Ruptura Compresión 1H→15M)',
+      setup_triggered: true,
+      setup_a_squeeze: { triggered: true },
+      rvol_gate: {
+        rvol_tod: 2.15,
+        min_required: 1.8,
+        ok: true,
+        label: '2.15x / req ≥ 1.80x (Verde)',
+      },
+      session_guard: {
+        window_label: 'Londres / NY AM (09:30–13:30 ART)',
+        is_blackout: false,
+        tf_floor_ok: true,
+      },
+      daily_limits: {
+        daily_trades_count: 1,
+        max_daily_trades: 2,
+        daily_sl_count: 0,
+        max_daily_sl: 2,
+        ok: true,
+      },
+    },
+    overlays: {},
+    execution_plan: {
+      can_execute: true,
+      block_reasons: [],
+      side: 'LONG',
+      entry_price: 2010.0,
+      sl_price: 1985.88,
+      tp_price: 2065.0,
+      sl_gross_pct: 1.2,
+      tp_gross_pct: 2.74,
+      net_rr: 2.01,
+    },
+  };
+
+  const desc = triada.buildTriadaOverlayDescriptors(snapshot);
+  assert.equal(desc.valid, true);
+  assert.equal(desc.presencialProtocol.activeSetup, 'SETUP_A_SQUEEZE');
+  assert.equal(desc.presencialProtocol.setupATriggered, true);
+  assert.equal(desc.presencialProtocol.rvolTod, 2.15);
+  assert.equal(desc.presencialProtocol.rvolOk, true);
+  assert.equal(desc.presencialProtocol.sessionBlackout, false);
+  assert.equal(desc.presencialProtocol.dailyQuotaText, '1/2 ops · 0/2 SL');
+});

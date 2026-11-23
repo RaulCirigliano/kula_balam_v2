@@ -70,12 +70,14 @@ def _build_green_triada_frames(wick_veto=False):
             df_5m.loc[idx, "close"] = 1955.0
             df_5m.loc[idx, "low"] = 1948.0
             df_5m.loc[idx, "high"] = 2000.0  # mecha superior > 80%
+            df_5m.loc[idx, "volume"] = 2400.0
         elif k == 1:
-            # Vela alcista limpia con mecha superior pequeña (< 20%)
+            # Vela alcista limpia con mecha superior pequeña (< 20%) y RVOL >= 1.4x
             df_5m.loc[idx, "open"] = 1942.0
             df_5m.loc[idx, "close"] = 1955.0
             df_5m.loc[idx, "low"] = 1938.0
             df_5m.loc[idx, "high"] = 1958.0
+            df_5m.loc[idx, "volume"] = 2400.0
         else:
             df_5m.loc[idx, "high"] = c_val + 14.0
             df_5m.loc[idx, "low"] = c_val - 14.0
@@ -86,6 +88,7 @@ def test_triada_evaluate_all_five_overlays_and_guarded_execution_plan(tmp_path):
     db_file = str(tmp_path / "triada_eval.sqlite3")
     broker = PaperBrokerAdapter(initial_vault_usd=500.0, db_path=db_file, fee_pct=0.10)
     df_1d, df_1h, df_5m = _build_green_triada_frames(wick_veto=False)
+    now_ok = datetime(2026, 11, 23, 14, 0, 0, tzinfo=timezone.utc)  # 11:00 ART (Londres/NY AM)
 
     snap = evaluate_triada_snapshot(
         symbol="ETHUSDT",
@@ -97,6 +100,7 @@ def test_triada_evaluate_all_five_overlays_and_guarded_execution_plan(tmp_path):
         df_1h=df_1h,
         df_tactical=df_5m,
         broker=broker,
+        now_utc=now_ok,
     )
 
     assert snap["status"] == "ok"
@@ -214,6 +218,7 @@ def test_triada_execute_sim_isolated_from_vault_and_campaign_audit(tmp_path, mon
     monkeypatch.setenv("CAMPAIGN_CONFIG_PATH", str(cfg_file))
 
     df_1d, df_1h, df_5m = _build_green_triada_frames(wick_veto=False)
+    now_ok = datetime(2026, 11, 23, 14, 0, 0, tzinfo=timezone.utc)  # 11:00 ART
     res = execute_triada_simulation(
         symbol="ETH/USDT",
         timeframe="5m",
@@ -224,6 +229,7 @@ def test_triada_execute_sim_isolated_from_vault_and_campaign_audit(tmp_path, mon
         df_1h=df_1h,
         df_tactical=df_5m,
         broker=broker,
+        now_utc=now_ok,
     )
     assert res["status"] == "ok"
     assert res["executed"] is True
@@ -274,8 +280,22 @@ def test_triada_fastapi_endpoints_smoke(tmp_path):
     class _FakeDaemon:
         broker = broker_iso
 
+    now_ok_guard = {
+        "art_time": "11:00",
+        "window_code": "LONDRES_NY_AM",
+        "window_label": "Londres / NY AM (09:30–13:30 ART)",
+        "is_primary_window": True,
+        "is_blackout": False,
+        "blackout_reason": None,
+        "tf_norm": "5m",
+        "tf_floor_ok": True,
+        "tf_recommended": "15m",
+        "tf_warning": None,
+    }
+
     client = TestClient(main.app)
     with patch("backend.triada_service._fetch_closed_df", side_effect=_fake_fetch), \
+         patch("backend.triada_service._evaluate_session_and_tf_guard", return_value=now_ok_guard), \
          patch("backend.daemon.get_trader_daemon", return_value=_FakeDaemon()):
         r_eval = client.get("/api/triada/evaluate?symbol=ETHUSDT&timeframe=5m&direction_mode=long_only&risk_pct=0.5&target_rr=2.0")
         assert r_eval.status_code == 200
@@ -294,3 +314,130 @@ def test_triada_fastapi_endpoints_smoke(tmp_path):
         assert d_exec["simulation"]["entry_price"] > 0
         assert d_exec["simulation"]["sl_price"] > 0
         assert d_exec["simulation"]["tp_price"] > 0
+
+
+def test_triada_presencial_5_step_protocol_setup_a_rvol_session_and_daily_caps(tmp_path):
+    """
+    Verifica los 5 pasos del Protocolo Presencial en backend/triada_service.py:
+      - Paso 1: Bloqueo en Lunch Lull (14:30 ART) y en escala 1m cripto; habilitado en Londres/NY (11:00 ART, 15m).
+      - Paso 2 y 3: Setup A (Ruptura post-compresión 1H -> 15M) dispara luz verde aunque el precio esté fuera de la Zona Dorada Fibo.
+      - Paso 4: RVOL-TOD bipolar bloquea si < 1.8x en Setup A (o < 1.1x en Setup B) y habilita si >= 1.8x.
+      - Paso 5: SL cripto >= 1.2% y cupo duro diario bloquea al llegar a 2 operaciones MANUAL_TRIADA o 2 SL en el día.
+    """
+    db_file = str(tmp_path / "triada_presencial_5steps.sqlite3")
+    broker = PaperBrokerAdapter(initial_vault_usd=500.0, db_path=db_file, fee_pct=0.10)
+
+    # 1D y 1H en tendencia alcista clara (Precio = 2145, arriba de Fibo 0.50-0.75 -> Setup B Fibo es False)
+    closes_1d = np.linspace(1500.0, 2145.0, 65)
+    df_1d = _make_ohlcv_df(closes_1d, step_sec=86400)
+    closes_1h = np.linspace(1700.0, 2145.0, 80)
+    df_1h = _make_ohlcv_df(closes_1h, step_sec=3600, spread_pct=0.004)
+
+    # 15M táctico: 35 velas muy comprimidas en [2138, 2140] con rango alto (ATR alto, STD de cierres casi 0 -> BB dentro de KC)
+    # y última vela rompe con fuerza a 2168 con volumen RVOL >= 2.2x
+    rows_15m = []
+    base_ts = 1795000000
+    for i in range(40):
+        ts_ms = (base_ts + i * 900) * 1000
+        if i < 39:
+            c = 2139.0 + (0.15 if i % 2 == 0 else -0.15)
+            o = 2139.0
+            hi = 2152.0
+            lo = 2126.0
+            vol = 1000.0
+        else:
+            # Vela de ruptura fuera de Keltner (kcu ~ 2183) con volumen institucional (2500 vs media 1000 -> 2.5x)
+            o = 2140.0
+            c = 2195.0
+            hi = 2198.0
+            lo = 2139.0
+            vol = 2500.0
+        rows_15m.append([ts_ms, o, hi, lo, c, vol])
+    df_15m = pd.DataFrame(rows_15m, columns=["timestamp", "open", "high", "low", "close", "volume"])
+
+    # Hora válida: Lunes 11:00 ART = 14:00 UTC
+    now_london_ny = datetime(2026, 11, 23, 14, 0, 0, tzinfo=timezone.utc)
+
+    snap_a = evaluate_triada_snapshot(
+        symbol="ETH/USDT",
+        timeframe="15m",
+        direction_mode="long_only",
+        df_1d=df_1d,
+        df_1h=df_1h,
+        df_tactical=df_15m,
+        broker=broker,
+        now_utc=now_london_ny,
+    )
+    proto = snap_a["presencial_protocol"]
+    assert proto["setup_b_fibo_pullback"]["triggered"] is False
+    assert proto["setup_a_squeeze"]["triggered"] is True
+    assert proto["active_setup"] == "SETUP_A_SQUEEZE"
+    assert proto["rvol_gate"]["ok"] is True
+    assert proto["rvol_gate"]["rvol_tod"] >= 1.8
+    assert snap_a["execution_plan"]["can_execute"] is True
+    assert snap_a["execution_plan"]["sl_gross_pct"] >= 1.2
+
+    # Si el volumen de la ruptura es seco (RVOL < 1.8x, ej. vol=800 -> 0.8x), Paso 4 debe bloquear
+    df_15m_low_vol = df_15m.copy()
+    df_15m_low_vol.loc[df_15m_low_vol.index[-1], "volume"] = 800.0
+    snap_low_rvol = evaluate_triada_snapshot(
+        symbol="ETH/USDT",
+        timeframe="15m",
+        direction_mode="long_only",
+        df_1d=df_1d,
+        df_1h=df_1h,
+        df_tactical=df_15m_low_vol,
+        broker=broker,
+        now_utc=now_london_ny,
+    )
+    assert snap_low_rvol["presencial_protocol"]["rvol_gate"]["ok"] is False
+    assert snap_low_rvol["execution_plan"]["can_execute"] is False
+    assert any("RVOL bipolar insuficiente" in r for r in snap_low_rvol["execution_plan"]["block_reasons"])
+
+    # Si estamos en Lunch Lull (14:30 ART = 17:30 UTC), Paso 1 debe bloquear
+    now_lunch_lull = datetime(2026, 11, 23, 17, 30, 0, tzinfo=timezone.utc)
+    snap_lunch = evaluate_triada_snapshot(
+        symbol="ETH/USDT",
+        timeframe="15m",
+        direction_mode="long_only",
+        df_1d=df_1d,
+        df_1h=df_1h,
+        df_tactical=df_15m,
+        broker=broker,
+        now_utc=now_lunch_lull,
+    )
+    assert snap_lunch["presencial_protocol"]["session_guard"]["is_blackout"] is True
+    assert snap_lunch["execution_plan"]["can_execute"] is False
+    assert any("Lunch Lull" in r for r in snap_lunch["execution_plan"]["block_reasons"])
+
+    # Si el operador ya ejecutó 2 operaciones MANUAL_TRIADA hoy, Paso 5 (cupo diario) debe bloquear la 3ra
+    for idx_t in range(2):
+        broker.ledger.open_shadow_trade(
+            symbol=f"SYM{idx_t}/USDT",
+            side="LONG",
+            qty=0.1,
+            entry_price=2000.0,
+            sl_price=1970.0,
+            tp_price=2065.0,
+            initial_sl_pct=1.5,
+            initial_tp_pct=3.25,
+            strategy="manual_triada",
+            arbiter_verdict="MANUAL_TRIADA",
+            arbiter_reason="Test cupo diario",
+            deduplicate=False,
+        )
+
+    snap_quota = evaluate_triada_snapshot(
+        symbol="ETH/USDT",
+        timeframe="15m",
+        direction_mode="long_only",
+        df_1d=df_1d,
+        df_1h=df_1h,
+        df_tactical=df_15m,
+        broker=broker,
+        now_utc=datetime.now(timezone.utc),
+    )
+    assert snap_quota["presencial_protocol"]["daily_limits"]["daily_trades_count"] == 2
+    assert snap_quota["presencial_protocol"]["daily_limits"]["ok"] is False
+    assert snap_quota["execution_plan"]["can_execute"] is False
+    assert any("Cupo diario presencial alcanzado" in r for r in snap_quota["execution_plan"]["block_reasons"])

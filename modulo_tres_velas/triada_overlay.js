@@ -230,6 +230,31 @@
       }
     }
 
+    const proto = snapshot.presencial_protocol || {};
+    const rvolGate = proto.rvol_gate || {};
+    const sessGuard = proto.session_guard || {};
+    const dailyLim = proto.daily_limits || {};
+    const setupA = proto.setup_a_squeeze || {};
+    const presencialProtocol = {
+      activeSetup: proto.active_setup || 'NONE',
+      activeSetupLabel: proto.active_setup_label || (plan && plan.active_setup_label) || 'En espera',
+      setupTriggered: Boolean(proto.setup_triggered),
+      setupATriggered: Boolean(setupA.triggered),
+      rvolTod: rvolGate.rvol_tod != null ? Number(rvolGate.rvol_tod) : null,
+      rvolMinRequired: Number(rvolGate.min_required || 1.1),
+      rvolOk: rvolGate.ok !== false,
+      rvolLabel: rvolGate.label || (rvolGate.rvol_tod != null ? `${Number(rvolGate.rvol_tod).toFixed(2)}x` : '--'),
+      sessionLabel: sessGuard.window_label || 'Sesión Libre',
+      sessionBlackout: Boolean(sessGuard.is_blackout),
+      tfFloorOk: sessGuard.tf_floor_ok !== false,
+      dailyTradesCount: Number(dailyLim.daily_trades_count || 0),
+      maxDailyTrades: Number(dailyLim.max_daily_trades || 2),
+      dailySlCount: Number(dailyLim.daily_sl_count || 0),
+      maxDailySl: Number(dailyLim.max_daily_sl || 2),
+      dailyOk: dailyLim.ok !== false,
+      dailyQuotaText: `${Number(dailyLim.daily_trades_count || 0)}/${Number(dailyLim.max_daily_trades || 2)} ops · ${Number(dailyLim.daily_sl_count || 0)}/${Number(dailyLim.max_daily_sl || 2)} SL`,
+    };
+
     return {
       valid: true,
       lines1D,
@@ -244,6 +269,7 @@
         ema21: Array.isArray(r12.series_ema21) ? r12.series_ema21 : [],
         ema89: Array.isArray(r12.series_ema89) ? r12.series_ema89 : [],
       },
+      presencialProtocol,
       executionCard: {
         canExecute: Boolean(plan && plan.can_execute),
         blockReasons: Array.isArray(plan && plan.block_reasons) ? plan.block_reasons : [],
@@ -465,6 +491,10 @@
 
     const badgeEl = document.getElementById('triadaExecStatusBadge');
     const dirEl = document.getElementById('triadaExecSide');
+    const setupEl = document.getElementById('triadaExecSetup');
+    const rvolEl = document.getElementById('triadaExecRvol');
+    const sessionEl = document.getElementById('triadaExecSession');
+    const quotaEl = document.getElementById('triadaExecDailyQuota');
     const entryEl = document.getElementById('triadaExecEntry');
     const slEl = document.getElementById('triadaExecSl');
     const tpEl = document.getElementById('triadaExecTp');
@@ -487,6 +517,7 @@
     const pxDec = Number.isInteger(snapshot.px_dec) ? snapshot.px_dec : 2;
     const plan = desc.executionCard.plan;
     const ov = snapshot.overlays || {};
+    const proto = desc.presencialProtocol || {};
     const isLong = plan.side === 'LONG';
 
     if (rulesRowEl) {
@@ -494,8 +525,10 @@
         { k: 'R0 1D', ok: Boolean(ov.rule0_macro_1d && ov.rule0_macro_1d.ok) },
         { k: 'R1 EMA50', ok: Boolean(ov.rules12_structure_1h && ov.rules12_structure_1h.rule1_ok) },
         { k: 'R2 21/89', ok: Boolean(ov.rules12_structure_1h && ov.rules12_structure_1h.rule2_ok) },
-        { k: 'R3 Fibo', ok: Boolean(ov.rule3_fibo_golden_zone && ov.rule3_fibo_golden_zone.ok) },
+        { k: 'Setup A Sqz', ok: Boolean(proto.setupATriggered) },
+        { k: 'Setup B Fibo', ok: Boolean(ov.rule3_fibo_golden_zone && ov.rule3_fibo_golden_zone.ok) },
         { k: 'R4 ATR', ok: Boolean(ov.rule4_atr_switch && ov.rule4_atr_switch.ok) },
+        { k: 'RVOL≥1x', ok: Boolean(proto.rvolOk) },
         { k: 'Mecha', ok: !(ov.rule5_wick_and_candlestick && ov.rule5_wick_and_candlestick.wick_veto_active) },
       ];
       rulesRowEl.innerHTML = pills
@@ -513,6 +546,31 @@
     if (dirEl) {
       dirEl.innerText = isLong ? '🟢 LONG' : '🔻 SHORT';
       dirEl.className = isLong ? 'font-mono font-black text-emerald-400' : 'font-mono font-black text-rose-400';
+    }
+    if (setupEl) {
+      setupEl.innerText = proto.activeSetupLabel || 'En espera';
+      setupEl.className = proto.setupTriggered
+        ? 'font-mono font-bold text-emerald-300 truncate max-w-[165px]'
+        : 'font-mono font-bold text-amber-300 truncate max-w-[165px]';
+    }
+    if (rvolEl) {
+      rvolEl.innerText = `${proto.rvolOk ? '✅' : '❌'} ${proto.rvolLabel || '--'}`;
+      rvolEl.className = proto.rvolOk
+        ? 'font-mono font-bold text-emerald-400'
+        : 'font-mono font-bold text-rose-400';
+    }
+    if (sessionEl) {
+      const sessOk = !proto.sessionBlackout && proto.tfFloorOk;
+      sessionEl.innerText = `${sessOk ? '🟢' : '🚫'} ${proto.sessionLabel || '--'} [${String(snapshot.timeframe || '15m').toUpperCase()}]`;
+      sessionEl.className = sessOk
+        ? 'font-mono font-bold text-cyan-300 truncate max-w-[170px]'
+        : 'font-mono font-bold text-rose-400 truncate max-w-[170px]';
+    }
+    if (quotaEl) {
+      quotaEl.innerText = `${proto.dailyOk ? '✅' : '🛑'} ${proto.dailyQuotaText || '0/2 ops · 0/2 SL'}`;
+      quotaEl.className = proto.dailyOk
+        ? 'font-mono font-bold text-emerald-300'
+        : 'font-mono font-bold text-rose-400';
     }
     if (entryEl) entryEl.innerText = `$${formatPx(plan.entry_price, pxDec)}`;
     if (slEl) slEl.innerText = `$${formatPx(plan.sl_price, pxDec)} (-${Number(plan.sl_gross_pct).toFixed(2)}%)`;
