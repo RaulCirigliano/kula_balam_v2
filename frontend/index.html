@@ -122,6 +122,11 @@
                 <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]"></span>
                 <span id="liveClockDisplay" class="text-emerald-300 font-bold">--:--:-- ART</span>
             </div>
+
+            <!-- Alerta de Sesión / Horario en Barra Superior (Verde: Londres/NY o Power Hour · Rojo/Gris: Lunch Lull o Cierre) -->
+            <span id="kula-session-alert-badge" class="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-mono font-bold bg-slate-800/90 text-slate-300 border border-slate-600/70 whitespace-nowrap ml-2" title="Estado de ventana líquida institucional en hora Argentina (ART)">
+                ⚪ Evaluando ventana horaria...
+            </span>
         </div>
         <div class="flex items-center space-x-4">
             <div class="bg-gray-900 px-3 py-1 rounded-lg border border-gray-700 flex items-center mr-4">
@@ -368,6 +373,9 @@
                         </span>
                         <button type="button" onclick="window.inspectHostLastCandlePattern && window.inspectHostLastCandlePattern()" class="px-2 py-1 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50 text-[11px] font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 shadow-sm">
                             <span>🔍</span> Clic Patrones
+                        </button>
+                        <button type="button" onclick="window.KulaChartEngine && window.KulaChartEngine.openQuickRulerCalculatorModal()" class="px-2 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 border border-cyan-500/50 text-[11px] font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 shadow-sm" title="Calculadora rápida: mide en % y ATR la distancia desde la vela actual hasta un soporte o Zona Dorada">
+                            <span>📏</span> Regla % / ATR
                         </button>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0 ml-auto">
@@ -2255,10 +2263,17 @@
             });
         })();
 
-        // Controlador de Paneles Auxiliares (RSI, ATR, Guía Rápida)
-        window.toggleAuxiliaryPanel = function(panelId, isChecked) {
+        // Controlador de Paneles Auxiliares (Volumen, RVOL, RSI, ATR, Guía Rápida) + Persistencia localStorage
+        window.toggleAuxiliaryPanel = function(panelId, isChecked, skipSave) {
             const panel = document.getElementById(panelId);
             if (!panel) return;
+            const chkMap = { panelVol: 'chkPanelVol', panelRvol: 'chkPanelRvol', panelRsi: 'chkPanelRsi', panelAtr: 'chkPanelAtr', panelGuide: 'chkPanelGuide' };
+            const storageKeyMap = { panelVol: 'vol', panelRvol: 'rvol', panelRsi: 'rsi', panelAtr: 'atr', panelGuide: 'guide' };
+            const chk = document.getElementById(chkMap[panelId]);
+            if (chk && chk.checked !== Boolean(isChecked)) chk.checked = Boolean(isChecked);
+            if (!skipSave && storageKeyMap[panelId] && window.KulaChartEngine && typeof window.KulaChartEngine.saveToggleState === 'function') {
+                window.KulaChartEngine.saveToggleState(storageKeyMap[panelId], Boolean(isChecked));
+            }
             if (isChecked) {
                 panel.classList.remove('hidden');
                 setTimeout(() => {
@@ -2268,6 +2283,22 @@
                 panel.classList.add('hidden');
             }
         };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.KulaChartEngine) {
+                if (typeof window.KulaChartEngine.startSessionAlertAutoUpdater === 'function') {
+                    window.KulaChartEngine.startSessionAlertAutoUpdater(['kula-session-alert-badge']);
+                }
+                if (typeof window.KulaChartEngine.loadSavedToggles === 'function') {
+                    const saved = window.KulaChartEngine.loadSavedToggles();
+                    if (typeof saved.vol === 'boolean') window.toggleAuxiliaryPanel('panelVol', saved.vol, true);
+                    if (typeof saved.rvol === 'boolean') window.toggleAuxiliaryPanel('panelRvol', saved.rvol, true);
+                    if (typeof saved.rsi === 'boolean') window.toggleAuxiliaryPanel('panelRsi', saved.rsi, true);
+                    if (typeof saved.atr === 'boolean') window.toggleAuxiliaryPanel('panelAtr', saved.atr, true);
+                    if (typeof saved.guide === 'boolean') window.toggleAuxiliaryPanel('panelGuide', saved.guide, true);
+                }
+            }
+        });
     </script>
 
     <!-- ========================================================================= -->

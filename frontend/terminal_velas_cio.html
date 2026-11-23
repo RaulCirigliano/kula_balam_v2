@@ -172,6 +172,11 @@
           <span>📚</span> Estudio Velas ↗
         </a>
 
+        <!-- Alerta de Sesión / Horario en Barra Superior (Verde: Londres/NY o Power Hour · Rojo/Gris: Lunch Lull o Cierre) -->
+        <span id="cio-session-alert-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-mono font-bold bg-slate-800/90 text-slate-300 border border-slate-600/70 whitespace-nowrap ml-1" title="Estado de ventana líquida institucional en hora Argentina (ART)">
+          ⚪ Evaluando ventana horaria...
+        </span>
+
         <!-- Menú Desplegable Universal del Ecosistema -->
         <div id="navEcosystemContainer" class="ml-1"></div>
       </div>
@@ -201,6 +206,9 @@
             </div>
             <button type="button" onclick="window.inspectCioLastCandlePattern && window.inspectCioLastCandlePattern()" class="px-2 py-0.5 rounded bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50 text-[10px] font-bold transition flex items-center gap-1 cursor-pointer">
               <span>🔍</span> Clic Patrones
+            </button>
+            <button type="button" onclick="window.KulaChartEngine && window.KulaChartEngine.openQuickRulerCalculatorModal()" class="px-2 py-0.5 rounded bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 border border-cyan-500/50 text-[10px] font-bold transition flex items-center gap-1 cursor-pointer" title="Calculadora rápida: mide en % y ATR la distancia desde la vela actual hasta un soporte o Zona Dorada">
+              <span>📏</span> Regla % / ATR
             </button>
             <button type="button" id="ku-btn-theme" onclick="window.KulaChartEngine && window.KulaChartEngine.toggleHostTheme()" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-[10px] font-bold text-amber-300 border border-slate-700 cursor-pointer">☀️ Blanco</button>
           </div>
@@ -233,19 +241,19 @@
             <span id="hud-vol" class="text-teal-300 font-semibold">Vol: --</span>
             <span id="hud-rvol" class="text-emerald-400 font-semibold">RVOL: --x</span>
             <label class="inline-flex items-center gap-1 cursor-pointer text-teal-300 font-bold ml-1" title="Histograma de Volumen por dirección de vela">
-              <input type="checkbox" id="chkCioPanelVol" onchange="document.getElementById('cio-panel-vol').classList.toggle('hidden', !this.checked); setTimeout(() => { if (volChart && volContainer && volContainer.clientWidth > 0) volChart.applyOptions({ width: volContainer.clientWidth }); }, 50);" class="rounded bg-slate-950 border-teal-500/60 text-teal-500 cursor-pointer">
+              <input type="checkbox" id="chkCioPanelVol" onchange="toggleCioSubPanel('vol', this.checked)" class="rounded bg-slate-950 border-teal-500/60 text-teal-500 cursor-pointer">
               <span>Volumen</span>
             </label>
             <label class="inline-flex items-center gap-1 cursor-pointer text-emerald-300 font-bold" title="Volumen Relativo bipolar respecto a 1.0x (verde arriba ≥1.0x / rojo abajo <1.0x)">
-              <input type="checkbox" id="chkCioPanelRvol" onchange="document.getElementById('cio-panel-rvol').classList.toggle('hidden', !this.checked); setTimeout(() => { if (rvolChart && rvolContainer && rvolContainer.clientWidth > 0) rvolChart.applyOptions({ width: rvolContainer.clientWidth }); }, 50);" class="rounded bg-slate-950 border-emerald-500/60 text-emerald-500 cursor-pointer">
+              <input type="checkbox" id="chkCioPanelRvol" onchange="toggleCioSubPanel('rvol', this.checked)" class="rounded bg-slate-950 border-emerald-500/60 text-emerald-500 cursor-pointer">
               <span>RVOL</span>
             </label>
             <label class="inline-flex items-center gap-1 cursor-pointer text-purple-300 font-bold">
-              <input type="checkbox" checked onchange="document.getElementById('cio-panel-rsi').classList.toggle('hidden', !this.checked)" class="rounded bg-slate-950 border-purple-500/60 text-purple-500 cursor-pointer">
+              <input type="checkbox" id="chkCioPanelRsi" checked onchange="toggleCioSubPanel('rsi', this.checked)" class="rounded bg-slate-950 border-purple-500/60 text-purple-500 cursor-pointer">
               <span>RSI(14)</span>
             </label>
             <label class="inline-flex items-center gap-1 cursor-pointer text-amber-300 font-bold">
-              <input type="checkbox" checked onchange="document.getElementById('cio-panel-atr').classList.toggle('hidden', !this.checked)" class="rounded bg-slate-950 border-amber-500/60 text-amber-500 cursor-pointer">
+              <input type="checkbox" id="chkCioPanelAtr" checked onchange="toggleCioSubPanel('atr', this.checked)" class="rounded bg-slate-950 border-amber-500/60 text-amber-500 cursor-pointer">
               <span>ATR(14)</span>
             </label>
           </div>
@@ -745,11 +753,13 @@
           singleWrapperId: 'kula-single-chart-wrapper',
           triadHeight: 280,
           hostChart: chart,
+          hostSeries: candleSeries,
           hostRsiChart: rsiChart,
           hostAtrChart: atrChart,
           hostVolChart: volChart,
           hostRvolChart: rvolChart,
-          getSymbol: () => (typeof currentAsset !== 'undefined' ? currentAsset : 'BTCUSDT')
+          getSymbol: () => (typeof currentAsset !== 'undefined' ? currentAsset : 'BTCUSDT'),
+          getCandles: () => (typeof marketCandles !== 'undefined' && Array.isArray(marketCandles) ? marketCandles : [])
         });
 
         window.inspectCioLastCandlePattern = function() {
@@ -2054,8 +2064,38 @@
       }
     }
 
+    function toggleCioSubPanel(key, isChecked, skipSave) {
+      const panelMap = { vol: 'cio-panel-vol', rvol: 'cio-panel-rvol', rsi: 'cio-panel-rsi', atr: 'cio-panel-atr' };
+      const chkMap = { vol: 'chkCioPanelVol', rvol: 'chkCioPanelRvol', rsi: 'chkCioPanelRsi', atr: 'chkCioPanelAtr' };
+      const panel = document.getElementById(panelMap[key]);
+      const chk = document.getElementById(chkMap[key]);
+      if (chk && chk.checked !== Boolean(isChecked)) chk.checked = Boolean(isChecked);
+      if (panel) panel.classList.toggle('hidden', !isChecked);
+      if (!skipSave && window.KulaChartEngine && typeof window.KulaChartEngine.saveToggleState === 'function') {
+        window.KulaChartEngine.saveToggleState(key, Boolean(isChecked));
+      }
+      setTimeout(() => {
+        if (volChart && volContainer && volContainer.clientWidth > 0) volChart.applyOptions({ width: volContainer.clientWidth });
+        if (rvolChart && rvolContainer && rvolContainer.clientWidth > 0) rvolChart.applyOptions({ width: rvolContainer.clientWidth });
+        if (rsiChart && rsiContainer && rsiContainer.clientWidth > 0) rsiChart.applyOptions({ width: rsiContainer.clientWidth });
+        if (atrChart && atrContainer && atrContainer.clientWidth > 0) atrChart.applyOptions({ width: atrContainer.clientWidth });
+      }, 50);
+    }
+
     window.onload = () => {
       initChart();
+      if (window.KulaChartEngine) {
+        if (typeof window.KulaChartEngine.startSessionAlertAutoUpdater === 'function') {
+          window.KulaChartEngine.startSessionAlertAutoUpdater(['cio-session-alert-badge']);
+        }
+        if (typeof window.KulaChartEngine.loadSavedToggles === 'function') {
+          const saved = window.KulaChartEngine.loadSavedToggles();
+          if (typeof saved.vol === 'boolean') toggleCioSubPanel('vol', saved.vol, true);
+          if (typeof saved.rvol === 'boolean') toggleCioSubPanel('rvol', saved.rvol, true);
+          if (typeof saved.rsi === 'boolean') toggleCioSubPanel('rsi', saved.rsi, true);
+          if (typeof saved.atr === 'boolean') toggleCioSubPanel('atr', saved.atr, true);
+        }
+      }
       fetchMonitorScanSuggestions();
       setInterval(fetchMonitorScanSuggestions, 60000);
     };

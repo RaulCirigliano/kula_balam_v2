@@ -455,7 +455,7 @@
 
       redrawAllDrawings(containerId, chartInstance);
       const ctx = canvas.getContext('2d');
-      drawPreviewTool(ctx, STATE.activeTool, startX, startY, currX, currY);
+      drawPreviewTool(ctx, STATE.activeTool, startX, startY, currX, currY, containerId);
     };
 
     canvas.onmouseup = (e) => {
@@ -473,7 +473,45 @@
     };
   }
 
-  function drawPreviewTool(ctx, tool, x1, y1, x2, y2) {
+  function resolveTriadaPriceAndAtrForContainer(containerId, y1, y2, canvasH) {
+    let series = window.series5M;
+    let candles = window._lastTrigger;
+    if (containerId === 'chart-container-1d') {
+      series = window.series1D;
+      candles = window._last1D;
+    } else if (containerId === 'chart-container-1h') {
+      series = window.series1H;
+      candles = window._last1H;
+    }
+    let p1 = null;
+    let p2 = null;
+    if (series && typeof series.coordinateToPrice === 'function') {
+      try {
+        p1 = series.coordinateToPrice(y1);
+        p2 = series.coordinateToPrice(y2);
+      } catch (_) {}
+    }
+    if ((!Number.isFinite(p1) || !Number.isFinite(p2)) && Array.isArray(candles) && candles.length >= 2 && canvasH > 0) {
+      const slice = candles.slice(-Math.min(50, candles.length));
+      const hi = Math.max(...slice.map(c => Number(c.high)));
+      const lo = Math.min(...slice.map(c => Number(c.low)));
+      if (hi > lo) {
+        const pad = (hi - lo) * 0.10;
+        const topP = hi + pad;
+        const botP = Math.max(0.0001, lo - pad);
+        p1 = topP - (y1 / canvasH) * (topP - botP);
+        p2 = topP - (y2 / canvasH) * (topP - botP);
+      }
+    }
+    let atrVal = null;
+    if (Array.isArray(candles) && candles.length >= 15 && window.KulaChartEngine && window.KulaChartEngine.formulas) {
+      const atrRes = window.KulaChartEngine.formulas.calculateATR(candles, 14);
+      if (atrRes && Number.isFinite(atrRes.lastValue) && atrRes.lastValue > 0) atrVal = atrRes.lastValue;
+    }
+    return { p1, p2, atrVal };
+  }
+
+  function drawPreviewTool(ctx, tool, x1, y1, x2, y2, containerId) {
     ctx.save();
     if (tool === 'box') {
       const w = x2 - x1;
@@ -513,22 +551,43 @@
       ctx.font = '11px ui-monospace, SFMono-Regular, monospace';
       ctx.fillText(`Target: +${((targetDist / y1) * 100).toFixed(2)}% | R:R 1:${rrRatio}`, leftX + 8, entryY - 6);
     } else if (tool === 'ruler') {
+      const cvsH = ctx.canvas ? ctx.canvas.height : 400;
+      const cvsW = ctx.canvas ? ctx.canvas.width : 600;
+      const { p1, p2, atrVal } = resolveTriadaPriceAndAtrForContainer(containerId || 'chart-container-5m', y1, y2, cvsH);
+      let labelText = '';
+      if (Number.isFinite(p1) && Number.isFinite(p2) && p1 > 0 && window.KulaChartEngine && typeof window.KulaChartEngine.calculateRulerMetrics === 'function') {
+        const m = window.KulaChartEngine.calculateRulerMetrics(p1, p2, atrVal);
+        if (m.valid) labelText = `📏 ${m.summaryText}`;
+      }
+      if (!labelText) {
+        const pct = (((y1 - y2) / Math.max(1, y1)) * 100).toFixed(2);
+        labelText = `📏 Δ ${pct}%`;
+      }
+
+      // Rectángulo sombreado de medición
+      ctx.fillStyle = y2 <= y1 ? 'rgba(16, 185, 129, 0.14)' : 'rgba(56, 189, 248, 0.14)';
+      ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+
       ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.8;
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
+      ctx.setLineDash([]);
 
-      const pct = (((y1 - y2) / y1) * 100).toFixed(2);
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(x2 + 5, y2 - 12, 85, 20);
+      ctx.font = 'bold 11px ui-monospace, SFMono-Regular, monospace';
+      const boxW = Math.max(175, ctx.measureText(labelText).width + 16);
+      const boxX = Math.max(6, Math.min(cvsW - boxW - 6, x2 + 6));
+      const boxY = Math.max(6, Math.min(cvsH - 26, y2 - 12));
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+      ctx.fillRect(boxX, boxY, boxW, 22);
       ctx.strokeStyle = '#38bdf8';
-      ctx.strokeRect(x2 + 5, y2 - 12, 85, 20);
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 11px monospace';
-      ctx.fillText(`Δ ${pct}%`, x2 + 10, y2 + 2);
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(boxX, boxY, boxW, 22);
+      ctx.fillStyle = '#e0f2fe';
+      ctx.fillText(labelText, boxX + 7, boxY + 15);
     } else if (tool === 'trendline') {
       // Línea de Tendencia con puntos de ancla
       ctx.strokeStyle = '#38bdf8';
@@ -697,7 +756,7 @@
       const y1 = d.ny1 * canvas.height;
       const x2 = d.nx2 * canvas.width;
       const y2 = d.ny2 * canvas.height;
-      drawPreviewTool(ctx, d.tool, x1, y1, x2, y2);
+      drawPreviewTool(ctx, d.tool, x1, y1, x2, y2, containerId);
     });
   }
 

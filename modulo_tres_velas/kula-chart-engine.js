@@ -32,14 +32,41 @@
     wickDownColor: '#f23645'
   };
 
+  function formatLocalTickMark(time, tickMarkType, locale) {
+    if (typeof time === 'number') {
+      const d = new Date(time * 1000);
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      if (tickMarkType === 0) return String(d.getFullYear());
+      if (tickMarkType === 1) return `${d.getDate()}/${d.getMonth() + 1}`;
+      if (tickMarkType === 2) return `${d.getDate()}/${d.getMonth() + 1}`;
+      return `${h}:${m}`;
+    }
+    return null;
+  }
+
+  function formatLocalTime(timeVal) {
+    if (typeof timeVal === 'number') {
+      const d = new Date(timeVal * 1000);
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+    return String(timeVal || '');
+  }
+
   function getChartThemeOptions(isLight) {
     if (isLight) {
       return {
         layout: {
-          background: { type: 'solid', color: '#ffffff' },
+          background: { type: 'solid', color: 'transparent' },
           textColor: '#131722',
           fontSize: 11,
           fontFamily: "'JetBrains Mono', -apple-system, BlinkMacSystemFont, sans-serif"
+        },
+        localization: {
+          dateFormat: 'yyyy-MM-dd',
+          timeFormatter: formatLocalTime
         },
         grid: {
           vertLines: { color: '#f0f3fa', style: 0 },
@@ -52,27 +79,44 @@
         },
         rightPriceScale: {
           borderColor: '#e0e3eb',
-          scaleMargins: { top: 0.08, bottom: 0.08 },
+          scaleMargins: { top: 0.12, bottom: 0.12 },
           autoScale: true,
           alignLabels: true,
           minimumWidth: 68
+        },
+        handleScale: {
+          axisPressedMouseMove: { time: true, price: true },
+          axisDoubleClickReset: { time: true, price: true },
+          mouseWheel: true,
+          pinch: true,
+        },
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: true,
         },
         timeScale: {
           borderColor: '#e0e3eb',
           timeVisible: true,
           secondsVisible: false,
-          rightOffset: 16,
+          rightOffset: 5,
           barSpacing: 13,
-          minBarSpacing: 5
+          minBarSpacing: 5,
+          tickMarkFormatter: formatLocalTickMark
         }
       };
     }
     return {
       layout: {
-        background: { type: 'solid', color: '#0b0e14' },
+        background: { type: 'solid', color: 'transparent' },
         textColor: '#94a3b8',
         fontSize: 11,
         fontFamily: "'JetBrains Mono', -apple-system, BlinkMacSystemFont, sans-serif"
+      },
+      localization: {
+        dateFormat: 'yyyy-MM-dd',
+        timeFormatter: formatLocalTime
       },
       grid: {
         vertLines: { color: 'rgba(30, 41, 59, 0.5)', style: 0 },
@@ -85,18 +129,31 @@
       },
       rightPriceScale: {
         borderColor: '#1e293b',
-        scaleMargins: { top: 0.08, bottom: 0.08 },
+        scaleMargins: { top: 0.12, bottom: 0.12 },
         autoScale: true,
         alignLabels: true,
         minimumWidth: 68
+      },
+      handleScale: {
+        axisPressedMouseMove: { time: true, price: true },
+        axisDoubleClickReset: { time: true, price: true },
+        mouseWheel: true,
+        pinch: true,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true,
       },
       timeScale: {
         borderColor: '#1e293b',
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 16,
+        rightOffset: 5,
         barSpacing: 13,
-        minBarSpacing: 5
+        minBarSpacing: 5,
+        tickMarkFormatter: formatLocalTickMark
       }
     };
   }
@@ -105,12 +162,12 @@
     if (!chart) return;
     const barsToShow = visibleBars || 42;
     chart.applyOptions({
-      timeScale: { rightOffset: 16, barSpacing: 13, minBarSpacing: 5 },
+      timeScale: { rightOffset: 5, barSpacing: 13, minBarSpacing: 5, tickMarkFormatter: formatLocalTickMark },
       rightPriceScale: { autoScale: true, scaleMargins: { top: 0.08, bottom: 0.08 } }
     });
     if (volChart) {
       volChart.applyOptions({
-        timeScale: { rightOffset: 16, barSpacing: 13, minBarSpacing: 5 }
+        timeScale: { rightOffset: 5, barSpacing: 13, minBarSpacing: 5, tickMarkFormatter: formatLocalTickMark }
       });
     }
     const count = candles && Array.isArray(candles) ? candles.length : 0;
@@ -407,6 +464,7 @@
               rvolVal = Math.round(ratio * 100) / 100;
             }
           }
+          // Actualizar historial estrictamente DESPUÉS del cálculo (causal)
           if (hmKey) {
             if (!todHist.has(hmKey)) todHist.set(hmKey, []);
             const arr = todHist.get(hmKey);
@@ -856,6 +914,233 @@
   }
 
   // ---------------------------------------------------------------------------
+  // 3B. VENTANAS HORARIAS ART (UTC-3), CALCULADORA DE DISTANCIA (% + ATR)
+  //     Y PERSISTENCIA LOCALSTORAGE DE TOGGLES
+  // ---------------------------------------------------------------------------
+  function evaluateArtSessionStatus(nowDate) {
+    const d = nowDate instanceof Date ? nowDate : new Date();
+    // Hora Argentina (ART = UTC-3 fijo)
+    const utcMs = d.getTime() + (d.getTimezoneOffset() * 60000);
+    const artDate = new Date(utcMs - 3 * 3600000);
+    const h = artDate.getHours();
+    const m = artDate.getMinutes();
+    const hm = h * 60 + m;
+    const day = artDate.getDay(); // 0=Dom .. 6=Sáb
+    const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ART`;
+
+    // Fin de semana (Sábado o Domingo antes de 18:00 / trampa dominical 18:00-21:00)
+    if (day === 6 || (day === 0 && hm < 18 * 60)) {
+      return {
+        code: 'WEEKEND_CLOSED',
+        status: 'closed',
+        isLiquid: false,
+        isBlackout: false,
+        artTime: timeStr,
+        shortLabel: `⚪ Fin de Semana · Cripto 24/7 (${timeStr})`,
+        detail: 'Mercados tradicionales cerrados. Solo Cripto 24/7 (vigilar menor liquidez).'
+      };
+    }
+    if (day === 0 && hm >= 18 * 60 && hm < 21 * 60) {
+      return {
+        code: 'SUNDAY_FX_TRAP',
+        status: 'blackout',
+        isLiquid: false,
+        isBlackout: true,
+        artTime: timeStr,
+        shortLabel: `🔴 Apertura Dom. FX · Spread Alto (${timeStr})`,
+        detail: 'Domingo 18:00–21:00 ART: trampa de liquidez y spreads ensanchados en Forex.'
+      };
+    }
+    // Ventana Primaria 1: Londres / NY AM (09:30 - 13:30 ART)
+    if (hm >= (9 * 60 + 30) && hm <= (13 * 60 + 30)) {
+      return {
+        code: 'LONDRES_NY_AM',
+        status: 'liquid',
+        isLiquid: true,
+        isBlackout: false,
+        artTime: timeStr,
+        shortLabel: `🟢 VENTANA LÍQUIDA: Londres/NY (09:30–13:30 · ${timeStr})`,
+        detail: 'Solapamiento Londres + Apertura NY: máxima liquidez institucional.'
+      };
+    }
+    // Transición pre-almuerzo (13:31 - 13:59 ART)
+    if (hm > (13 * 60 + 30) && hm < 14 * 60) {
+      return {
+        code: 'PRE_LUNCH_TRANSITION',
+        status: 'neutral',
+        isLiquid: false,
+        isBlackout: false,
+        artTime: timeStr,
+        shortLabel: `⚪ Transición Pre-Lunch (${timeStr})`,
+        detail: 'Moderación de volumen previo al Lunch Lull de Nueva York (14:00–15:30 ART).'
+      };
+    }
+    // Lunch Lull NY (14:00 - 15:30 ART) -> Rojo / Bloqueo
+    if (hm >= 14 * 60 && hm < (15 * 60 + 30)) {
+      return {
+        code: 'LUNCH_LULL',
+        status: 'blackout',
+        isLiquid: false,
+        isBlackout: true,
+        artTime: timeStr,
+        shortLabel: `🔴 LUNCH LULL NY: Evitar Rupturas (14:00–15:30 · ${timeStr})`,
+        detail: 'Almuerzo en Wall Street: caída de volumen institucional y alto riesgo de falsas rupturas.'
+      };
+    }
+    // Ventana Primaria 2: NY Power Hour (15:30 - 17:30 ART)
+    if (hm >= (15 * 60 + 30) && hm <= (17 * 60 + 30)) {
+      return {
+        code: 'NY_POWER_HOUR',
+        status: 'liquid',
+        isLiquid: true,
+        isBlackout: false,
+        artTime: timeStr,
+        shortLabel: `🟢 VENTANA LÍQUIDA: Power Hour NY (15:30–17:30 · ${timeStr})`,
+        detail: 'Tramo final e institucional de Wall Street: alta tracción direccional.'
+      };
+    }
+    // Cierre NY / Fuera de ventana primaria (17:31 - 09:29 ART) -> Gris
+    return {
+      code: 'AFTER_HOURS_ASIA',
+      status: 'closed',
+      isLiquid: false,
+      isBlackout: false,
+      artTime: timeStr,
+      shortLabel: `⚪ Cierre NY / Sesión Nocturna (${timeStr})`,
+      detail: 'Fuera de ventanas primarias (09:30–13:30 y 15:30–17:30 ART). BYMA/NYSE cerrados.'
+    };
+  }
+
+  function calculateRulerMetrics(startPrice, targetPrice, atrVal, fiboZoneMin, fiboZoneMax) {
+    const p1 = Number(startPrice);
+    const p2 = Number(targetPrice);
+    const atr = Number(atrVal);
+    if (!Number.isFinite(p1) || !Number.isFinite(p2) || p1 <= 0 || p2 <= 0) {
+      return { valid: false };
+    }
+    const diffUsd = p2 - p1;
+    const absUsd = Math.abs(diffUsd);
+    const diffPct = (diffUsd / p1) * 100;
+    const absPct = Math.abs(diffPct);
+    const atrMult = (Number.isFinite(atr) && atr > 0) ? (absUsd / atr) : null;
+    const slRecommended18AtrPct = (Number.isFinite(atr) && atr > 0) ? ((1.8 * atr / p1) * 100) : null;
+
+    let fiboGoldenDistPct = null;
+    let fiboGoldenDistAtr = null;
+    let fiboStatus = null;
+    const zMin = Number(fiboZoneMin);
+    const zMax = Number(fiboZoneMax);
+    if (Number.isFinite(zMin) && Number.isFinite(zMax) && zMax >= zMin && zMin > 0) {
+      if (p1 >= zMin && p1 <= zMax) {
+        fiboGoldenDistPct = 0.0;
+        fiboGoldenDistAtr = 0.0;
+        fiboStatus = 'DENTRO_ZONA_DORADA';
+      } else {
+        const nearestEdge = p1 > zMax ? zMax : zMin;
+        const dFibo = nearestEdge - p1;
+        fiboGoldenDistPct = (dFibo / p1) * 100;
+        fiboGoldenDistAtr = (Number.isFinite(atr) && atr > 0) ? (Math.abs(dFibo) / atr) : null;
+        fiboStatus = p1 > zMax ? 'ARRIBA_DE_050' : 'DEBAJO_DE_075';
+      }
+    }
+
+    const sign = diffPct >= 0 ? '+' : '';
+    const atrTag = atrMult !== null ? `${atrMult.toFixed(2)}x ATR` : 'ATR N/D';
+    const summaryText = `${sign}${diffPct.toFixed(2)}% (${sign}$${formatPrice(Math.abs(diffUsd))}) · ${atrTag}`;
+
+    return {
+      valid: true,
+      startPrice: p1,
+      targetPrice: p2,
+      diffUsd,
+      absUsd,
+      diffPct,
+      absPct,
+      atr: Number.isFinite(atr) && atr > 0 ? atr : null,
+      atrMult,
+      slRecommended18AtrPct,
+      fiboGoldenDistPct,
+      fiboGoldenDistAtr,
+      fiboStatus,
+      summaryText
+    };
+  }
+
+  const TOGGLE_STORAGE_KEY = 'kula_ui_toggles_v1';
+  const DEFAULT_UI_TOGGLES = {
+    vol: true,
+    rvol: false,
+    rsi: false,
+    atr: false,
+    triada5Puntos: true,
+    guide: false
+  };
+
+  function loadSavedToggles(storageObj) {
+    const store = storageObj || (typeof window !== 'undefined' && window.localStorage ? window.localStorage : null);
+    if (!store) return Object.assign({}, DEFAULT_UI_TOGGLES);
+    try {
+      const raw = store.getItem(TOGGLE_STORAGE_KEY);
+      if (!raw) return Object.assign({}, DEFAULT_UI_TOGGLES);
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return Object.assign({}, DEFAULT_UI_TOGGLES);
+      const out = Object.assign({}, DEFAULT_UI_TOGGLES);
+      Object.keys(DEFAULT_UI_TOGGLES).forEach(k => {
+        if (typeof parsed[k] === 'boolean') out[k] = parsed[k];
+      });
+      return out;
+    } catch (_) {
+      return Object.assign({}, DEFAULT_UI_TOGGLES);
+    }
+  }
+
+  function saveToggleState(key, isChecked, storageObj) {
+    const store = storageObj || (typeof window !== 'undefined' && window.localStorage ? window.localStorage : null);
+    const current = loadSavedToggles(store);
+    if (key in DEFAULT_UI_TOGGLES) {
+      current[key] = Boolean(isChecked);
+    }
+    if (store) {
+      try {
+        store.setItem(TOGGLE_STORAGE_KEY, JSON.stringify(current));
+      } catch (_) {}
+    }
+    return current;
+  }
+
+  function renderSessionAlertBadgeDom(elementOrId, nowDate) {
+    const el = typeof elementOrId === 'string'
+      ? (typeof document !== 'undefined' ? document.getElementById(elementOrId) : null)
+      : elementOrId;
+    const info = evaluateArtSessionStatus(nowDate);
+    if (!el) return info;
+
+    el.title = info.detail;
+    el.innerText = info.shortLabel;
+    if (info.status === 'liquid') {
+      el.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-mono font-bold bg-emerald-950/90 text-emerald-300 border border-emerald-500/70 shadow-[0_0_8px_rgba(16,185,129,0.25)] whitespace-nowrap';
+    } else if (info.status === 'blackout') {
+      el.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-mono font-bold bg-rose-950/90 text-rose-300 border border-rose-500/70 shadow-[0_0_8px_rgba(244,63,94,0.25)] whitespace-nowrap';
+    } else {
+      el.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-mono font-bold bg-slate-800/90 text-slate-300 border border-slate-600/70 whitespace-nowrap';
+    }
+    return info;
+  }
+
+  function startSessionAlertAutoUpdater(badgeIds) {
+    const ids = Array.isArray(badgeIds) && badgeIds.length
+      ? badgeIds
+      : ['kula-session-alert-badge', 'triada-session-alert-badge', 'cio-session-alert-badge'];
+    const tick = () => {
+      ids.forEach(id => renderSessionAlertBadgeDom(id));
+    };
+    tick();
+    if (typeof window !== 'undefined' && !window._kulaSessionAlertTimer) {
+      window._kulaSessionAlertTimer = setInterval(tick, 20000);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // 4. CONTROLADOR UNIFICADO DE BARRA LATERAL (44px) Y MODALIDAD 1 VELA ↔ 3 VELAS
   //    Para Kula Balam Cockpit Principal (frontend/index.html) y Terminal CIO
   // ---------------------------------------------------------------------------
@@ -867,12 +1152,242 @@
     triadCharts: { c1D: null, s1D: null, sma1D: null, ema1D: null, vwap1D: null, c1H: null, s1H: null, sma1H: null, ema1H: null, vwap1H: null, c5M: null, s5M: null, sma5M: null, ema5M: null, vwap5M: null },
     triadData: { d1D: [], d1H: [], d5M: [] },
     getSymbol: () => 'BTCUSDT',
+    getCandles: null,
     hostChart: null,
+    hostSeries: null,
     hostRsiChart: null,
     hostAtrChart: null,
     hostVolChart: null,
     hostRvolChart: null
   };
+
+  function resolveHostCandlesAndAtr() {
+    let candles = [];
+    if (typeof HOST_STATE.getCandles === 'function') {
+      try { candles = HOST_STATE.getCandles() || []; } catch (_) {}
+    }
+    if (!candles.length && typeof window !== 'undefined') {
+      if (Array.isArray(window._lastTrigger) && window._lastTrigger.length) candles = window._lastTrigger;
+      else if (Array.isArray(window.currentHistoryData) && window.currentHistoryData.length) candles = window.currentHistoryData;
+      else if (Array.isArray(window.marketCandles) && window.marketCandles.length) candles = window.marketCandles;
+      else if (HOST_STATE.triadData && Array.isArray(HOST_STATE.triadData.d5M) && HOST_STATE.triadData.d5M.length) candles = HOST_STATE.triadData.d5M;
+    }
+    let lastPrice = candles.length ? Number(candles[candles.length - 1].close) : null;
+    if (!lastPrice && typeof document !== 'undefined') {
+      const pxEl = document.getElementById('chart-last-price') || document.getElementById('currentPrice');
+      if (pxEl) {
+        const rawAttr = pxEl.getAttribute('data-price') || (pxEl.innerText || '').replace(/[^0-9.-]/g, '');
+        const parsed = parseFloat(rawAttr);
+        if (Number.isFinite(parsed) && parsed > 0) lastPrice = parsed;
+      }
+    }
+    let atrVal = null;
+    if (candles.length >= 15) {
+      const atrRes = calculateATR(candles, 14);
+      if (atrRes && Number.isFinite(atrRes.lastValue) && atrRes.lastValue > 0) {
+        atrVal = atrRes.lastValue;
+      }
+    }
+    if (!atrVal && typeof document !== 'undefined') {
+      const atrEl = document.getElementById('atrLiveValue') || document.getElementById('brainMetricAtr');
+      if (atrEl) {
+        const parsedAtr = parseFloat((atrEl.innerText || '').replace(/[^0-9.-]/g, ''));
+        if (Number.isFinite(parsedAtr) && parsedAtr > 0) atrVal = parsedAtr;
+      }
+    }
+    // Swing Fibo 0.50 - 0.75 sobre las últimas 50 velas disponibles (o 1H si existe)
+    let fiboMin = null;
+    let fiboMax = null;
+    const refCandles = (typeof window !== 'undefined' && Array.isArray(window._last1H) && window._last1H.length >= 10)
+      ? window._last1H
+      : candles;
+    if (refCandles && refCandles.length >= 10) {
+      const slice = refCandles.slice(-Math.min(50, refCandles.length));
+      const hi = Math.max(...slice.map(c => Number(c.high)));
+      const lo = Math.min(...slice.map(c => Number(c.low)));
+      if (hi > lo) {
+        const f50 = hi - 0.50 * (hi - lo);
+        const f75 = hi - 0.75 * (hi - lo);
+        fiboMin = Math.min(f50, f75);
+        fiboMax = Math.max(f50, f75);
+      }
+    }
+    return { candles, lastPrice, atrVal, fiboMin, fiboMax };
+  }
+
+  function yToPriceOnHost(yCoord, svgHeight) {
+    if (HOST_STATE.hostSeries && typeof HOST_STATE.hostSeries.coordinateToPrice === 'function') {
+      try {
+        const p = HOST_STATE.hostSeries.coordinateToPrice(yCoord);
+        if (Number.isFinite(p) && p > 0) return Number(p);
+      } catch (_) {}
+    }
+    const { candles, lastPrice } = resolveHostCandlesAndAtr();
+    if (candles.length >= 2 && svgHeight > 0) {
+      const slice = candles.slice(-Math.min(60, candles.length));
+      const hi = Math.max(...slice.map(c => Number(c.high)));
+      const lo = Math.min(...slice.map(c => Number(c.low)));
+      if (hi > lo) {
+        const pad = (hi - lo) * 0.12;
+        const topP = hi + pad;
+        const botP = Math.max(0.0001, lo - pad);
+        const ratio = Math.max(0, Math.min(1, yCoord / svgHeight));
+        return topP - ratio * (topP - botP);
+      }
+    }
+    if (lastPrice && svgHeight > 0) {
+      const rel = (0.5 - (yCoord / svgHeight)) * 0.06;
+      return lastPrice * (1 + rel);
+    }
+    return null;
+  }
+
+  function openQuickRulerCalculatorModal(customTargetPrice) {
+    if (typeof document === 'undefined') return;
+    let modal = document.getElementById('kula-quick-ruler-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'kula-quick-ruler-modal';
+      modal.className = 'hidden fixed top-20 right-4 md:right-8 z-[100050] bg-slate-950/98 border border-cyan-500/70 rounded-2xl p-4 shadow-2xl backdrop-blur-xl w-80 sm:w-96 text-xs font-mono space-y-3';
+      modal.innerHTML = `
+        <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="text-base">📏</span>
+            <div>
+              <h3 class="text-xs font-black text-white uppercase tracking-wider">Regla & Calculadora Rápida (% / ATR)</h3>
+              <span class="text-[9.5px] text-cyan-400">Distancia desde Vela Actual a Soporte o Zona Dorada</span>
+            </div>
+          </div>
+          <button type="button" onclick="document.getElementById('kula-quick-ruler-modal').classList.add('hidden')" class="text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 cursor-pointer">✕</button>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-[10.5px]">
+          <div class="p-2 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="text-slate-400 block text-[9px] uppercase">Precio Actual:</span>
+            <strong id="kr-cur-price" class="text-white text-xs">$--</strong>
+          </div>
+          <div class="p-2 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="text-slate-400 block text-[9px] uppercase">ATR (14) Activo:</span>
+            <strong id="kr-cur-atr" class="text-amber-300 text-xs">$--</strong>
+          </div>
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-300 font-bold block mb-1">Nivel Objetivo / Soporte / Zona Dorada ($):</label>
+          <div class="flex items-center gap-1.5">
+            <input type="number" step="any" id="kr-target-input" class="flex-1 bg-slate-900 border border-cyan-500/50 rounded-lg px-2.5 py-1.5 text-white font-bold text-xs outline-none" placeholder="Ej: 1950.00">
+            <button type="button" id="kr-btn-fibo50" class="px-2 py-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-500/40 text-[10px] font-bold cursor-pointer" title="Cargar nivel Fibo 0.50 (Inicio Zona Dorada)">Fibo 0.50</button>
+            <button type="button" id="kr-btn-fibo75" class="px-2 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/40 text-[10px] font-bold cursor-pointer" title="Cargar nivel Fibo 0.75 (Invalidación)">Fibo 0.75</button>
+          </div>
+        </div>
+        <div class="p-2.5 rounded-xl bg-slate-900/95 border border-slate-800 space-y-1.5 text-[10.5px]">
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">Distancia en %:</span>
+            <strong id="kr-res-pct" class="text-cyan-300 text-xs">--%</strong>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">Distancia en ATR (14):</span>
+            <strong id="kr-res-atr" class="text-amber-300 text-xs">--x ATR</strong>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">Distancia a Zona Dorada (0.50–0.75):</span>
+            <strong id="kr-res-fibo" class="text-emerald-300">--</strong>
+          </div>
+          <div class="flex justify-between items-center pt-1 border-t border-slate-800/80">
+            <span class="text-slate-400">SL Recomendado (1.8×ATR):</span>
+            <strong id="kr-res-sl18" class="text-rose-400">--</strong>
+          </div>
+        </div>
+        <div class="text-[9.5px] text-slate-400 leading-tight">
+          💡 Tip: También podés seleccionar la herramienta <strong>📏 Regla</strong> en la barra izquierda del gráfico y arrastrar entre cualquier vela y soporte.
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    const ctxInfo = resolveHostCandlesAndAtr();
+    const p1 = ctxInfo.lastPrice || 0;
+    const atr = ctxInfo.atrVal || 0;
+    const fMin = ctxInfo.fiboMin;
+    const fMax = ctxInfo.fiboMax;
+
+    const curEl = document.getElementById('kr-cur-price');
+    const atrEl = document.getElementById('kr-cur-atr');
+    const inp = document.getElementById('kr-target-input');
+    const btnF50 = document.getElementById('kr-btn-fibo50');
+    const btnF75 = document.getElementById('kr-btn-fibo75');
+
+    if (curEl) curEl.innerText = p1 > 0 ? `$${formatPrice(p1)}` : '$--';
+    if (atrEl) atrEl.innerText = atr > 0 ? `$${formatPrice(atr)} (${p1 > 0 ? ((atr / p1) * 100).toFixed(2) : '--'}%)` : 'N/D';
+
+    const recompute = () => {
+      const targetVal = parseFloat(inp ? inp.value : '0');
+      const m = calculateRulerMetrics(p1, targetVal, atr, fMin, fMax);
+      const pctEl = document.getElementById('kr-res-pct');
+      const rAtrEl = document.getElementById('kr-res-atr');
+      const fiboEl = document.getElementById('kr-res-fibo');
+      const slEl = document.getElementById('kr-res-sl18');
+      if (!m.valid) {
+        if (pctEl) pctEl.innerText = '--%';
+        if (rAtrEl) rAtrEl.innerText = '--x ATR';
+        return;
+      }
+      const sign = m.diffPct >= 0 ? '+' : '';
+      if (pctEl) {
+        pctEl.innerText = `${sign}${m.diffPct.toFixed(2)}% (${sign}$${formatPrice(m.absUsd)})`;
+        pctEl.className = m.diffPct >= 0 ? 'text-emerald-400 font-bold text-xs' : 'text-rose-400 font-bold text-xs';
+      }
+      if (rAtrEl) {
+        rAtrEl.innerText = m.atrMult !== null ? `${m.atrMult.toFixed(2)}x ATR` : 'ATR N/D';
+      }
+      if (fiboEl) {
+        if (m.fiboStatus === 'DENTRO_ZONA_DORADA') {
+          fiboEl.innerText = '✅ DENTRO DE ZONA DORADA (0.00%)';
+          fiboEl.className = 'text-emerald-400 font-bold';
+        } else if (m.fiboGoldenDistPct !== null) {
+          const sF = m.fiboGoldenDistPct >= 0 ? '+' : '';
+          const aF = m.fiboGoldenDistAtr !== null ? ` (${m.fiboGoldenDistAtr.toFixed(2)}x ATR)` : '';
+          fiboEl.innerText = `${sF}${m.fiboGoldenDistPct.toFixed(2)}%${aF}`;
+          fiboEl.className = 'text-amber-300 font-bold';
+        } else {
+          fiboEl.innerText = 'N/D';
+        }
+      }
+      if (slEl) {
+        if (m.slRecommended18AtrPct !== null && p1 > 0) {
+          const slPx = p1 * (1 - Math.max(1.2, m.slRecommended18AtrPct) / 100);
+          slEl.innerText = `-$${formatPrice(p1 - slPx)} (-${Math.max(1.2, m.slRecommended18AtrPct).toFixed(2)}%)`;
+        } else {
+          slEl.innerText = 'N/D';
+        }
+      }
+    };
+
+    if (inp) {
+      const defaultTarget = Number.isFinite(customTargetPrice) && customTargetPrice > 0
+        ? customTargetPrice
+        : (fMax || (p1 > 0 ? p1 * 0.985 : 0));
+      inp.value = defaultTarget > 0 ? (defaultTarget >= 100 ? defaultTarget.toFixed(2) : defaultTarget.toFixed(4)) : '';
+      inp.oninput = recompute;
+    }
+    if (btnF50) {
+      btnF50.onclick = () => {
+        if (inp && fMax) {
+          inp.value = fMax >= 100 ? fMax.toFixed(2) : fMax.toFixed(4);
+          recompute();
+        }
+      };
+    }
+    if (btnF75) {
+      btnF75.onclick = () => {
+        if (inp && fMin) {
+          inp.value = fMin >= 100 ? fMin.toFixed(2) : fMin.toFixed(4);
+          recompute();
+        }
+      };
+    }
+
+    recompute();
+    modal.classList.remove('hidden');
+  }
 
   async function fetchTriadKlines(symbol, interval, limit) {
     limit = limit || 120;
@@ -1044,7 +1559,9 @@
     options = options || {};
     ensureCandlePatternModal();
     if (options.getSymbol) HOST_STATE.getSymbol = options.getSymbol;
+    if (options.getCandles) HOST_STATE.getCandles = options.getCandles;
     if (options.hostChart) HOST_STATE.hostChart = options.hostChart;
+    if (options.hostSeries) HOST_STATE.hostSeries = options.hostSeries;
     if (options.hostRsiChart) HOST_STATE.hostRsiChart = options.hostRsiChart;
     if (options.hostAtrChart) HOST_STATE.hostAtrChart = options.hostAtrChart;
     if (options.hostVolChart) HOST_STATE.hostVolChart = options.hostVolChart;
@@ -1063,9 +1580,11 @@
       <aside id="kula-left-drawing-bar" class="w-[40px] shrink-0 bg-slate-950/95 border border-slate-800 rounded-lg py-1.5 px-1 flex flex-col items-center gap-1 select-none shadow-lg z-20">
         <button type="button" onclick="window.KulaChartEngine.setDrawingTool('cursor')" id="ku-tool-cursor" class="w-7 h-7 rounded flex items-center justify-center text-xs bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 cursor-pointer" title="Cursor Crosshair">➕</button>
         <button type="button" onclick="window.KulaChartEngine.setDrawingTool('trendline')" id="ku-tool-trendline" class="w-7 h-7 rounded flex items-center justify-center text-xs text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer" title="Línea de Tendencia (2 clics)">╱</button>
-        <button type="button" onclick="window.KulaChartEngine.setDrawingTool('fibo')" id="ku-tool-fibo" class="w-7 h-7 rounded flex items-center justify-center text-xs text-amber-400 hover:bg-slate-800 cursor-pointer" title="Zona Dorada Fibonacci (0.382 - 0.75)">📐</button>
+        <button type="button" onclick="window.KulaChartEngine.setDrawingTool('fibo')" id="ku-tool-fibo" class="w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold font-mono text-amber-400 hover:bg-slate-800 hover:text-amber-300 cursor-pointer border border-transparent hover:border-amber-500/40" title="Retroceso de Fibonacci Institucional (0.0% · 38.2% · 50.0% · 61.8% · 75.0% · 100.0%)">Fib</button>
         <button type="button" onclick="window.KulaChartEngine.setDrawingTool('ob')" id="ku-tool-ob" class="w-7 h-7 rounded flex items-center justify-center text-xs text-indigo-400 hover:bg-slate-800 cursor-pointer" title="Order Block Institucional">🧱</button>
         <button type="button" onclick="window.KulaChartEngine.setDrawingTool('rr')" id="ku-tool-rr" class="w-7 h-7 rounded flex items-center justify-center text-xs text-emerald-400 hover:bg-slate-800 cursor-pointer" title="Proyección Asimetría R:R (1:2)">⚖️</button>
+        <button type="button" onclick="window.KulaChartEngine.setDrawingTool('ruler')" id="ku-tool-ruler" class="w-7 h-7 rounded flex items-center justify-center text-xs text-cyan-300 hover:bg-slate-800 cursor-pointer" title="Regla de Medición (% y ATR desde vela actual hasta soporte o Zona Dorada)">📏</button>
+        <button type="button" onclick="window.KulaChartEngine.openQuickRulerCalculatorModal()" id="ku-tool-calc" class="w-7 h-7 rounded flex items-center justify-center text-xs text-amber-300 hover:bg-slate-800 cursor-pointer" title="Calculadora Rápida de Distancia en % y ATR a Soporte / Zona Dorada">🧮</button>
         <div class="w-5 border-t border-slate-800 my-0.5"></div>
         <button type="button" onclick="window.KulaChartEngine.clearDrawings()" class="w-7 h-7 rounded flex items-center justify-center text-xs text-rose-400 hover:bg-rose-950/60 cursor-pointer" title="Borrar Dibujos">🗑️</button>
       </aside>`;
@@ -1250,17 +1769,77 @@
       rSl.setAttribute('stroke', '#ef4444');
       rSl.setAttribute('stroke-width', '2');
       svg.appendChild(rSl);
+    } else if (tool === 'ruler') {
+      const svgH = svg.clientHeight || 360;
+      const ctxInfo = resolveHostCandlesAndAtr();
+      const p1Price = yToPriceOnHost(p1.y, svgH) || ctxInfo.lastPrice || 100;
+      const p2Price = yToPriceOnHost(p2.y, svgH) || p1Price * (1 + ((p1.y - p2.y) / Math.max(1, svgH)) * 0.08);
+      const metrics = calculateRulerMetrics(p1Price, p2Price, ctxInfo.atrVal, ctxInfo.fiboMin, ctxInfo.fiboMax);
+
+      // Caja sombreada de medición
+      const box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      box.setAttribute('x', Math.min(p1.x, p2.x));
+      box.setAttribute('y', Math.min(p1.y, p2.y));
+      box.setAttribute('width', Math.max(8, Math.abs(p2.x - p1.x)));
+      box.setAttribute('height', Math.max(4, Math.abs(p2.y - p1.y)));
+      box.setAttribute('fill', p2.y <= p1.y ? 'rgba(16, 185, 129, 0.14)' : 'rgba(56, 189, 248, 0.14)');
+      box.setAttribute('stroke', '#38bdf8');
+      box.setAttribute('stroke-width', '1');
+      box.setAttribute('stroke-dasharray', '3,3');
+      svg.appendChild(box);
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', p1.x);
+      line.setAttribute('y1', p1.y);
+      line.setAttribute('x2', p2.x);
+      line.setAttribute('y2', p2.y);
+      line.setAttribute('stroke', '#38bdf8');
+      line.setAttribute('stroke-width', '2');
+      line.setAttribute('stroke-dasharray', '4,3');
+      svg.appendChild(line);
+
+      const lblText = metrics.valid ? `📏 ${metrics.summaryText}` : '📏 Regla';
+      const boxW = Math.max(185, lblText.length * 6.8);
+      const lblX = Math.max(8, Math.min((svg.clientWidth || 600) - boxW - 8, p2.x + 6));
+      const lblY = Math.max(24, Math.min(svgH - 12, p2.y));
+
+      const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bg.setAttribute('x', lblX);
+      bg.setAttribute('y', lblY - 18);
+      bg.setAttribute('width', boxW);
+      bg.setAttribute('height', 22);
+      bg.setAttribute('rx', '5');
+      bg.setAttribute('fill', 'rgba(15, 23, 42, 0.94)');
+      bg.setAttribute('stroke', '#38bdf8');
+      bg.setAttribute('stroke-width', '1.2');
+      svg.appendChild(bg);
+
+      const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      txt.setAttribute('x', lblX + 7);
+      txt.setAttribute('y', lblY - 3);
+      txt.setAttribute('fill', '#e0f2fe');
+      txt.setAttribute('font-size', '10.5');
+      txt.setAttribute('font-weight', 'bold');
+      txt.setAttribute('font-family', 'monospace');
+      txt.textContent = lblText;
+      svg.appendChild(txt);
     }
   }
 
   function setDrawingTool(tool) {
     HOST_STATE.activeTool = tool;
-    ['cursor', 'trendline', 'fibo', 'ob', 'rr'].forEach(t => {
+    ['cursor', 'trendline', 'fibo', 'ob', 'rr', 'ruler'].forEach(t => {
       const btn = document.getElementById(`ku-tool-${t}`);
       if (btn) {
-        btn.className = (t === tool)
-          ? "w-7 h-7 rounded flex items-center justify-center text-xs bg-cyan-500/25 text-cyan-300 border border-cyan-500/50 cursor-pointer"
-          : "w-7 h-7 rounded flex items-center justify-center text-xs text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer";
+        if (t === 'fibo') {
+          btn.className = (t === tool)
+            ? "w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold font-mono bg-amber-500/25 text-amber-300 border border-amber-500/60 shadow-sm cursor-pointer"
+            : "w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold font-mono text-amber-400 hover:text-white hover:bg-slate-800 cursor-pointer";
+        } else {
+          btn.className = (t === tool)
+            ? "w-7 h-7 rounded flex items-center justify-center text-xs bg-cyan-500/25 text-cyan-300 border border-cyan-500/50 cursor-pointer"
+            : "w-7 h-7 rounded flex items-center justify-center text-xs text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer";
+        }
       }
     });
     const svg = document.getElementById('kula-drawing-svg');
@@ -1314,6 +1893,10 @@
     if (btn) {
       btn.innerHTML = HOST_STATE.isLight ? '☀️ Blanco' : '🌙 Oscuro';
     }
+    const singleWrapper = document.getElementById('kula-single-chart-wrapper');
+    if (singleWrapper) {
+      singleWrapper.style.backgroundColor = HOST_STATE.isLight ? '#ffffff' : '#0b0e14';
+    }
   }
 
   // Exportar motor al espacio global
@@ -1333,8 +1916,19 @@
       calculateRvolTod,
       getRvolBarColor,
       getVolumeBarColor,
-      detectCandlePatternDetails
+      detectCandlePatternDetails,
+      evaluateArtSessionStatus,
+      calculateRulerMetrics
     },
+    TOGGLE_STORAGE_KEY,
+    DEFAULT_UI_TOGGLES,
+    loadSavedToggles,
+    saveToggleState,
+    evaluateArtSessionStatus,
+    calculateRulerMetrics,
+    renderSessionAlertBadgeDom,
+    startSessionAlertAutoUpdater,
+    openQuickRulerCalculatorModal,
     ensureCandlePatternModal,
     renderUniversalPatternModal,
     mountUnifiedChartWorkspace,

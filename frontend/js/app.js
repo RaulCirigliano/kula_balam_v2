@@ -1097,11 +1097,13 @@ if (window.KulaChartEngine) {
         singleWrapperId: 'kula-single-chart-wrapper',
         triadHeight: 380,
         hostChart: chart,
+        hostSeries: candleSeries,
         hostRsiChart: rsiChart,
         hostAtrChart: atrChart,
         hostVolChart: volChart,
         hostRvolChart: rvolChart,
-        getSymbol: () => (typeof currentSymbol !== 'undefined' ? currentSymbol : 'BTCUSDT')
+        getSymbol: () => (typeof currentSymbol !== 'undefined' ? currentSymbol : 'BTCUSDT'),
+        getCandles: () => (typeof currentHistoryData !== 'undefined' && Array.isArray(currentHistoryData) ? currentHistoryData : [])
     });
 
     chart.subscribeClick(param => {

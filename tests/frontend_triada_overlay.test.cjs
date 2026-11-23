@@ -169,3 +169,60 @@ test('buildTriadaOverlayDescriptors maps 5-step Presencial Protocol (Setup A/B, 
   assert.equal(desc.presencialProtocol.sessionBlackout, false);
   assert.equal(desc.presencialProtocol.dailyQuotaText, '1/2 ops · 0/2 SL');
 });
+
+test('KulaChartEngine evaluateArtSessionStatus, calculateRulerMetrics, and localStorage toggle persistence work deterministically', () => {
+  global.window = global.window || {};
+  require('../frontend/js/kula-chart-engine.js');
+  const engine = global.window.KulaChartEngine;
+  assert.ok(engine);
+
+  // 1. Alerta de sesión en ART (UTC-3)
+  // Lunes 11:00 ART = 14:00 UTC -> Ventana líquida Londres/NY
+  const stLiquidAm = engine.evaluateArtSessionStatus(new Date('2026-11-23T14:00:00Z'));
+  assert.equal(stLiquidAm.status, 'liquid');
+  assert.equal(stLiquidAm.code, 'LONDRES_NY_AM');
+  assert.equal(stLiquidAm.isLiquid, true);
+
+  // Lunes 14:30 ART = 17:30 UTC -> Lunch Lull (rojo / blackout)
+  const stLunch = engine.evaluateArtSessionStatus(new Date('2026-11-23T17:30:00Z'));
+  assert.equal(stLunch.status, 'blackout');
+  assert.equal(stLunch.code, 'LUNCH_LULL');
+  assert.equal(stLunch.isBlackout, true);
+
+  // Lunes 16:15 ART = 19:15 UTC -> Power Hour NY (verde)
+  const stPower = engine.evaluateArtSessionStatus(new Date('2026-11-23T19:15:00Z'));
+  assert.equal(stPower.status, 'liquid');
+  assert.equal(stPower.code, 'NY_POWER_HOUR');
+
+  // Lunes 20:00 ART = 23:00 UTC -> Cierre / Fuera de ventana (gris)
+  const stClosed = engine.evaluateArtSessionStatus(new Date('2026-11-23T23:00:00Z'));
+  assert.equal(stClosed.status, 'closed');
+  assert.equal(stClosed.isLiquid, false);
+
+  // 2. Regla de medición / Calculadora rápida (% y ATR + distancia a Zona Dorada)
+  const m = engine.calculateRulerMetrics(2000.0, 1950.0, 25.0, 1900.0, 1960.0);
+  assert.equal(m.valid, true);
+  assert.equal(Number(m.diffPct.toFixed(2)), -2.50);
+  assert.equal(Number(m.atrMult.toFixed(2)), 2.00);
+  assert.equal(m.fiboStatus, 'ARRIBA_DE_050');
+  assert.equal(Number(m.fiboGoldenDistPct.toFixed(2)), -2.00);
+  assert.equal(Number(m.fiboGoldenDistAtr.toFixed(2)), 1.60);
+
+  // 3. Guardado automático de toggles en localStorage (RVOL, RSI, ATR, Vol, 5 Puntos)
+  const memStore = {
+    _data: {},
+    getItem(k) { return this._data[k] || null; },
+    setItem(k, v) { this._data[k] = String(v); },
+  };
+  engine.saveToggleState('rvol', true, memStore);
+  engine.saveToggleState('rsi', true, memStore);
+  engine.saveToggleState('atr', true, memStore);
+  engine.saveToggleState('triada5Puntos', false, memStore);
+
+  const loaded = engine.loadSavedToggles(memStore);
+  assert.equal(loaded.rvol, true);
+  assert.equal(loaded.rsi, true);
+  assert.equal(loaded.atr, true);
+  assert.equal(loaded.triada5Puntos, false);
+  assert.equal(loaded.vol, true);
+});

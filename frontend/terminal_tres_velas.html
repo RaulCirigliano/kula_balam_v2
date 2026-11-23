@@ -214,6 +214,16 @@
         <span id="feed-status">Binance Feed Live</span>
       </div>
 
+      <!-- Alerta de Sesión / Horario en Barra Superior (Verde: Londres/NY o Power Hour · Rojo/Gris: Lunch Lull o Cierre) -->
+      <span id="triada-session-alert-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-mono font-bold bg-slate-800/90 text-slate-300 border border-slate-600/70 whitespace-nowrap" title="Estado de ventana líquida institucional en hora Argentina (ART)">
+        ⚪ Evaluando ventana horaria...
+      </span>
+
+      <!-- Botón Calculadora Rápida / Regla en % y ATR -->
+      <button type="button" onclick="window.KulaChartEngine && window.KulaChartEngine.openQuickRulerCalculatorModal()" class="px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 hover:text-white text-xs font-bold transition flex items-center gap-1 border border-cyan-500/50 cursor-pointer shadow-sm" title="Calculadora rápida: mide en % y ATR la distancia desde la vela actual hasta un soporte o Zona Dorada">
+        <span>📏</span> Regla % / ATR
+      </button>
+
       <!-- Botón de Ayuda: ¿Cómo leer las velas y temporalidades? -->
       <button onclick="toggleHelpModal()" id="btnHelpModal" class="px-2.5 py-1 rounded-lg bg-indigo-950/60 hover:bg-indigo-900 text-indigo-300 hover:text-white text-xs font-bold transition flex items-center gap-1 border border-indigo-700/50 cursor-pointer shadow-sm" title="Guía visual para entender cómo funcionan las temporalidades y cómo se leen las velas">
         <span>📖</span> ¿Cómo leer las velas?
@@ -1135,8 +1145,12 @@
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
       </button>
       <!-- 8. Regla de Medición -->
-      <button type="button" onclick="setTvTool('ruler')" data-tv-tool="ruler" class="w-8 h-8 rounded-lg bg-slate-800/90 hover:bg-cyan-600 text-cyan-300 hover:text-white flex items-center justify-center transition cursor-pointer shadow-sm" title="Regla de Medición (% y ticks)">
+      <button type="button" onclick="setTvTool('ruler')" data-tv-tool="ruler" class="w-8 h-8 rounded-lg bg-slate-800/90 hover:bg-cyan-600 text-cyan-300 hover:text-white flex items-center justify-center transition cursor-pointer shadow-sm" title="Regla de Medición en Gráfico (% y múltiplos de ATR)">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.3 8.7 15.3 2.7a2 2 0 0 0-2.8 0L2.7 12.5a2 2 0 0 0 0 2.8l6 6a2 2 0 0 0 2.8 0l9.8-9.8a2 2 0 0 0 0-2.8z"/><line x1="8" y1="12" x2="10" y2="14"/><line x1="11" y1="9" x2="13" y2="11"/><line x1="14" y1="6" x2="16" y2="8"/></svg>
+      </button>
+      <!-- 8B. Calculadora Rápida (% y ATR a Soporte / Zona Dorada) -->
+      <button type="button" onclick="window.KulaChartEngine && window.KulaChartEngine.openQuickRulerCalculatorModal()" class="w-8 h-8 rounded-lg bg-amber-950/70 hover:bg-amber-700 text-amber-300 hover:text-white flex items-center justify-center transition cursor-pointer border border-amber-500/40 shadow-sm text-xs" title="Calculadora Rápida: mide en % y ATR la distancia desde la vela actual hasta un soporte o Zona Dorada">
+        🧮
       </button>
       <!-- 9. Goma de Borrar -->
       <button type="button" onclick="setTvTool('eraser')" data-tv-tool="eraser" class="w-8 h-8 rounded-lg bg-slate-800/90 hover:bg-rose-700 text-rose-300 hover:text-white flex items-center justify-center transition cursor-pointer shadow-sm" title="Goma de Borrar: Haz clic sobre un dibujo para eliminarlo">
@@ -3782,9 +3796,9 @@
       }
     };
 
-    // Control de Paneles Auxiliares (Volumen, RSI 14, ATR 14, Guía Rápida)
-    window.toggleAuxPanel = function(panelId, isChecked) {
-      if (panelId === 'vol') {
+    // Control de Paneles Auxiliares (Volumen, RSI 14, ATR 14, RVOL, Guía Rápida) + Persistencia localStorage
+    window.toggleAuxPanel = function(panelId, isChecked, skipSave) {
+      if (panelId === 'vol' || panelId === 'panelVol') {
         ['volume-pane-1d', 'volume-pane-1h', 'volume-pane-5m'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.classList.toggle('hidden', !isChecked);
@@ -3797,6 +3811,9 @@
             ? "px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-teal-500/25 text-teal-200 border border-teal-400 shadow-sm"
             : "px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-teal-950/80 text-teal-300 border border-teal-500/40 shadow-sm";
         }
+        if (!skipSave && window.KulaChartEngine && typeof window.KulaChartEngine.saveToggleState === 'function') {
+          window.KulaChartEngine.saveToggleState('vol', isChecked);
+        }
         if (typeof window.reflowAllCharts === 'function') window.reflowAllCharts();
         return;
       }
@@ -3806,8 +3823,12 @@
 
       // Sincronizar checkboxes y botones de la barra superior
       const chkMap = { panelRsi: 'chkPanelRsi', panelAtr: 'chkPanelAtr', panelRvol: 'chkPanelRvol', panelGuide: 'chkPanelGuide' };
+      const storageKeyMap = { panelRsi: 'rsi', panelAtr: 'atr', panelRvol: 'rvol', panelGuide: 'guide' };
       const chk = document.getElementById(chkMap[panelId]);
       if (chk && chk.checked !== isChecked) chk.checked = isChecked;
+      if (!skipSave && storageKeyMap[panelId] && window.KulaChartEngine && typeof window.KulaChartEngine.saveToggleState === 'function') {
+        window.KulaChartEngine.saveToggleState(storageKeyMap[panelId], isChecked);
+      }
 
       if (panelId === 'panelRsi') {
         const btnTop = document.getElementById('btnTopRsi14');
@@ -5581,10 +5602,26 @@
       evaluarEstrategiaEnVivo();
     }
 
-    function toggleTriadaOverlays(isChecked) {
+    function toggleTriadaOverlays(isChecked, skipSave) {
+      const chkOv = document.getElementById('chkTriadaOverlays');
+      if (chkOv && chkOv.checked !== Boolean(isChecked)) chkOv.checked = Boolean(isChecked);
+      if (!skipSave && window.KulaChartEngine && typeof window.KulaChartEngine.saveToggleState === 'function') {
+        window.KulaChartEngine.saveToggleState('triada5Puntos', Boolean(isChecked));
+      }
       if (window.TriadaOverlayEngine && typeof window.TriadaOverlayEngine.setVisible === 'function') {
         window.TriadaOverlayEngine.setVisible(Boolean(isChecked));
       }
+    }
+
+    function restoreSavedTriadaToggles() {
+      if (!window.KulaChartEngine || typeof window.KulaChartEngine.loadSavedToggles !== 'function') return;
+      const saved = window.KulaChartEngine.loadSavedToggles();
+      if (typeof saved.vol === 'boolean') window.toggleAuxPanel('vol', saved.vol, true);
+      if (typeof saved.rvol === 'boolean') window.toggleAuxPanel('panelRvol', saved.rvol, true);
+      if (typeof saved.rsi === 'boolean') window.toggleAuxPanel('panelRsi', saved.rsi, true);
+      if (typeof saved.atr === 'boolean') window.toggleAuxPanel('panelAtr', saved.atr, true);
+      if (typeof saved.guide === 'boolean') window.toggleAuxPanel('panelGuide', saved.guide, true);
+      if (typeof saved.triada5Puntos === 'boolean') toggleTriadaOverlays(saved.triada5Puntos, true);
     }
 
     async function ejecutarGatilloTriadaSim() {
@@ -5879,6 +5916,10 @@
     // Arranque inicial
     window.onload = () => {
       initCharts();
+      restoreSavedTriadaToggles();
+      if (window.KulaChartEngine && typeof window.KulaChartEngine.startSessionAlertAutoUpdater === 'function') {
+        window.KulaChartEngine.startSessionAlertAutoUpdater(['triada-session-alert-badge']);
+      }
       const savedStyle = localStorage.getItem('ai_fractal_trading_style') || 'day_trading';
       if (savedStyle && savedStyle !== 'day_trading') {
         setFractalTradingStyle(savedStyle);
