@@ -989,6 +989,53 @@ if (atrContainer && typeof LightweightCharts !== 'undefined') {
     });
 }
 
+// --- SUB-GRÁFICO 3: RVOL (VOLUMEN RELATIVO POR HORA DEL DÍA) ---
+const rvolContainer = document.getElementById('rvol-chart-container');
+let rvolChart = null;
+let rvolSeries = null;
+window._lastRvolByTime = new Map();
+
+if (rvolContainer && typeof LightweightCharts !== 'undefined') {
+    rvolChart = LightweightCharts.createChart(rvolContainer, {
+        ...chartOptions,
+        width: rvolContainer.clientWidth || chartContainer.clientWidth,
+        height: 110,
+        rightPriceScale: {
+            borderColor: 'rgba(55, 65, 81, 1)',
+            scaleMargins: { top: 0.15, bottom: 0.05 },
+        },
+        timeScale: {
+            borderColor: 'rgba(55, 65, 81, 1)',
+            timeVisible: true,
+            visible: true,
+        },
+    });
+
+    rvolSeries = rvolChart.addHistogramSeries({
+        color: 'rgba(56, 189, 248, 0.55)',
+        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+        priceLineVisible: false,
+        lastValueVisible: true,
+    });
+
+    rvolSeries.createPriceLine({
+        price: 1.0,
+        color: '#94a3b8',
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted,
+        axisLabelVisible: true,
+        title: '1.0x',
+    });
+    rvolSeries.createPriceLine({
+        price: 2.0,
+        color: '#10b981',
+        lineWidth: 1.5,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: '2.0x',
+    });
+}
+
 // Sincronización bidireccional de desplazamiento y zoom (TimeScale)
 let _isSyncingRange = false;
 function syncTimeScales(source, targets) {
@@ -1006,10 +1053,12 @@ function syncTimeScales(source, targets) {
     });
 }
 
-if (chart && rsiChart && atrChart) {
-    syncTimeScales(chart, [rsiChart, atrChart]);
-    syncTimeScales(rsiChart, [chart, atrChart]);
-    syncTimeScales(atrChart, [chart, rsiChart]);
+if (chart) {
+    const auxCharts = [rsiChart, atrChart, rvolChart].filter(Boolean);
+    syncTimeScales(chart, auxCharts);
+    auxCharts.forEach((src) => {
+        syncTimeScales(src, [chart, ...auxCharts.filter((t) => t !== src)]);
+    });
 }
 
 // Montar Barra Lateral de Herramientas TradingView (44px), Modalidad 1 Vela ↔ 3 Velas y "Clic Patrones"
@@ -1020,6 +1069,7 @@ if (window.KulaChartEngine) {
         hostChart: chart,
         hostRsiChart: rsiChart,
         hostAtrChart: atrChart,
+        hostRvolChart: rvolChart,
         getSymbol: () => (typeof currentSymbol !== 'undefined' ? currentSymbol : 'BTCUSDT')
     });
 
@@ -1083,6 +1133,44 @@ window.updateAtrBadge = function(val, price) {
         } else {
             badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-gray-800 text-amber-300 border border-gray-700 font-medium';
             badge.innerText = `🌊 NORMAL (${pct.toFixed(2)}%)`;
+        }
+    }
+};
+
+window.updateRvolBadge = function(val) {
+    const el = document.getElementById('rvolLiveValue');
+    const badge = document.getElementById('rvolStatusBadge');
+    const legEl = document.getElementById('legend-rvol');
+    const hasNum = typeof val === 'number' && Number.isFinite(val);
+    if (el) el.innerText = hasNum ? `${val.toFixed(2)}x` : '--x';
+    if (legEl) {
+        if (!hasNum) {
+            legEl.textContent = 'RVOL: --x';
+            legEl.className = 'text-slate-400 font-semibold shrink-0';
+        } else if (val >= 2.0) {
+            legEl.textContent = `RVOL: ${val.toFixed(2)}x`;
+            legEl.className = 'text-emerald-400 font-bold shrink-0';
+        } else if (val < 0.7) {
+            legEl.textContent = `RVOL: ${val.toFixed(2)}x`;
+            legEl.className = 'text-slate-400 font-semibold shrink-0';
+        } else {
+            legEl.textContent = `RVOL: ${val.toFixed(2)}x`;
+            legEl.className = 'text-sky-300 font-semibold shrink-0';
+        }
+    }
+    if (badge) {
+        if (!hasNum) {
+            badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-gray-800 text-slate-400 border border-gray-700';
+            badge.innerText = '🚫 Sin Volumen Real';
+        } else if (val >= 2.0) {
+            badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500 font-bold';
+            badge.innerText = `🔥 RUPTURA INSTITUCIONAL (${val.toFixed(2)}x ≥ 2.0x)`;
+        } else if (val < 0.7) {
+            badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-700';
+            badge.innerText = `🧊 VOLUMEN SECO (${val.toFixed(2)}x < 0.7x)`;
+        } else {
+            badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-gray-800 text-sky-300 border border-gray-700';
+            badge.innerText = `⚪ NORMAL (${val.toFixed(2)}x)`;
         }
     }
 };
@@ -1421,6 +1509,8 @@ chart.subscribeCrosshairMove((param) => {
                 const prev = arr.length > 1 ? arr[arr.length - 2] : null;
                 const prev2 = arr.length > 2 ? arr[arr.length - 3] : null;
                 window.updateCandlePatternIndicator(last, prev, prev2);
+                const lastRv = window._lastRvolByTime ? window._lastRvolByTime.get(last.time) : last.rvol_tod;
+                if (typeof window.updateRvolBadge === 'function') window.updateRvolBadge(lastRv);
             }
         }
         return; // Fuera del gráfico
@@ -1471,6 +1561,8 @@ chart.subscribeCrosshairMove((param) => {
         if (pt) {
             if (typeof pt.rsi === 'number') window.updateRsiBadge(pt.rsi);
             if (typeof pt.atr === 'number') window.updateAtrBadge(pt.atr, pt.close);
+            const rv = window._lastRvolByTime && window._lastRvolByTime.has(pt.time) ? window._lastRvolByTime.get(pt.time) : pt.rvol_tod;
+            if (typeof window.updateRvolBadge === 'function') window.updateRvolBadge(typeof rv === 'number' ? rv : null);
         }
     }
 });
@@ -6160,6 +6252,8 @@ symbolSelect.addEventListener('change', () => {
     vwapLowerSeries.setData([]);
     if (rsiSeries) rsiSeries.setData([]);
     if (atrSeries) atrSeries.setData([]);
+    if (rvolSeries) rvolSeries.setData([]);
+    if (window._lastRvolByTime) window._lastRvolByTime.clear();
     fetchMarketData();
     updateSentiment();
     if (typeof updateCapitalDisplay === 'function') updateCapitalDisplay();
@@ -6254,6 +6348,19 @@ async function fetchMarketData() {
                     window.updateAtrBadge(atrData[atrData.length - 1].value, lastClose);
                 }
 
+                // --- ACTUALIZACIÓN DE RVOL (VOLUMEN RELATIVO POR HORA DEL DÍA) ---
+                if (rvolSeries) {
+                    const tfNow = document.getElementById('timeframeSelect')?.value || '1h';
+                    const rvolRes = (window.KulaChartEngine && window.KulaChartEngine.formulas && typeof window.KulaChartEngine.formulas.calculateRvolTod === 'function')
+                        ? window.KulaChartEngine.formulas.calculateRvolTod(data, null, tfNow)
+                        : { series: [], map: new Map(), lastValue: null };
+                    window._lastRvolByTime = rvolRes.map || new Map();
+                    rvolSeries.setData(rvolRes.series || []);
+                    if (typeof window.updateRvolBadge === 'function') {
+                        window.updateRvolBadge(rvolRes.lastValue);
+                    }
+                }
+
                 // Inyectar marcas visuales de operaciones (E / S) en el gráfico
                 if (typeof window.updateChartTradeMarkers === 'function') {
                     window.updateChartTradeMarkers();
@@ -6338,6 +6445,7 @@ window.addEventListener('resize', () => {
     if (chart && chartContainer) chart.applyOptions({ width: chartContainer.clientWidth });
     if (rsiChart && rsiContainer) rsiChart.applyOptions({ width: rsiContainer.clientWidth });
     if (atrChart && atrContainer) atrChart.applyOptions({ width: atrContainer.clientWidth });
+    if (rvolChart && rvolContainer) rvolChart.applyOptions({ width: rvolContainer.clientWidth });
 });
 
 // Ciclo de IA (Bloque 4: Ciclo de vida idempotente y gestión de señales)
@@ -8887,6 +8995,8 @@ document.getElementById('timeframeSelect')?.addEventListener('change', () => {
     vwapLowerSeries.setData([]);
     if (rsiSeries) rsiSeries.setData([]);
     if (atrSeries) atrSeries.setData([]);
+    if (rvolSeries) rvolSeries.setData([]);
+    if (window._lastRvolByTime) window._lastRvolByTime.clear();
     if (typeof window.updateQuickTimeframeButtons === 'function') {
         window.updateQuickTimeframeButtons(sel.value);
     }

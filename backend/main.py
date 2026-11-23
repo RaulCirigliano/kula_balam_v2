@@ -1044,10 +1044,12 @@ def get_history(symbol: str = "BTC/USDT", timeframe: str = "1h", limit: int = 10
     # Acotar limit a rango seguro 10..1000 (Soporte de historial extendido para paneo fluido)
     bounded_limit = max(10, min(1000, int(limit)))
     try:
-        warmup_limit = bounded_limit + 25
+        extra_warmup = 120 if timeframe in ("1h", "4h") else 25
+        warmup_limit = min(1000, bounded_limit + extra_warmup)
         ohlcv = get_ohlcv(symbol, timeframe, warmup_limit)
         import pandas as pd
         import ta
+        from backend.indicators import compute_rvol_tod
         df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['sma_20'] = ta.trend.SMAIndicator(close=df['close'], window=20).sma_indicator()
         df['vwap'] = ta.volume.VolumeWeightedAveragePrice(high=df['high'], low=df['low'], close=df['close'], volume=df['volume'], window=14).volume_weighted_average_price()
@@ -1057,6 +1059,7 @@ def get_history(symbol: str = "BTC/USDT", timeframe: str = "1h", limit: int = 10
         df['vwap_lower'] = df['vwap'] - vwap_std
         df['rsi'] = ta.momentum.RSIIndicator(close=df['close'], window=14).rsi()
         df['atr'] = ta.volatility.AverageTrueRange(high=df['high'], low=df['low'], close=df['close'], window=14).average_true_range()
+        df['rvol_tod'] = compute_rvol_tod(df, timeframe=timeframe)
         
         if len(df) > bounded_limit:
             df = df.tail(bounded_limit)
@@ -1083,6 +1086,11 @@ def get_history(symbol: str = "BTC/USDT", timeframe: str = "1h", limit: int = 10
                 item["rsi"] = round(row['rsi'], 2)
             if not pd.isna(row['atr']) and float(row['atr']) > 0:
                 item["atr"] = round(row['atr'], 4)
+            rvol_v = row['rvol_tod']
+            if not pd.isna(rvol_v) and math.isfinite(float(rvol_v)) and float(rvol_v) >= 0.0:
+                item["rvol_tod"] = round(float(rvol_v), 2)
+            else:
+                item["rvol_tod"] = None
             formatted_data.append(item)
             
         if formatted_data and not df.empty:

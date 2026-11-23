@@ -400,6 +400,7 @@
                         <div id="legend-ema" class="text-purple-400 font-semibold shrink-0">EMA 20: ---</div>
                         <div id="legend-vwap" class="text-yellow-500 font-semibold shrink-0">VWAP: ---</div>
                         <div id="legend-vwap-bands" class="text-yellow-700 shrink-0">Bandas: --- / ---</div>
+                        <div id="legend-rvol" class="text-emerald-400 font-semibold shrink-0">RVOL: --x</div>
                     </div>
                 </div>
 
@@ -443,6 +444,11 @@
                             <input type="checkbox" id="chkPanelAtr" onchange="toggleAuxiliaryPanel('panelAtr', this.checked)" class="rounded bg-gray-950 border-amber-500/60 text-amber-500 focus:ring-0 cursor-pointer">
                             <span>ATR (14)</span>
                         </label>
+                        <!-- Tilde RVOL (Volumen Relativo por Hora del Día) -->
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-emerald-300 hover:text-emerald-200 select-none" title="Volumen Relativo por franja horaria exacta (5–10 sesiones previas, causal)">
+                            <input type="checkbox" id="chkPanelRvol" onchange="toggleAuxiliaryPanel('panelRvol', this.checked)" class="rounded bg-gray-950 border-emerald-500/60 text-emerald-500 focus:ring-0 cursor-pointer">
+                            <span>RVOL</span>
+                        </label>
                         <!-- Tilde Guía Rápida -->
                         <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-300 hover:text-white select-none">
                             <input type="checkbox" id="chkPanelGuide" onchange="toggleAuxiliaryPanel('panelGuide', this.checked)" class="rounded bg-gray-950 border-slate-600 text-cyan-500 focus:ring-0 cursor-pointer">
@@ -483,6 +489,23 @@
                         </div>
                     </div>
                     <div id="atr-chart-container" style="width: 100%; height: 110px; position: relative;"></div>
+                </div>
+
+                <!-- SUB-PANEL 3: RVOL (VOLUMEN RELATIVO POR HORA DEL DÍA) (OCULTO POR DEFECTO, DESPLEGABLE POR TILDE) -->
+                <div id="panelRvol" class="hidden mt-2.5 bg-gray-900/95 rounded-lg border border-emerald-500/40 p-2.5 shadow-md">
+                    <div class="flex flex-wrap justify-between items-center mb-1.5 px-1 gap-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                            <span class="text-xs font-bold text-emerald-300 uppercase tracking-wider">RVOL · Volumen Relativo por Hora Exacta</span>
+                            <span id="rvolStatusBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-800 text-sky-300 border border-gray-700">Volumen Normal</span>
+                        </div>
+                        <div class="flex items-center space-x-3 text-[11px] font-mono">
+                            <span class="text-slate-400">Normal: 1.0x</span>
+                            <span class="text-emerald-400 font-semibold">Institucional: ≥ 2.0x</span>
+                            <span class="text-emerald-300 font-bold ml-1">RVOL: <span id="rvolLiveValue" class="text-white text-sm font-semibold">--x</span></span>
+                        </div>
+                    </div>
+                    <div id="rvol-chart-container" style="width: 100%; height: 110px; position: relative;"></div>
                 </div>
 
                 <!-- Guía de Indicadores del Gráfico (OCULTO POR DEFECTO, DESPLEGABLE POR TILDE) -->
@@ -2119,7 +2142,7 @@
 
     <script src="js/trading_guards.js?v=5"></script>
     <script src="js/ui_components.js?v=20261019_ui"></script>
-    <script src="js/app.js?v=20261121_camp2"></script>
+    <script src="js/app.js?v=20261123_rvol"></script>
     <script src="js/cio_cockpit.js?v=1"></script>
     <script>
         // Controlador interactivo ultra-estable para el menú desplegable de Terminales & Páginas del Ecosistema

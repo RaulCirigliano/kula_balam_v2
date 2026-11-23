@@ -336,6 +336,104 @@
     return { series, lastValue: lastVal, noise15x, statusText, statusClass };
   }
 
+  function getRvolBarColor(val) {
+    const v = Number(val);
+    if (!Number.isFinite(v) || v < 0.7) return 'rgba(100, 116, 139, 0.38)';
+    if (v >= 3.0) return 'rgba(251, 191, 36, 0.92)';
+    if (v >= 2.0) return 'rgba(16, 185, 129, 0.90)';
+    return 'rgba(56, 189, 248, 0.55)';
+  }
+
+  function calculateRvolTod(candles, volumes, timeframe, maxSessions, minSamples) {
+    const tf = String(timeframe || '1h').trim().toLowerCase();
+    const maxS = maxSessions || 10;
+    const minS = minSamples || 3;
+    const isIntraday = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h'].includes(tf);
+    const outSeries = [];
+    const outMap = new Map();
+    if (!Array.isArray(candles) || candles.length === 0) {
+      return { series: outSeries, map: outMap, lastValue: null, hasVolume: false, statusText: 'Sin Volumen', statusClass: 'bg-slate-800 text-slate-400 border border-slate-700' };
+    }
+
+    const volByTime = new Map();
+    if (Array.isArray(volumes)) {
+      volumes.forEach((v) => {
+        if (v && v.time !== undefined) volByTime.set(v.time, Number(v.value));
+      });
+    }
+
+    const todHist = new Map();
+    const prevPosVols = [];
+    let hasPositiveVol = false;
+
+    for (let i = 0; i < candles.length; i++) {
+      const c = candles[i];
+      if (!c || c.time === undefined) continue;
+
+      let rvolVal = null;
+      if (typeof c.rvol_tod === 'number' && Number.isFinite(c.rvol_tod) && c.rvol_tod >= 0) {
+        rvolVal = c.rvol_tod;
+        if (rvolVal > 0) hasPositiveVol = true;
+      } else {
+        const rawV = volByTime.has(c.time) ? volByTime.get(c.time) : Number(c.volume);
+        if (Number.isFinite(rawV) && rawV > 0) {
+          hasPositiveVol = true;
+          let hmKey = null;
+          if (isIntraday) {
+            const sec = Number(c.time) > 1e11 ? Math.floor(Number(c.time) / 1000) : Number(c.time);
+            const dt = new Date(sec * 1000);
+            if (!isNaN(dt.getTime())) {
+              hmKey = `${dt.getUTCHours()}:${dt.getUTCMinutes()}`;
+            }
+          }
+          let denom = null;
+          if (hmKey && todHist.has(hmKey) && todHist.get(hmKey).length >= minS) {
+            const arr = todHist.get(hmKey);
+            denom = arr.reduce((a, b) => a + b, 0) / arr.length;
+          }
+          if ((!denom || denom <= 0) && prevPosVols.length > 0) {
+            const sl = prevPosVols.slice(-20);
+            denom = sl.reduce((a, b) => a + b, 0) / sl.length;
+          }
+          if (denom && denom > 0) {
+            const ratio = rawV / denom;
+            if (Number.isFinite(ratio) && ratio >= 0) {
+              rvolVal = Math.round(ratio * 100) / 100;
+            }
+          }
+          if (hmKey) {
+            if (!todHist.has(hmKey)) todHist.set(hmKey, []);
+            const arr = todHist.get(hmKey);
+            arr.push(rawV);
+            if (arr.length > maxS) arr.shift();
+          }
+          prevPosVols.push(rawV);
+        }
+      }
+
+      if (rvolVal !== null && Number.isFinite(rvolVal)) {
+        outMap.set(c.time, rvolVal);
+        outSeries.push({ time: c.time, value: rvolVal, color: getRvolBarColor(rvolVal) });
+      }
+    }
+
+    const lastVal = outSeries.length ? outSeries[outSeries.length - 1].value : null;
+    let statusText = '⚪ Volumen Normal (0.7–1.99x)';
+    let statusClass = 'bg-slate-800 text-sky-300 border border-sky-700/60';
+    if (!hasPositiveVol || lastVal === null) {
+      statusText = '🚫 Sin Volumen Real (FX/OTC)';
+      statusClass = 'bg-slate-800 text-slate-400 border border-slate-700';
+    } else if (lastVal >= 2.0) {
+      statusText = `🔥 RUPTURA INSTITUCIONAL (${lastVal.toFixed(2)}x ≥ 2.0x)`;
+      statusClass = 'bg-emerald-950 text-emerald-300 border border-emerald-500/70 font-bold';
+    } else if (lastVal < 0.7) {
+      statusText = `🧊 VOLUMEN SECO (${lastVal.toFixed(2)}x < 0.7x)`;
+      statusClass = 'bg-slate-900 text-slate-400 border border-slate-700';
+    }
+
+    return { series: outSeries, map: outMap, lastValue: lastVal, hasVolume: hasPositiveVol, statusText, statusClass };
+  }
+
   // Clasificador Cuantitativo de Velas Japonesas (Benchmark Thomas Bulkowski - 4.7M velas)
   function detectCandlePatternDetails(candle, prevCandle, prev2Candle, trendContext) {
     if (!candle || candle.high === undefined || candle.low === undefined || candle.open === undefined || candle.close === undefined) {
@@ -765,7 +863,8 @@
     getSymbol: () => 'BTCUSDT',
     hostChart: null,
     hostRsiChart: null,
-    hostAtrChart: null
+    hostAtrChart: null,
+    hostRvolChart: null
   };
 
   async function fetchTriadKlines(symbol, interval, limit) {
@@ -941,6 +1040,7 @@
     if (options.hostChart) HOST_STATE.hostChart = options.hostChart;
     if (options.hostRsiChart) HOST_STATE.hostRsiChart = options.hostRsiChart;
     if (options.hostAtrChart) HOST_STATE.hostAtrChart = options.hostAtrChart;
+    if (options.hostRvolChart) HOST_STATE.hostRvolChart = options.hostRvolChart;
 
     const singleWrapper = document.getElementById(options.singleWrapperId || 'kula-single-chart-wrapper');
     if (!singleWrapper || singleWrapper.dataset.kulaMounted === '1') return;
@@ -1197,6 +1297,7 @@
     if (HOST_STATE.hostChart) HOST_STATE.hostChart.applyOptions(opts);
     if (HOST_STATE.hostRsiChart) HOST_STATE.hostRsiChart.applyOptions(opts);
     if (HOST_STATE.hostAtrChart) HOST_STATE.hostAtrChart.applyOptions(opts);
+    if (HOST_STATE.hostRvolChart) HOST_STATE.hostRvolChart.applyOptions(opts);
     ['c1D', 'c1H', 'c5M'].forEach(k => {
       if (HOST_STATE.triadCharts[k]) HOST_STATE.triadCharts[k].applyOptions(opts);
     });
@@ -1220,6 +1321,8 @@
       calculateVWAP,
       calculateRSI,
       calculateATR,
+      calculateRvolTod,
+      getRvolBarColor,
       detectCandlePatternDetails
     },
     ensureCandlePatternModal,

@@ -364,6 +364,9 @@
       <button type="button" onclick="window.toggleAuxPanelFromToolbar && window.toggleAuxPanelFromToolbar('panelAtr')" id="btnTopAtr14" class="px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-amber-950/80 text-amber-300 border border-amber-500/40 shadow-sm" title="Mostrar/Ocultar Sub-Gráfico Volatilidad Real ATR (14)">
         <span>⚡</span> ATR (14)
       </button>
+      <button type="button" onclick="window.toggleAuxPanelFromToolbar && window.toggleAuxPanelFromToolbar('panelRvol')" id="btnTopRvol" class="px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-sm" title="Mostrar/Ocultar Sub-Gráfico RVOL (Volumen Relativo por Hora del Día)">
+        <span>📊</span> RVOL
+      </button>
       <button type="button" onclick="openLayersModal()" class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1 border border-slate-700 cursor-pointer" title="Configurar todas las capas visuales e indicadores del gráfico">
         <span>⚙️</span> Todas ▾
       </button>
@@ -1168,6 +1171,7 @@
             <button type="button" onclick="toggleChartLayer('ema')" id="btnHdrLayerEma1D" class="px-2 py-0.5 rounded text-[10px] font-bold transition bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-pointer" title="Activar/Desactivar EMA 50 Macro">EMA 50</button>
             <button type="button" onclick="window.openAuxForTf('1d', 'panelRsi')" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-950/80 hover:bg-purple-800 text-purple-300 border border-purple-500/40 cursor-pointer" title="Abrir gráfico RSI (14) para 1D">RSI</button>
             <button type="button" onclick="window.openAuxForTf('1d', 'panelAtr')" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-500/40 cursor-pointer" title="Abrir gráfico ATR (14) para 1D">ATR</button>
+            <button type="button" onclick="window.openAuxForTf('1d', 'panelRvol')" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 hover:bg-emerald-800 text-emerald-300 border border-emerald-500/40 cursor-pointer" title="Abrir gráfico RVOL para 1D">RVOL</button>
             <button onclick="fitZoom(chart1D, volChart1D)" class="text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 text-[10px] cursor-pointer" title="Restablecer encuadre y proporción TradingView">Zoom</button>
             <button onclick="toggleMaximizeChart('1d')" id="btnMax-1d" class="text-amber-300 hover:text-white px-2 py-0.5 rounded bg-amber-950/80 border border-amber-600/40 text-[10px] cursor-pointer font-bold whitespace-nowrap" title="Maximizar este gráfico a pantalla completa">⛶ Maximizar</button>
           </div>
@@ -1234,6 +1238,7 @@
               <button type="button" onclick="toggleChartLayer('ema')" id="btnHdrLayerEma1H" class="px-1.5 py-0.5 rounded font-bold transition bg-purple-500/20 text-purple-300 border border-purple-500/40 cursor-pointer" title="Activar/Desactivar EMA 20 Setup">EMA 20</button>
               <button type="button" onclick="window.openAuxForTf('1h', 'panelRsi')" class="px-1.5 py-0.5 rounded font-bold bg-purple-950/80 hover:bg-purple-800 text-purple-300 border border-purple-500/40 cursor-pointer" title="Abrir gráfico RSI (14) para 1H">RSI</button>
               <button type="button" onclick="window.openAuxForTf('1h', 'panelAtr')" class="px-1.5 py-0.5 rounded font-bold bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-500/40 cursor-pointer" title="Abrir gráfico ATR (14) para 1H">ATR</button>
+              <button type="button" onclick="window.openAuxForTf('1h', 'panelRvol')" class="px-1.5 py-0.5 rounded font-bold bg-emerald-950/80 hover:bg-emerald-800 text-emerald-300 border border-emerald-500/40 cursor-pointer" title="Abrir gráfico RVOL (por hora exacta) para 1H">RVOL</button>
               <button onclick="fitZoom(chart1H, volChart1H)" class="text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800 cursor-pointer" title="Restablecer encuadre y proporción TradingView">Zoom</button>
               <button onclick="toggleMaximizeChart('1h')" id="btnMax-1h" class="text-indigo-200 hover:text-white px-2 py-0.5 rounded bg-indigo-800/80 hover:bg-indigo-700 border border-indigo-400/60 cursor-pointer font-bold whitespace-nowrap shadow-sm shrink-0" title="Maximizar este gráfico a pantalla completa">⛶ Maximizar</button>
             </div>
@@ -1295,6 +1300,7 @@
               <button type="button" onclick="toggleChartLayer('vwap')" id="btnHdrLayerVwap" class="px-1.5 py-0.5 rounded font-bold transition bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 cursor-pointer" title="Activar/Desactivar VWAP de Sesión">VWAP</button>
               <button type="button" onclick="window.openAuxForTf('5m', 'panelRsi')" class="px-1.5 py-0.5 rounded font-bold bg-purple-950/80 hover:bg-purple-800 text-purple-300 border border-purple-500/40 cursor-pointer" title="Abrir gráfico RSI (14) para 5M">RSI</button>
               <button type="button" onclick="window.openAuxForTf('5m', 'panelAtr')" class="px-1.5 py-0.5 rounded font-bold bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-500/40 cursor-pointer" title="Abrir gráfico ATR (14) para 5M">ATR</button>
+              <button type="button" onclick="window.openAuxForTf('5m', 'panelRvol')" class="px-1.5 py-0.5 rounded font-bold bg-emerald-950/80 hover:bg-emerald-800 text-emerald-300 border border-emerald-500/40 cursor-pointer" title="Abrir gráfico RVOL (por hora exacta) para 5M">RVOL</button>
               <button onclick="fitZoom(chart5M, volChart5M)" class="text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800 cursor-pointer" title="Restaurar encuadre y proporción TradingView">Zoom</button>
               <button onclick="toggleMaximizeChart('5m')" id="btnMax-5m" class="text-emerald-200 hover:text-white px-2 py-0.5 rounded bg-emerald-800/80 hover:bg-emerald-700 border border-emerald-400/60 cursor-pointer font-bold whitespace-nowrap shadow-sm shrink-0" title="Maximizar este gráfico a pantalla completa">⛶ Maximizar</button>
             </div>
@@ -1363,6 +1369,10 @@
               <input type="checkbox" id="chkPanelAtr" onchange="window.toggleAuxPanel('panelAtr', this.checked)" class="rounded bg-slate-950 border-amber-500/60 text-amber-500 focus:ring-0 cursor-pointer">
               <span>⚡ ATR (14)</span>
             </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-emerald-300 hover:text-emerald-200 select-none" title="Volumen Relativo por Hora Exacta del Día (5–10 sesiones previas)">
+              <input type="checkbox" id="chkPanelRvol" onchange="window.toggleAuxPanel('panelRvol', this.checked)" class="rounded bg-slate-950 border-emerald-500/60 text-emerald-500 focus:ring-0 cursor-pointer">
+              <span>📊 RVOL</span>
+            </label>
             <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-300 hover:text-white select-none">
               <input type="checkbox" id="chkPanelGuide" onchange="window.toggleAuxPanel('panelGuide', this.checked)" class="rounded bg-slate-950 border-slate-600 text-cyan-500 focus:ring-0 cursor-pointer">
               <span>📖 Guía Rápida</span>
@@ -1402,6 +1412,23 @@
             </div>
           </div>
           <div id="atr-chart-container" style="width: 100%; height: 105px; position: relative;"></div>
+        </div>
+
+        <!-- SUB-PANEL 2B: RVOL (VOLUMEN RELATIVO POR HORA DEL DÍA) -->
+        <div id="panelRvol" class="hidden bg-slate-900/95 rounded-xl border border-emerald-500/40 p-2.5 shadow-lg">
+          <div class="flex flex-wrap justify-between items-center mb-1.5 px-1 gap-2">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span class="text-xs font-bold text-emerald-300 uppercase tracking-wider">RVOL · Volumen Relativo por Hora Exacta [<span id="rvolTargetTfLabel">5M</span>]</span>
+              <span id="rvolStatusBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-sky-300 border border-sky-700/60">⚪ Normal</span>
+            </div>
+            <div class="flex items-center space-x-3 text-[11px] font-mono">
+              <span class="text-slate-400">Normal: 1.0x</span>
+              <span class="text-emerald-400 font-semibold">Institucional: ≥ 2.0x</span>
+              <span class="text-emerald-300 font-bold ml-1">RVOL: <span id="rvolLiveValue" class="text-white text-sm font-semibold">--x</span></span>
+            </div>
+          </div>
+          <div id="rvol-chart-container" style="width: 100%; height: 105px; position: relative;"></div>
         </div>
 
         <!-- SUB-PANEL 3: GUÍA RÁPIDA DE INDICADORES Y FÓRMULAS -->
@@ -3460,6 +3487,7 @@
     let volChart5M, volMa5M, sma5M, ema5M;
     let rsiChart, rsiSeries, rsiLine70, rsiLine50, rsiLine30;
     let atrChart, atrSeries;
+    let rvolChart, rvolSeries;
     let currentAuxTargetTf = '5m';
     let isSma20LayerVisible = true;
 
@@ -3533,6 +3561,47 @@
         atrSeries = atrChart.addLineSeries({ color: '#f59e0b', lineWidth: 2, title: 'ATR 14' });
       }
 
+      const rvolContainer = document.getElementById('rvol-chart-container');
+      if (rvolContainer) {
+        rvolChart = LightweightCharts.createChart(rvolContainer, Object.assign({}, chartThemeOptions, {
+          rightPriceScale: { borderColor: '#e0e3eb', scaleMargins: { top: 0.15, bottom: 0.05 }, minimumWidth: 68 }
+        }));
+        rvolSeries = rvolChart.addHistogramSeries({
+          color: 'rgba(56, 189, 248, 0.55)',
+          priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+          priceLineVisible: false,
+          lastValueVisible: true,
+        });
+        rvolSeries.createPriceLine({
+          price: 1.0,
+          color: '#94a3b8',
+          lineWidth: 1,
+          lineStyle: LightweightCharts.LineStyle.Dotted,
+          axisLabelVisible: true,
+          title: '1.0x',
+        });
+        rvolSeries.createPriceLine({
+          price: 2.0,
+          color: '#10b981',
+          lineWidth: 1.5,
+          lineStyle: LightweightCharts.LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: '2.0x',
+        });
+        rvolChart.subscribeCrosshairMove(param => {
+          const liveEl = document.getElementById('rvolLiveValue');
+          if (!liveEl) return;
+          if (!param || !param.time || !param.seriesData) {
+            if (typeof window._lastAuxRvolVal === 'number') liveEl.innerText = `${window._lastAuxRvolVal.toFixed(2)}x`;
+            return;
+          }
+          const pt = param.seriesData.get(rvolSeries);
+          if (pt && typeof pt.value === 'number' && Number.isFinite(pt.value)) {
+            liveEl.innerText = `${pt.value.toFixed(2)}x`;
+          }
+        });
+      }
+
       // Vincular instancias globales y con CockpitEngine
       window.chart1D = chart1D;
       window.volChart1D = volChart1D;
@@ -3559,6 +3628,7 @@
       window.ema1H = ema1H;
       window.rsiChart = rsiChart;
       window.atrChart = atrChart;
+      window.rvolChart = rvolChart;
       window.fitZoom = fitZoom;
 
       window.toggleSmaLayer = function() {
@@ -3629,13 +3699,14 @@
             if (entry.target === volContainer5M && volChart5M) volChart5M.resize(width, height);
             if (entry.target === rsiContainer && rsiChart) rsiChart.resize(width, height);
             if (entry.target === atrContainer && atrChart) atrChart.resize(width, height);
+            if (entry.target === rvolContainer && rvolChart) rvolChart.resize(width, height);
           }
         }
         if (window.TriadaOverlayEngine && typeof window.TriadaOverlayEngine.redrawBands === 'function') {
           window.TriadaOverlayEngine.redrawBands();
         }
       });
-      [container1D, volContainer1D, container1H, volContainer1H, container5M, volContainer5M, rsiContainer, atrContainer].forEach(c => {
+      [container1D, volContainer1D, container1H, volContainer1H, container5M, volContainer5M, rsiContainer, atrContainer, rvolContainer].forEach(c => {
         if (c) resizeObserver.observe(c);
       });
     }
@@ -3700,7 +3771,7 @@
       panel.classList.toggle('hidden', !isChecked);
 
       // Sincronizar checkboxes y botones de la barra superior
-      const chkMap = { panelRsi: 'chkPanelRsi', panelAtr: 'chkPanelAtr', panelGuide: 'chkPanelGuide' };
+      const chkMap = { panelRsi: 'chkPanelRsi', panelAtr: 'chkPanelAtr', panelRvol: 'chkPanelRvol', panelGuide: 'chkPanelGuide' };
       const chk = document.getElementById(chkMap[panelId]);
       if (chk && chk.checked !== isChecked) chk.checked = isChecked;
 
@@ -3717,6 +3788,13 @@
           btnTop.className = isChecked
             ? "px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-amber-500/30 text-amber-200 border border-amber-400 shadow-sm"
             : "px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-amber-950/80 text-amber-300 border border-amber-500/40 shadow-sm";
+        }
+      } else if (panelId === 'panelRvol') {
+        const btnTop = document.getElementById('btnTopRvol');
+        if (btnTop) {
+          btnTop.className = isChecked
+            ? "px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-emerald-500/30 text-emerald-200 border border-emerald-400 shadow-sm"
+            : "px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-sm";
         }
       }
 
@@ -3737,8 +3815,10 @@
         setTimeout(() => {
           const rc = document.getElementById('rsi-chart-container');
           const ac = document.getElementById('atr-chart-container');
+          const vc = document.getElementById('rvol-chart-container');
           if (rc && rsiChart && rc.clientWidth > 0) rsiChart.resize(rc.clientWidth, rc.clientHeight || 120);
           if (ac && atrChart && ac.clientWidth > 0) atrChart.resize(ac.clientWidth, ac.clientHeight || 105);
+          if (vc && rvolChart && vc.clientWidth > 0) rvolChart.resize(vc.clientWidth, vc.clientHeight || 105);
         }, 60);
       }
     };
@@ -3773,20 +3853,28 @@
     window.updateAuxRsiAtrCharts = function() {
       if (!window.KulaChartEngine || !window.KulaChartEngine.formulas) return;
       let candles = window._lastTrigger;
-      let tfLabel = (currentTriggerTf || '5m').toUpperCase();
+      let volumes = window._lastTriggerVolumes;
+      let tfCode = (currentTriggerTf || '5m').toLowerCase();
+      let tfLabel = tfCode.toUpperCase();
       if (currentAuxTargetTf === '1h') {
         candles = window._last1H;
-        tfLabel = (currentChart2Tf || '1h').toUpperCase();
+        volumes = window._last1HVolumes;
+        tfCode = (currentChart2Tf || '1h').toLowerCase();
+        tfLabel = tfCode.toUpperCase();
       } else if (currentAuxTargetTf === '1d') {
         candles = window._last1D;
-        tfLabel = (currentChart1Tf || '1d').toUpperCase();
+        volumes = window._last1DVolumes;
+        tfCode = (currentChart1Tf || '1d').toLowerCase();
+        tfLabel = tfCode.toUpperCase();
       }
       if (!candles || !candles.length) return;
 
       const rsiLbl = document.getElementById('rsiTargetTfLabel');
       const atrLbl = document.getElementById('atrTargetTfLabel');
+      const rvolLbl = document.getElementById('rvolTargetTfLabel');
       if (rsiLbl) rsiLbl.innerText = tfLabel;
       if (atrLbl) atrLbl.innerText = tfLabel;
+      if (rvolLbl) rvolLbl.innerText = tfLabel;
 
       const rsiRes = window.KulaChartEngine.formulas.calculateRSI(candles, 14);
       if (rsiSeries && rsiRes.series.length) {
@@ -3817,6 +3905,24 @@
       if (atrBadgeEl) {
         atrBadgeEl.innerText = atrRes.statusText;
         atrBadgeEl.className = `text-[10px] font-mono px-2 py-0.5 rounded ${atrRes.statusClass}`;
+      }
+
+      if (typeof window.KulaChartEngine.formulas.calculateRvolTod === 'function') {
+        const rvolRes = window.KulaChartEngine.formulas.calculateRvolTod(candles, volumes, tfCode);
+        window._lastAuxRvolVal = rvolRes.lastValue;
+        if (rvolSeries) {
+          rvolSeries.setData(rvolRes.series || []);
+          if (rvolRes.series && rvolRes.series.length) {
+            applyTradingViewProportions(rvolChart, null, candles);
+          }
+        }
+        const rvolLiveEl = document.getElementById('rvolLiveValue');
+        const rvolBadgeEl = document.getElementById('rvolStatusBadge');
+        if (rvolLiveEl) rvolLiveEl.innerText = (typeof rvolRes.lastValue === 'number') ? `${rvolRes.lastValue.toFixed(2)}x` : '--x';
+        if (rvolBadgeEl) {
+          rvolBadgeEl.innerText = rvolRes.statusText;
+          rvolBadgeEl.className = `text-[10px] font-mono px-2 py-0.5 rounded ${rvolRes.statusClass}`;
+        }
       }
     };
 
