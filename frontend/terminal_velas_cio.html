@@ -11,7 +11,7 @@
   <!-- TradingView Lightweight Charts -->
   <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
   <!-- Motor Gráfico y Fórmulas Cuantitativas Centralizadas de Kula Balam -->
-  <script src="kula-chart-engine.js"></script>
+  <script src="kula-chart-engine.js?v=20261123_volrvol"></script>
   <style>
     body {
       background-color: #06090e;
@@ -230,18 +230,23 @@
             <span id="hud-sma" class="text-blue-400 font-semibold">SMA 20: --</span>
             <span id="hud-vwap" class="text-amber-400 font-semibold">VWAP: --</span>
             <span id="hud-bands" class="text-amber-600">Bandas: -- / --</span>
+            <span id="hud-vol" class="text-teal-300 font-semibold">Vol: --</span>
             <span id="hud-rvol" class="text-emerald-400 font-semibold">RVOL: --x</span>
-            <label class="inline-flex items-center gap-1 cursor-pointer text-purple-300 font-bold ml-1">
+            <label class="inline-flex items-center gap-1 cursor-pointer text-teal-300 font-bold ml-1" title="Histograma de Volumen por dirección de vela">
+              <input type="checkbox" id="chkCioPanelVol" onchange="document.getElementById('cio-panel-vol').classList.toggle('hidden', !this.checked); setTimeout(() => { if (volChart && volContainer && volContainer.clientWidth > 0) volChart.applyOptions({ width: volContainer.clientWidth }); }, 50);" class="rounded bg-slate-950 border-teal-500/60 text-teal-500 cursor-pointer">
+              <span>Volumen</span>
+            </label>
+            <label class="inline-flex items-center gap-1 cursor-pointer text-emerald-300 font-bold" title="Volumen Relativo bipolar respecto a 1.0x (verde arriba ≥1.0x / rojo abajo <1.0x)">
+              <input type="checkbox" id="chkCioPanelRvol" onchange="document.getElementById('cio-panel-rvol').classList.toggle('hidden', !this.checked); setTimeout(() => { if (rvolChart && rvolContainer && rvolContainer.clientWidth > 0) rvolChart.applyOptions({ width: rvolContainer.clientWidth }); }, 50);" class="rounded bg-slate-950 border-emerald-500/60 text-emerald-500 cursor-pointer">
+              <span>RVOL</span>
+            </label>
+            <label class="inline-flex items-center gap-1 cursor-pointer text-purple-300 font-bold">
               <input type="checkbox" checked onchange="document.getElementById('cio-panel-rsi').classList.toggle('hidden', !this.checked)" class="rounded bg-slate-950 border-purple-500/60 text-purple-500 cursor-pointer">
               <span>RSI(14)</span>
             </label>
             <label class="inline-flex items-center gap-1 cursor-pointer text-amber-300 font-bold">
               <input type="checkbox" checked onchange="document.getElementById('cio-panel-atr').classList.toggle('hidden', !this.checked)" class="rounded bg-slate-950 border-amber-500/60 text-amber-500 cursor-pointer">
               <span>ATR(14)</span>
-            </label>
-            <label class="inline-flex items-center gap-1 cursor-pointer text-emerald-300 font-bold" title="Volumen Relativo por Hora Exacta (5–10 sesiones previas)">
-              <input type="checkbox" id="chkCioPanelRvol" onchange="document.getElementById('cio-panel-rvol').classList.toggle('hidden', !this.checked); setTimeout(() => { if (rvolChart && rvolContainer && rvolContainer.clientWidth > 0) rvolChart.applyOptions({ width: rvolContainer.clientWidth }); }, 50);" class="rounded bg-slate-950 border-emerald-500/60 text-emerald-500 cursor-pointer">
-              <span>RVOL</span>
             </label>
           </div>
 
@@ -258,6 +263,39 @@
               <button onclick="selectQuickQuadrant(20)" class="px-1.5 py-0.2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition">20V</button>
             </div>
           </div>
+        </div>
+
+        <!-- SUB-PANEL VOLUMEN (ARRIBA DE RVOL, IGUAL QUE EN LA REFERENCIA VISUAL) -->
+        <div id="cio-panel-vol" class="hidden bg-[#06090e] rounded-lg border border-teal-500/30 p-1.5 shadow-inner space-y-1">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-teal-400"></span>
+              <span class="text-[10px] font-bold text-teal-300 uppercase tracking-wide">Volumen · Barras por Dirección</span>
+            </div>
+            <div class="flex items-center gap-2 text-[10px] font-mono">
+              <span class="text-teal-400 text-[9px]">● Alcista</span>
+              <span class="text-rose-400 text-[9px]">● Bajista</span>
+              <span class="text-teal-300 font-bold ml-1">Vol: <span id="volLiveValue" class="text-white font-bold">--</span></span>
+            </div>
+          </div>
+          <div id="vol-chart-container" class="relative w-full h-[58px] rounded overflow-hidden"></div>
+        </div>
+
+        <!-- SUB-PANEL RVOL BIPOLAR (VERDE ARRIBA >= 1.0x / ROJO ABAJO < 1.0x) -->
+        <div id="cio-panel-rvol" class="hidden bg-[#06090e] rounded-lg border border-emerald-500/30 p-1.5 shadow-inner space-y-1">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="text-[10px] font-bold text-emerald-300 uppercase tracking-wide">RVOL · Volumen Relativo (Base 1.0x)</span>
+              <span id="rvolStatusBadge" class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-sky-300 border border-sky-500/40">⚪ NORMAL</span>
+            </div>
+            <div class="flex items-center gap-2 text-[10px] font-mono">
+              <span class="text-rose-400 text-[9px]">&lt;1.0x</span>
+              <span class="text-emerald-400 text-[9px]">≥1.0x · ≥2.0x</span>
+              <span class="text-emerald-300 font-bold ml-1">RVOL: <span id="rvolLiveValue" class="text-white font-bold">--x</span></span>
+            </div>
+          </div>
+          <div id="rvol-chart-container" class="relative w-full h-[58px] rounded overflow-hidden"></div>
         </div>
 
         <!-- SUB-PANEL 1: OSCILADOR RSI (14) -->
@@ -291,22 +329,6 @@
             </div>
           </div>
           <div id="atr-chart-container" class="relative w-full h-[52px] rounded overflow-hidden"></div>
-        </div>
-
-        <!-- SUB-PANEL 3: RVOL (VOLUMEN RELATIVO POR HORA EXACTA) -->
-        <div id="cio-panel-rvol" class="hidden bg-[#06090e] rounded-lg border border-emerald-500/30 p-1.5 shadow-inner space-y-1">
-          <div class="flex items-center justify-between px-1">
-            <div class="flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span class="text-[10px] font-bold text-emerald-300 uppercase tracking-wide">RVOL · Volumen Relativo por Hora</span>
-              <span id="rvolStatusBadge" class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-sky-300 border border-sky-500/40">⚪ NORMAL</span>
-            </div>
-            <div class="flex items-center gap-2 text-[10px] font-mono">
-              <span class="text-slate-400 text-[9px]">Normal: 1.0x · Ruptura: ≥2.0x</span>
-              <span class="text-emerald-300 font-bold ml-1">RVOL: <span id="rvolLiveValue" class="text-white font-bold">--x</span></span>
-            </div>
-          </div>
-          <div id="rvol-chart-container" class="relative w-full h-[58px] rounded overflow-hidden"></div>
         </div>
 
       </div>
@@ -497,11 +519,13 @@
     let chart, candleSeries, smaSeries, vwapSeries, vwapUpperSeries, vwapLowerSeries;
     let rsiChart, rsiSeries;
     let atrChart, atrSeries;
+    let volChart, volSeries;
     let rvolChart, rvolSeries;
 
     let chartContainer = document.getElementById('chart-container');
     let rsiContainer = document.getElementById('rsi-chart-container');
     let atrContainer = document.getElementById('atr-chart-container');
+    let volContainer = document.getElementById('vol-chart-container');
     let rvolContainer = document.getElementById('rvol-chart-container');
 
     let assistantActive = true;
@@ -512,6 +536,7 @@
     let marketCandles = [];
     let rsiValues = [];
     let atrValues = [];
+    let volValues = [];
     let rvolValues = [];
     let activeCandle = null;
 
@@ -657,7 +682,24 @@
         lastValueVisible: true,
       });
 
-      // 4. Sub-Gráfico RVOL (Volumen Relativo por Hora Exacta)
+      // 4A. Sub-Gráfico Volumen
+      if (volContainer) {
+        volContainer.innerHTML = '';
+        volChart = LightweightCharts.createChart(volContainer, {
+          layout: { background: { color: '#06090e' }, textColor: '#94a3b8', fontSize: 9, fontFamily: 'monospace' },
+          grid: { vertLines: { color: 'rgba(30, 41, 59, 0.2)' }, horzLines: { color: 'rgba(30, 41, 59, 0.2)' } },
+          rightPriceScale: { borderColor: '#1e293b', scaleMargins: { top: 0.12, bottom: 0.02 } },
+          timeScale: { borderColor: '#1e293b', timeVisible: true, visible: false },
+        });
+        volSeries = volChart.addHistogramSeries({
+          color: 'rgba(38, 166, 154, 0.72)',
+          priceFormat: { type: 'volume' },
+          priceLineVisible: false,
+          lastValueVisible: true,
+        });
+      }
+
+      // 4B. Sub-Gráfico RVOL Bipolar (Verde >= 1.0x / Rojo < 1.0x)
       if (rvolContainer) {
         rvolContainer.innerHTML = '';
         rvolChart = LightweightCharts.createChart(rvolContainer, {
@@ -673,7 +715,7 @@
           },
           rightPriceScale: {
             borderColor: '#1e293b',
-            scaleMargins: { top: 0.15, bottom: 0.05 },
+            scaleMargins: { top: 0.12, bottom: 0.10 },
           },
           timeScale: {
             borderColor: '#1e293b',
@@ -682,7 +724,8 @@
           },
         });
         rvolSeries = rvolChart.addHistogramSeries({
-          color: 'rgba(56, 189, 248, 0.55)',
+          base: 1.0,
+          color: 'rgba(74, 222, 128, 0.58)',
           priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
           priceLineVisible: false,
           lastValueVisible: true,
@@ -692,7 +735,7 @@
       }
 
       // Sincronizar escalas de tiempo
-      const auxList = [rsiChart, atrChart, rvolChart].filter(Boolean);
+      const auxList = [volChart, rvolChart, rsiChart, atrChart].filter(Boolean);
       syncTimeScales(chart, auxList);
       auxList.forEach(src => syncTimeScales(src, [chart, ...auxList.filter(t => t !== src)]));
 
@@ -704,6 +747,7 @@
           hostChart: chart,
           hostRsiChart: rsiChart,
           hostAtrChart: atrChart,
+          hostVolChart: volChart,
           hostRvolChart: rvolChart,
           getSymbol: () => (typeof currentAsset !== 'undefined' ? currentAsset : 'BTCUSDT')
         });
@@ -728,6 +772,7 @@
         if (chart && chartContainer) chart.applyOptions({ width: chartContainer.clientWidth });
         if (rsiChart && rsiContainer) rsiChart.applyOptions({ width: rsiContainer.clientWidth });
         if (atrChart && atrContainer) atrChart.applyOptions({ width: atrContainer.clientWidth });
+        if (volChart && volContainer) volChart.applyOptions({ width: volContainer.clientWidth });
         if (rvolChart && rvolContainer) rvolChart.applyOptions({ width: rvolContainer.clientWidth });
       });
     }
@@ -929,9 +974,15 @@
       vwapUpperSeries.setData(vwapUpper);
       vwapLowerSeries.setData(vwapLower);
 
-      // Calcular y Cargar RSI, ATR y RVOL por hora exacta
+      // Calcular y Cargar Volumen, RVOL, RSI y ATR
       rsiValues = calculateRSI(marketCandles, 14);
       atrValues = calculateATR(marketCandles, 14);
+      const volColorFn = (window.KulaChartEngine && window.KulaChartEngine.formulas && typeof window.KulaChartEngine.formulas.getVolumeBarColor === 'function')
+        ? window.KulaChartEngine.formulas.getVolumeBarColor
+        : (c => (c.close >= c.open ? 'rgba(38, 166, 154, 0.72)' : 'rgba(239, 83, 80, 0.72)'));
+      volValues = marketCandles
+        .filter(c => typeof c.volume === 'number' && Number.isFinite(c.volume) && c.volume > 0)
+        .map(c => ({ time: c.time, value: c.volume, color: volColorFn(c) }));
       const rvolRes = (window.KulaChartEngine && window.KulaChartEngine.formulas && typeof window.KulaChartEngine.formulas.calculateRvolTod === 'function')
         ? window.KulaChartEngine.formulas.calculateRvolTod(marketCandles, null, currentTf)
         : { series: [] };
@@ -939,6 +990,7 @@
 
       if (rsiSeries && rsiValues.length > 0) rsiSeries.setData(rsiValues);
       if (atrSeries && atrValues.length > 0) atrSeries.setData(atrValues);
+      if (volSeries) volSeries.setData(volValues);
       if (rvolSeries) rvolSeries.setData(rvolValues);
 
       chart.timeScale().fitContent();
@@ -1180,7 +1232,19 @@
     function updateIndicatorsBadges(time) {
       const rsiItem = rsiValues.find(r => r.time === time) || rsiValues[rsiValues.length - 1];
       const atrItem = atrValues.find(a => a.time === time) || atrValues[atrValues.length - 1];
+      const volItem = volValues.find(v => v.time === time) || volValues[volValues.length - 1];
       const rvolItem = rvolValues.find(v => v.time === time) || rvolValues[rvolValues.length - 1];
+      const hudVol = document.getElementById('hud-vol');
+      const volLive = document.getElementById('volLiveValue');
+      if (volItem && typeof volItem.value === 'number' && Number.isFinite(volItem.value)) {
+        const vv = volItem.value;
+        const fmt = vv >= 1e6 ? `${(vv / 1e6).toFixed(2)}M` : (vv >= 1e3 ? `${(vv / 1e3).toFixed(2)}K` : vv.toFixed(2));
+        if (hudVol) hudVol.innerText = `Vol: ${fmt}`;
+        if (volLive) volLive.innerText = fmt;
+      } else {
+        if (hudVol) hudVol.innerText = 'Vol: --';
+        if (volLive) volLive.innerText = '--';
+      }
       const hudRvol = document.getElementById('hud-rvol');
       const rvolLive = document.getElementById('rvolLiveValue');
       const rvolBadge = document.getElementById('rvolStatusBadge');
@@ -1192,12 +1256,12 @@
           if (rv >= 2.0) {
             rvolBadge.innerText = `🔥 RUPTURA (${rv.toFixed(2)}x)`;
             rvolBadge.className = 'text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-500 font-bold';
-          } else if (rv < 0.7) {
-            rvolBadge.innerText = `🧊 SECO (${rv.toFixed(2)}x)`;
-            rvolBadge.className = 'text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-900 text-slate-400 border border-slate-700';
+          } else if (rv < 1.0) {
+            rvolBadge.innerText = `🔻 BAJO MEDIA (${rv.toFixed(2)}x)`;
+            rvolBadge.className = 'text-[9px] font-mono px-1.5 py-0.2 rounded bg-rose-950/60 text-rose-300 border border-rose-700/60';
           } else {
-            rvolBadge.innerText = `⚪ NORMAL (${rv.toFixed(2)}x)`;
-            rvolBadge.className = 'text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-sky-300 border border-sky-500/40';
+            rvolBadge.innerText = `🟢 SOBRE MEDIA (${rv.toFixed(2)}x)`;
+            rvolBadge.className = 'text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/50 text-emerald-300 border border-emerald-700/60';
           }
         }
       } else {

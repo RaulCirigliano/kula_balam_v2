@@ -336,12 +336,18 @@
     return { series, lastValue: lastVal, noise15x, statusText, statusClass };
   }
 
+  function getVolumeBarColor(candle) {
+    if (!candle) return 'rgba(38, 166, 154, 0.72)';
+    return Number(candle.close) >= Number(candle.open)
+      ? 'rgba(38, 166, 154, 0.72)'
+      : 'rgba(239, 83, 80, 0.72)';
+  }
+
   function getRvolBarColor(val) {
     const v = Number(val);
-    if (!Number.isFinite(v) || v < 0.7) return 'rgba(100, 116, 139, 0.38)';
-    if (v >= 3.0) return 'rgba(251, 191, 36, 0.92)';
-    if (v >= 2.0) return 'rgba(16, 185, 129, 0.90)';
-    return 'rgba(56, 189, 248, 0.55)';
+    if (!Number.isFinite(v) || v < 1.0) return 'rgba(248, 113, 113, 0.55)';
+    if (v >= 2.0) return 'rgba(16, 185, 129, 0.92)';
+    return 'rgba(74, 222, 128, 0.58)';
   }
 
   function calculateRvolTod(candles, volumes, timeframe, maxSessions, minSamples) {
@@ -864,6 +870,7 @@
     hostChart: null,
     hostRsiChart: null,
     hostAtrChart: null,
+    hostVolChart: null,
     hostRvolChart: null
   };
 
@@ -1040,6 +1047,7 @@
     if (options.hostChart) HOST_STATE.hostChart = options.hostChart;
     if (options.hostRsiChart) HOST_STATE.hostRsiChart = options.hostRsiChart;
     if (options.hostAtrChart) HOST_STATE.hostAtrChart = options.hostAtrChart;
+    if (options.hostVolChart) HOST_STATE.hostVolChart = options.hostVolChart;
     if (options.hostRvolChart) HOST_STATE.hostRvolChart = options.hostRvolChart;
 
     const singleWrapper = document.getElementById(options.singleWrapperId || 'kula-single-chart-wrapper');
@@ -1297,6 +1305,7 @@
     if (HOST_STATE.hostChart) HOST_STATE.hostChart.applyOptions(opts);
     if (HOST_STATE.hostRsiChart) HOST_STATE.hostRsiChart.applyOptions(opts);
     if (HOST_STATE.hostAtrChart) HOST_STATE.hostAtrChart.applyOptions(opts);
+    if (HOST_STATE.hostVolChart) HOST_STATE.hostVolChart.applyOptions(opts);
     if (HOST_STATE.hostRvolChart) HOST_STATE.hostRvolChart.applyOptions(opts);
     ['c1D', 'c1H', 'c5M'].forEach(k => {
       if (HOST_STATE.triadCharts[k]) HOST_STATE.triadCharts[k].applyOptions(opts);
@@ -1323,6 +1332,7 @@
       calculateATR,
       calculateRvolTod,
       getRvolBarColor,
+      getVolumeBarColor,
       detectCandlePatternDetails
     },
     ensureCandlePatternModal,

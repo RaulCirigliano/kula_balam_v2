@@ -989,7 +989,36 @@ if (atrContainer && typeof LightweightCharts !== 'undefined') {
     });
 }
 
-// --- SUB-GRÁFICO 3: RVOL (VOLUMEN RELATIVO POR HORA DEL DÍA) ---
+// --- SUB-GRÁFICO VOLUMEN (BARRAS POR DIRECCIÓN DE VELA) ---
+const volContainer = document.getElementById('vol-chart-container');
+let volChart = null;
+let volSeries = null;
+
+if (volContainer && typeof LightweightCharts !== 'undefined') {
+    volChart = LightweightCharts.createChart(volContainer, {
+        ...chartOptions,
+        width: volContainer.clientWidth || chartContainer.clientWidth,
+        height: 110,
+        rightPriceScale: {
+            borderColor: 'rgba(55, 65, 81, 1)',
+            scaleMargins: { top: 0.12, bottom: 0.02 },
+        },
+        timeScale: {
+            borderColor: 'rgba(55, 65, 81, 1)',
+            timeVisible: true,
+            visible: false,
+        },
+    });
+
+    volSeries = volChart.addHistogramSeries({
+        color: 'rgba(38, 166, 154, 0.72)',
+        priceFormat: { type: 'volume' },
+        priceLineVisible: false,
+        lastValueVisible: true,
+    });
+}
+
+// --- SUB-GRÁFICO 3: RVOL BIPOLAR (VERDE ARRIBA >= 1.0x / ROJO ABAJO < 1.0x) ---
 const rvolContainer = document.getElementById('rvol-chart-container');
 let rvolChart = null;
 let rvolSeries = null;
@@ -999,10 +1028,10 @@ if (rvolContainer && typeof LightweightCharts !== 'undefined') {
     rvolChart = LightweightCharts.createChart(rvolContainer, {
         ...chartOptions,
         width: rvolContainer.clientWidth || chartContainer.clientWidth,
-        height: 110,
+        height: 115,
         rightPriceScale: {
             borderColor: 'rgba(55, 65, 81, 1)',
-            scaleMargins: { top: 0.15, bottom: 0.05 },
+            scaleMargins: { top: 0.12, bottom: 0.10 },
         },
         timeScale: {
             borderColor: 'rgba(55, 65, 81, 1)',
@@ -1012,7 +1041,8 @@ if (rvolContainer && typeof LightweightCharts !== 'undefined') {
     });
 
     rvolSeries = rvolChart.addHistogramSeries({
-        color: 'rgba(56, 189, 248, 0.55)',
+        base: 1.0,
+        color: 'rgba(74, 222, 128, 0.58)',
         priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
         priceLineVisible: false,
         lastValueVisible: true,
@@ -1054,7 +1084,7 @@ function syncTimeScales(source, targets) {
 }
 
 if (chart) {
-    const auxCharts = [rsiChart, atrChart, rvolChart].filter(Boolean);
+    const auxCharts = [volChart, rvolChart, rsiChart, atrChart].filter(Boolean);
     syncTimeScales(chart, auxCharts);
     auxCharts.forEach((src) => {
         syncTimeScales(src, [chart, ...auxCharts.filter((t) => t !== src)]);
@@ -1069,6 +1099,7 @@ if (window.KulaChartEngine) {
         hostChart: chart,
         hostRsiChart: rsiChart,
         hostAtrChart: atrChart,
+        hostVolChart: volChart,
         hostRvolChart: rvolChart,
         getSymbol: () => (typeof currentSymbol !== 'undefined' ? currentSymbol : 'BTCUSDT')
     });
@@ -1137,6 +1168,25 @@ window.updateAtrBadge = function(val, price) {
     }
 };
 
+window.updateVolBadge = function(val, isBull) {
+    const el = document.getElementById('volLiveValue');
+    const legEl = document.getElementById('legend-vol');
+    const hasNum = typeof val === 'number' && Number.isFinite(val) && val > 0;
+    let formatted = '--';
+    if (hasNum) {
+        if (val >= 1e6) formatted = `${(val / 1e6).toFixed(2)}M`;
+        else if (val >= 1e3) formatted = `${(val / 1e3).toFixed(2)}K`;
+        else formatted = val.toFixed(2);
+    }
+    if (el) el.innerText = formatted;
+    if (legEl) {
+        legEl.textContent = `Vol: ${formatted}`;
+        legEl.className = hasNum
+            ? (isBull ? 'text-teal-300 font-semibold shrink-0' : 'text-rose-400 font-semibold shrink-0')
+            : 'text-slate-400 font-semibold shrink-0';
+    }
+};
+
 window.updateRvolBadge = function(val) {
     const el = document.getElementById('rvolLiveValue');
     const badge = document.getElementById('rvolStatusBadge');
@@ -1150,12 +1200,12 @@ window.updateRvolBadge = function(val) {
         } else if (val >= 2.0) {
             legEl.textContent = `RVOL: ${val.toFixed(2)}x`;
             legEl.className = 'text-emerald-400 font-bold shrink-0';
-        } else if (val < 0.7) {
+        } else if (val < 1.0) {
             legEl.textContent = `RVOL: ${val.toFixed(2)}x`;
-            legEl.className = 'text-slate-400 font-semibold shrink-0';
+            legEl.className = 'text-rose-400 font-semibold shrink-0';
         } else {
             legEl.textContent = `RVOL: ${val.toFixed(2)}x`;
-            legEl.className = 'text-sky-300 font-semibold shrink-0';
+            legEl.className = 'text-emerald-300 font-semibold shrink-0';
         }
     }
     if (badge) {
@@ -1165,12 +1215,12 @@ window.updateRvolBadge = function(val) {
         } else if (val >= 2.0) {
             badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500 font-bold';
             badge.innerText = `🔥 RUPTURA INSTITUCIONAL (${val.toFixed(2)}x ≥ 2.0x)`;
-        } else if (val < 0.7) {
-            badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-700';
-            badge.innerText = `🧊 VOLUMEN SECO (${val.toFixed(2)}x < 0.7x)`;
+        } else if (val < 1.0) {
+            badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-700/60';
+            badge.innerText = `🔻 BAJO MEDIA (${val.toFixed(2)}x < 1.0x)`;
         } else {
-            badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-gray-800 text-sky-300 border border-gray-700';
-            badge.innerText = `⚪ NORMAL (${val.toFixed(2)}x)`;
+            badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/50 text-emerald-300 border border-emerald-700/60';
+            badge.innerText = `🟢 SOBRE MEDIA (${val.toFixed(2)}x)`;
         }
     }
 };
@@ -1509,6 +1559,7 @@ chart.subscribeCrosshairMove((param) => {
                 const prev = arr.length > 1 ? arr[arr.length - 2] : null;
                 const prev2 = arr.length > 2 ? arr[arr.length - 3] : null;
                 window.updateCandlePatternIndicator(last, prev, prev2);
+                if (typeof window.updateVolBadge === 'function') window.updateVolBadge(Number(last.volume), last.close >= last.open);
                 const lastRv = window._lastRvolByTime ? window._lastRvolByTime.get(last.time) : last.rvol_tod;
                 if (typeof window.updateRvolBadge === 'function') window.updateRvolBadge(lastRv);
             }
@@ -1561,6 +1612,7 @@ chart.subscribeCrosshairMove((param) => {
         if (pt) {
             if (typeof pt.rsi === 'number') window.updateRsiBadge(pt.rsi);
             if (typeof pt.atr === 'number') window.updateAtrBadge(pt.atr, pt.close);
+            if (typeof window.updateVolBadge === 'function') window.updateVolBadge(Number(pt.volume), pt.close >= pt.open);
             const rv = window._lastRvolByTime && window._lastRvolByTime.has(pt.time) ? window._lastRvolByTime.get(pt.time) : pt.rvol_tod;
             if (typeof window.updateRvolBadge === 'function') window.updateRvolBadge(typeof rv === 'number' ? rv : null);
         }
@@ -6252,6 +6304,7 @@ symbolSelect.addEventListener('change', () => {
     vwapLowerSeries.setData([]);
     if (rsiSeries) rsiSeries.setData([]);
     if (atrSeries) atrSeries.setData([]);
+    if (volSeries) volSeries.setData([]);
     if (rvolSeries) rvolSeries.setData([]);
     if (window._lastRvolByTime) window._lastRvolByTime.clear();
     fetchMarketData();
@@ -6346,6 +6399,21 @@ async function fetchMarketData() {
                     atrSeries.setData(atrData);
                     const lastClose = cleanCandleData[cleanCandleData.length - 1]?.close || 0;
                     window.updateAtrBadge(atrData[atrData.length - 1].value, lastClose);
+                }
+
+                // --- ACTUALIZACIÓN DE VOLUMEN (BARRAS POR DIRECCIÓN DE VELA) ---
+                if (volSeries) {
+                    const colorFn = (window.KulaChartEngine && window.KulaChartEngine.formulas && typeof window.KulaChartEngine.formulas.getVolumeBarColor === 'function')
+                        ? window.KulaChartEngine.formulas.getVolumeBarColor
+                        : (d => (d.close >= d.open ? 'rgba(38, 166, 154, 0.72)' : 'rgba(239, 83, 80, 0.72)'));
+                    const volData = data
+                        .filter(d => typeof d.volume === 'number' && !isNaN(d.volume) && d.volume > 0)
+                        .map(d => ({ time: d.time, value: d.volume, color: colorFn(d) }));
+                    volSeries.setData(volData);
+                    const lastPt = data.length > 0 ? data[data.length - 1] : null;
+                    if (typeof window.updateVolBadge === 'function') {
+                        window.updateVolBadge(lastPt ? Number(lastPt.volume) : null, lastPt ? lastPt.close >= lastPt.open : true);
+                    }
                 }
 
                 // --- ACTUALIZACIÓN DE RVOL (VOLUMEN RELATIVO POR HORA DEL DÍA) ---
@@ -6445,6 +6513,7 @@ window.addEventListener('resize', () => {
     if (chart && chartContainer) chart.applyOptions({ width: chartContainer.clientWidth });
     if (rsiChart && rsiContainer) rsiChart.applyOptions({ width: rsiContainer.clientWidth });
     if (atrChart && atrContainer) atrChart.applyOptions({ width: atrContainer.clientWidth });
+    if (volChart && volContainer) volChart.applyOptions({ width: volContainer.clientWidth });
     if (rvolChart && rvolContainer) rvolChart.applyOptions({ width: rvolContainer.clientWidth });
 });
 
@@ -8995,6 +9064,7 @@ document.getElementById('timeframeSelect')?.addEventListener('change', () => {
     vwapLowerSeries.setData([]);
     if (rsiSeries) rsiSeries.setData([]);
     if (atrSeries) atrSeries.setData([]);
+    if (volSeries) volSeries.setData([]);
     if (rvolSeries) rvolSeries.setData([]);
     if (window._lastRvolByTime) window._lastRvolByTime.clear();
     if (typeof window.updateQuickTimeframeButtons === 'function') {

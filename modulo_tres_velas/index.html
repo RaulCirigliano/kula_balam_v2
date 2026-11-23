@@ -11,7 +11,7 @@
   <!-- TradingView Lightweight Charts (Librería Oficial Gráficos Reales) -->
   <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
   <!-- Motor Gráfico y Fórmulas Cuantitativas Centralizadas de Kula Balam -->
-  <script src="kula-chart-engine.js"></script>
+  <script src="kula-chart-engine.js?v=20261123_volrvol"></script>
   <!-- Cockpit Cuantitativo Avanzado TradingView Pro (Herramientas, Replay, Paper & Auditor Forense) -->
   <script src="cockpit.js"></script>
   <!-- Overlays de los 5 Puntos de la Tríada y Ejecución Asistida Protegida (Simulación Aislada) -->
@@ -364,7 +364,10 @@
       <button type="button" onclick="window.toggleAuxPanelFromToolbar && window.toggleAuxPanelFromToolbar('panelAtr')" id="btnTopAtr14" class="px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-amber-950/80 text-amber-300 border border-amber-500/40 shadow-sm" title="Mostrar/Ocultar Sub-Gráfico Volatilidad Real ATR (14)">
         <span>⚡</span> ATR (14)
       </button>
-      <button type="button" onclick="window.toggleAuxPanelFromToolbar && window.toggleAuxPanelFromToolbar('panelRvol')" id="btnTopRvol" class="px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-sm" title="Mostrar/Ocultar Sub-Gráfico RVOL (Volumen Relativo por Hora del Día)">
+      <button type="button" onclick="window.toggleAuxPanel && window.toggleAuxPanel('vol', !document.getElementById('chkPanelVol')?.checked)" id="btnTopVol" class="px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-teal-500/25 text-teal-200 border border-teal-400 shadow-sm" title="Mostrar/Ocultar Sub-Gráficos de Volumen debajo de cada vela">
+        <span>📊</span> Vol
+      </button>
+      <button type="button" onclick="window.toggleAuxPanelFromToolbar && window.toggleAuxPanelFromToolbar('panelRvol')" id="btnTopRvol" class="px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-sm" title="Mostrar/Ocultar Sub-Gráfico RVOL Bipolar (Verde ≥ 1.0x / Rojo < 1.0x)">
         <span>📊</span> RVOL
       </button>
       <button type="button" onclick="openLayersModal()" class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1 border border-slate-700 cursor-pointer" title="Configurar todas las capas visuales e indicadores del gráfico">
@@ -1423,8 +1426,9 @@
               <span id="rvolStatusBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-sky-300 border border-sky-700/60">⚪ Normal</span>
             </div>
             <div class="flex items-center space-x-3 text-[11px] font-mono">
-              <span class="text-slate-400">Normal: 1.0x</span>
-              <span class="text-emerald-400 font-semibold">Institucional: ≥ 2.0x</span>
+              <span class="text-rose-400">Bajo media: &lt;1.0x</span>
+              <span class="text-emerald-400">Sobre media: ≥1.0x</span>
+              <span class="text-emerald-300 font-semibold">Ruptura: ≥2.0x</span>
               <span class="text-emerald-300 font-bold ml-1">RVOL: <span id="rvolLiveValue" class="text-white text-sm font-semibold">--x</span></span>
             </div>
           </div>
@@ -3567,7 +3571,8 @@
           rightPriceScale: { borderColor: '#e0e3eb', scaleMargins: { top: 0.15, bottom: 0.05 }, minimumWidth: 68 }
         }));
         rvolSeries = rvolChart.addHistogramSeries({
-          color: 'rgba(56, 189, 248, 0.55)',
+          base: 1.0,
+          color: 'rgba(74, 222, 128, 0.58)',
           priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
           priceLineVisible: false,
           lastValueVisible: true,
@@ -3763,6 +3768,14 @@
           const el = document.getElementById(id);
           if (el) el.classList.toggle('hidden', !isChecked);
         });
+        const chkVol = document.getElementById('chkPanelVol');
+        if (chkVol && chkVol.checked !== isChecked) chkVol.checked = isChecked;
+        const btnVol = document.getElementById('btnTopVol');
+        if (btnVol) {
+          btnVol.className = isChecked
+            ? "px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-teal-500/25 text-teal-200 border border-teal-400 shadow-sm"
+            : "px-2 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-teal-950/80 text-teal-300 border border-teal-500/40 shadow-sm";
+        }
         if (typeof window.reflowAllCharts === 'function') window.reflowAllCharts();
         return;
       }
