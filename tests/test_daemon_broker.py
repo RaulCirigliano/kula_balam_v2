@@ -988,16 +988,21 @@ def test_candado_piso_costo_040_con_colchon_respiracion(isolated_daemon):
     """
     Regla General 1:
     Verifica que un avance bruto de +0.41% (ej. BTC de $77,448.48 a $77,767.16) arma inmediatamente
-    el Candado de Piso de Costo Real (be_armed=1) situando el stop técnico en +0.25% bruto (~$77,642.10),
-    cubriendo el 100% de las comisiones de ida y vuelta ($0.20 USDT) más +$0.05 USDT netos y dejando
-    ~$125 de holgura bajo el pico para no ahogar el trade.
+    el Candado de Piso de Costo Real (be_armed=1) situando el stop técnico en
+    gross_target_for_net(0.05 + 0.03, fee=0.10, spread=0.05) (~+0.3807% bruto / ~$77,743.33),
+    cubriendo el 100% de las comisiones + spread ida y vuelta más colchón anti-slippage,
+    de modo que el cierre por Breakeven Real jamás termine en pérdida neta.
     """
+    from backend.quant_risk import gross_target_for_net
+
     isolated_daemon.strategy = "kula_balam_cava_ruiz"
     isolated_daemon.broker.place_entry(
         "BTC/USDT", "BUY", qty=0.00129118, price=77448.48, initial_tp_pct=2.1, initial_sl_pct=0.6
     )
+    expected_be_gross = round(gross_target_for_net(0.08, 0.10, 0.05), 4)
+    expected_be_price = 77448.48 * (1.0 + expected_be_gross / 100.0)
 
-    # 1. Precio toca $77,767.16 (+0.4115% bruto >= +0.40%): arma el Candado de Piso de Costo Real (+0.25% bruto)
+    # 1. Precio toca $77,767.16 (+0.4115% bruto >= +0.40%): arma el Candado de Piso de Costo Real (+0.3807% bruto)
     with patch("backend.main.get_price", return_value={"symbol": "BTC/USDT", "price": 77767.16}):
         liq1 = isolated_daemon._check_open_positions_protections()
     assert len(liq1) == 0
@@ -1006,21 +1011,21 @@ def test_candado_piso_costo_040_con_colchon_respiracion(isolated_daemon):
     assert pos["be_armed"] == 1
     assert pos["current_stop_net_pct"] == pytest.approx(0.15, 0.01)
     cf = isolated_daemon.counterfactual_cache["BTC/USDT"]
-    assert cf["active_stop_price"] == pytest.approx(77642.10, abs=1.0)
+    assert cf["active_stop_price"] == pytest.approx(expected_be_price, abs=1.0)
 
-    # 2. Retroceso normal de descanso a $77,680.00 (+0.30% bruto): NO ahoga ni cierra la operación
-    with patch("backend.main.get_price", return_value={"symbol": "BTC/USDT", "price": 77680.00}):
+    # 2. Retroceso menor por encima del piso real ($77,755.00 > $77,743.33): NO cierra la operación
+    with patch("backend.main.get_price", return_value={"symbol": "BTC/USDT", "price": 77755.00}):
         liq2 = isolated_daemon._check_open_positions_protections()
     assert len(liq2) == 0
     assert len(isolated_daemon.broker.fetch_positions()) == 1
 
-    # 3. Caída a $77,640.00 (debajo de $77,642.10): ejecuta Breakeven Real con GANANCIA NETA POSITIVA tras comisiones
-    with patch("backend.main.get_price", return_value={"symbol": "BTC/USDT", "price": 77640.00}):
+    # 3. Caída a $77,742.00 (debajo de $77,743.33): ejecuta Breakeven Real con GANANCIA NETA POSITIVA tras comisiones
+    with patch("backend.main.get_price", return_value={"symbol": "BTC/USDT", "price": 77742.00}):
         liq3 = isolated_daemon._check_open_positions_protections()
     assert len(liq3) == 1
     assert liq3[0]["action"] == "BREAKEVEN_REAL"
     assert len(isolated_daemon.broker.fetch_positions()) == 0
-    assert liq3[0]["result"]["net_pnl"] > 0.04
+    assert liq3[0]["result"]["net_pnl"] > 0.10
 
 
 def test_peluqueo_50_climax_rsi_70_con_ganancia_1pct(isolated_daemon):
@@ -1342,12 +1347,13 @@ def test_daemon_vault_slot_alloc_pct_25_with_sl_loss_cap(tmp_path, monkeypatch):
 
 def test_daemon_auto_active_strategies_uncapped_trailing_runner(isolated_daemon):
     """
-    Bajo Cerebro Kula Autónomo ('auto'), TODAS las estrategias activas/promovidas
-    (squeeze_dual_eth_4h_slot1, donchian_breakout_1h, cava_fallo_macd_eurusd_1h)
-    operan SIN TECHO de ganancia: peluquean 50% en TP1 (si >= $5) y dejan correr
-    el remanente con Trailing Stop móvil subiendo sin cerrar por TAKE_PROFIT.
+    Bajo Cerebro Kula Autónomo ('auto'):
+    1. Las estrategias con Peluqueo/Trailing explícito (kula_balam_cava_ruiz, trailing_trend_runner)
+       operan SIN TECHO: peluquean 50% en TP1 y dejan correr el remanente con Trailing Stop móvil.
+    2. Las estrategias certificadas en Lab con BREAKEVEN_RR == 0.0 y TRAILING_ATR_MULT == 0.0
+       (squeeze_dual_eth_4h_slot1, donchian_breakout_1h) liquidan 100% por TAKE_PROFIT sin peluqueo ni trailing.
     """
-    for idx, strat_id in enumerate(["squeeze_dual_eth_4h_slot1", "donchian_breakout_1h"]):
+    for idx, strat_id in enumerate(["kula_balam_cava_ruiz", "trailing_trend_runner"]):
         sym = "ETH/USDT" if idx == 0 else "SOL/USDT"
         isolated_daemon.strategy = "auto"
         isolated_daemon.broker.place_entry(
@@ -1386,12 +1392,33 @@ def test_daemon_auto_active_strategies_uncapped_trailing_runner(isolated_daemon)
         assert liq3[0]["result"]["net_pnl"] > 3.0
         assert isolated_daemon.broker.fetch_positions() == []
 
+    # 4. Estrategias de catálogo sin trailing (TRAILING_ATR_MULT == 0.0) y donchian_breakout_1h cierran 100% en TP
+    for idx, strat_id in enumerate(["squeeze_dual_eth_4h_slot1", "donchian_breakout_1h"]):
+        sym = "ETH/USDT" if idx == 0 else "SOL/USDT"
+        isolated_daemon.strategy = "auto"
+        isolated_daemon.broker.place_entry(
+            sym,
+            "BUY",
+            qty=1.0,
+            price=100.0,
+            initial_tp_pct=3.0,
+            initial_sl_pct=1.5,
+            strategy=strat_id,
+        )
+        with patch("backend.main.get_price", return_value={"symbol": sym, "price": 103.50}), \
+             patch("backend.main.get_analysis", return_value={"rsi": 58.0}):
+            liq_tp = isolated_daemon._check_open_positions_protections()
+        assert len(liq_tp) == 1
+        assert liq_tp[0]["action"] == "TAKE_PROFIT"
+        assert isolated_daemon.broker.fetch_positions() == []
+
 
 def test_daemon_auto_forex_scaled_breakeven_and_trailing(isolated_daemon):
     """
-    En Forex (=X, EURUSD=X) bajo Cerebro Kula ('auto'), los umbrales de Breakeven (+0.16%),
-    Cerrojo (+0.25%) y Trailing Stop (~0.12%-0.22% detrás del pico) escalan a escala Forex
-    en vez de exigir 1.5% (168 pips) de cripto, manteniendo la ganancia sin techo.
+    En Forex (=X, EURUSD=X) bajo Cerebro Kula ('auto'):
+    1. Para `cava_fallo_macd_eurusd_1h` (BREAKEVEN_RR=0.0, TRAILING_ATR_MULT=1.8):
+       NO arma Breakeven prematuro en +0.18%, pero sí activa Peluqueo/Trailing escalado a Forex.
+    2. Para `kula_balam_cava_ruiz` (con BE habilitado): arma Breakeven Real Forex en +0.18%.
     """
     isolated_daemon.broker.set_operating_capital("USD", 500.0)
     isolated_daemon.strategy = "auto"
@@ -1405,16 +1432,17 @@ def test_daemon_auto_forex_scaled_breakeven_and_trailing(isolated_daemon):
         strategy="cava_fallo_macd_eurusd_1h",
     )
 
-    # 1. Avance +0.18% ($1.12202, ~20 pips): arma Breakeven Real Forex
+    # 1. Avance +0.18% ($1.12202 < 1R=0.21%): como BREAKEVEN_RR == 0.0, NO arma BE prematuro
     with patch("backend.estrategias.registry.is_asset_market_open", return_value=True), \
          patch("backend.main.get_price", return_value={"symbol": "EURUSD=X", "price": 1.12202}), \
          patch("backend.main.get_analysis", return_value={"rsi": 56.0}):
         liq1 = isolated_daemon._check_open_positions_protections()
     assert liq1 == []
     pos1 = isolated_daemon.broker.fetch_positions()[0]
-    assert pos1["be_armed"] == 1
+    assert pos1["be_armed"] == 0
+    assert pos1["trail_active"] == 0
 
-    # 2. Avance +0.50% ($1.12560 >= TP1 0.45%): Peluqueo 50% en EURUSD
+    # 2. Avance +0.50% ($1.12560 >= TP1 0.45%): TRAILING_ATR_MULT=1.8 habilita Peluqueo 50% en EURUSD
     with patch("backend.estrategias.registry.is_asset_market_open", return_value=True), \
          patch("backend.main.get_price", return_value={"symbol": "EURUSD=X", "price": 1.12560}), \
          patch("backend.main.get_analysis", return_value={"rsi": 60.0}):
@@ -1440,6 +1468,23 @@ def test_daemon_auto_forex_scaled_breakeven_and_trailing(isolated_daemon):
     assert len(liq4) == 1
     assert liq4[0]["action"] == "TRAILING_STOP"
     assert liq4[0]["result"]["net_pnl"] > 0
+
+    # 5. Estrategia con BE habilitado (kula_balam_cava_ruiz) en Forex SÍ arma BE Real en +0.18%
+    isolated_daemon.broker.place_entry(
+        "EURUSD=X",
+        "BUY",
+        qty=100.0,
+        price=1.1200,
+        initial_tp_pct=0.45,
+        initial_sl_pct=0.21,
+        strategy="kula_balam_cava_ruiz",
+    )
+    with patch("backend.estrategias.registry.is_asset_market_open", return_value=True), \
+         patch("backend.main.get_price", return_value={"symbol": "EURUSD=X", "price": 1.12202}), \
+         patch("backend.main.get_analysis", return_value={"rsi": 56.0}):
+        liq_be = isolated_daemon._check_open_positions_protections()
+    assert liq_be == []
+    assert isolated_daemon.broker.fetch_positions()[0]["be_armed"] == 1
 
 
 def test_vault_book_slot_isolation_drop_regime_usdt_allows_usd_stocks(tmp_path, monkeypatch):
@@ -2007,6 +2052,153 @@ def test_ttm_squeeze_eth_1h_and_sol_4h_registered_isolated_and_whitelisted(isola
     wl_block = app_js[wl_start:app_js.index("]);", wl_start)]
     assert "'ttm_squeeze_eth_1h'" in wl_block
     assert "'ttm_squeeze_sol_4h'" in wl_block
+
+
+def test_catalog_strategies_no_premature_breakeven_at_044pct(isolated_daemon):
+    """
+    Regresión del bug en vivo de ETH/USDT SHORT (`2_squeeze_dual_eth_4h`, entrada $1,641.93,
+    pico $1,634.71 = +0.44%, rebote $1,641.80 -> -$0.91 por BE prematuro):
+    Verifica que `2_squeeze_dual_eth_4h`, `ttm_squeeze_eth_1h`, `ttm_squeeze_sol_4h` y
+    `donchian_breakout_1h` (todas con BREAKEVEN_RR == 0.0 y TRAILING_ATR_MULT == 0.0) bajo
+    `strategy="auto"` NO activan Pre-BE Short (+0.30%), Escalón 1A/1B (+0.44%), Cerrojo de
+    Scalping (+1.20%) ni Trailing Stop, cerrando exclusivamente por SL o TP.
+    """
+    # Caso A: Reproducción exacta al centavo del incidente ETH/USDT SHORT en 2_squeeze_dual_eth_4h
+    isolated_daemon.strategy = "auto"
+    isolated_daemon.broker.place_entry(
+        "ETH/USDT",
+        "SHORT",
+        qty=0.289,
+        price=1641.93,
+        initial_tp_pct=4.5,
+        initial_sl_pct=1.8,
+        strategy="2_squeeze_dual_eth_4h",
+    )
+
+    with patch("backend.main.get_price", return_value={"symbol": "ETH/USDT", "price": 1634.71}):
+        liq_peak = isolated_daemon._check_open_positions_protections()
+    assert liq_peak == []
+    pos_peak = isolated_daemon.broker.fetch_positions()[0]
+    assert pos_peak["be_armed"] == 0
+    assert pos_peak["trail_active"] == 0
+    assert pos_peak["current_stop_net_pct"] == pytest.approx(-1.8, abs=1e-4)
+
+    # Rebote al precio de entrada ($1,641.80): NO debe liquidar por Breakeven Real
+    with patch("backend.main.get_price", return_value={"symbol": "ETH/USDT", "price": 1641.80}):
+        liq_rebound = isolated_daemon._check_open_positions_protections()
+    assert liq_rebound == []
+    assert len(isolated_daemon.broker.fetch_positions()) == 1
+    isolated_daemon.broker.flatten("ETH/USDT", current_price=1641.80)
+
+    # Caso B: Matriz completa LONG y SHORT para las 3 estrategias pedidas + donchian_breakout_1h
+    cases = [
+        ("2_squeeze_dual_eth_4h", "ETH/USDT", "SHORT"),
+        ("2_squeeze_dual_eth_4h", "ETH/USDT", "LONG"),
+        ("ttm_squeeze_eth_1h", "ETH/USDT", "SHORT"),
+        ("ttm_squeeze_eth_1h", "ETH/USDT", "LONG"),
+        ("ttm_squeeze_sol_4h", "SOL/USDT", "SHORT"),
+        ("ttm_squeeze_sol_4h", "SOL/USDT", "LONG"),
+        ("donchian_breakout_1h", "SOL/USDT", "SHORT"),
+    ]
+    for strat_id, sym, side in cases:
+        isolated_daemon.strategy = "auto"
+        entry_px = 100.0
+        isolated_daemon.broker.place_entry(
+            sym,
+            side,
+            qty=1.0,
+            price=entry_px,
+            initial_tp_pct=4.0,
+            initial_sl_pct=2.0,
+            strategy=strat_id,
+        )
+
+        # 1. Avance +0.35% (zona Pre-BE Short): sin compresión de SL
+        px_035 = entry_px * (1.0 - 0.0035) if side == "SHORT" else entry_px * (1.0 + 0.0035)
+        with patch("backend.main.get_price", return_value={"symbol": sym, "price": px_035}):
+            assert isolated_daemon._check_open_positions_protections() == []
+        pos = isolated_daemon.broker.fetch_positions()[0]
+        assert pos["be_armed"] == 0, f"{strat_id} {side} armó BE en +0.35%"
+        assert pos["current_stop_net_pct"] == pytest.approx(-2.0, abs=1e-4)
+
+        # 2. Avance +0.44% (zona Escalón 1A): be_armed=0, trail_active=0
+        px_044 = entry_px * (1.0 - 0.0044) if side == "SHORT" else entry_px * (1.0 + 0.0044)
+        with patch("backend.main.get_price", return_value={"symbol": sym, "price": px_044}):
+            assert isolated_daemon._check_open_positions_protections() == []
+        pos = isolated_daemon.broker.fetch_positions()[0]
+        assert pos["be_armed"] == 0, f"{strat_id} {side} sufrió BE prematuro en +0.44%"
+        assert pos["trail_active"] == 0, f"{strat_id} {side} activó trailing en +0.44%"
+        assert pos["current_stop_net_pct"] == pytest.approx(-2.0, abs=1e-4)
+
+        # 3. Avance +1.20% (zona Cerrojo Scalping): sigue sin BE ni Cerrojo ni Trailing
+        px_120 = entry_px * (1.0 - 0.0120) if side == "SHORT" else entry_px * (1.0 + 0.0120)
+        with patch("backend.main.get_price", return_value={"symbol": sym, "price": px_120}):
+            assert isolated_daemon._check_open_positions_protections() == []
+        pos = isolated_daemon.broker.fetch_positions()[0]
+        assert pos["be_armed"] == 0, f"{strat_id} {side} activó Cerrojo Scalping en +1.20%"
+        assert pos["trail_active"] == 0
+        assert pos["current_stop_net_pct"] == pytest.approx(-2.0, abs=1e-4)
+
+        # 4. Retroceso de vuelta al precio de entrada: sigue abierta sin liquidar en falso BE
+        with patch("backend.main.get_price", return_value={"symbol": sym, "price": entry_px}):
+            assert isolated_daemon._check_open_positions_protections() == []
+        assert len(isolated_daemon.broker.fetch_positions()) == 1
+
+        # 5. Alcance de TP (+4.2%): liquida 100% por TAKE_PROFIT (sin peluqueo ni trailing)
+        px_tp = entry_px * (1.0 - 0.042) if side == "SHORT" else entry_px * (1.0 + 0.042)
+        with patch("backend.main.get_price", return_value={"symbol": sym, "price": px_tp}):
+            liq_tp = isolated_daemon._check_open_positions_protections()
+        assert len(liq_tp) == 1
+        assert liq_tp[0]["action"] == "TAKE_PROFIT"
+        assert isolated_daemon.broker.fetch_positions() == []
+
+
+def test_breakeven_real_covers_fee_spread_and_slippage_no_net_loss(isolated_daemon):
+    """
+    Verifica que donde SÍ existe Breakeven (ej. `kula_balam_cava_ruiz`), el piso temprano
+    usa `gross_target_for_net(be_early_net_pct + anti_slippage, pos_fee, pos_spread)` de modo
+    que el retorno neto tras comisiones + spread sea estrictamente positivo tanto en LONG como
+    en SHORT y nunca cierre un empate en pérdida neta.
+    """
+    from backend.quant_risk import gross_target_for_net, net_return_after_costs
+
+    expected_gross = round(gross_target_for_net(0.08, 0.10, 0.05), 4)
+    assert expected_gross > 0.35
+    assert net_return_after_costs(expected_gross, 0.10, 0.05) >= 0.075
+
+    for side in ("LONG", "SHORT"):
+        isolated_daemon.strategy = "kula_balam_cava_ruiz"
+        entry_px = 1641.93
+        isolated_daemon.broker.place_entry(
+            "ETH/USDT",
+            side,
+            qty=0.10,
+            price=entry_px,
+            initial_tp_pct=3.0,
+            initial_sl_pct=1.5,
+            strategy="kula_balam_cava_ruiz",
+        )
+
+        # Avance +0.44% arma BE Real en kula_balam_cava_ruiz
+        px_arm = entry_px * (1.0 - 0.0044) if side == "SHORT" else entry_px * (1.0 + 0.0044)
+        with patch("backend.main.get_price", return_value={"symbol": "ETH/USDT", "price": px_arm}):
+            assert isolated_daemon._check_open_positions_protections() == []
+
+        pos = isolated_daemon.broker.fetch_positions()[0]
+        assert pos["be_armed"] == 1
+        expected_stop = entry_px * (1.0 - expected_gross / 100.0) if side == "SHORT" else entry_px * (1.0 + expected_gross / 100.0)
+        cf = isolated_daemon.counterfactual_cache["ETH/USDT"]
+        assert cf["active_stop_price"] == pytest.approx(expected_stop, abs=0.05)
+
+        # Cierre justo al cruzar el piso de Breakeven Real: PnL neto estrictamente positivo (> 0)
+        px_trigger = expected_stop * 1.0001 if side == "SHORT" else expected_stop * 0.9999
+        with patch("backend.main.get_price", return_value={"symbol": "ETH/USDT", "price": px_trigger}):
+            liq = isolated_daemon._check_open_positions_protections()
+        assert len(liq) == 1
+        assert liq[0]["action"] == "BREAKEVEN_REAL"
+        assert liq[0]["result"]["net_pnl"] > 0.0
+        assert isolated_daemon.broker.fetch_positions() == []
+
 
 
 

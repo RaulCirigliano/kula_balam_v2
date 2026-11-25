@@ -24,6 +24,8 @@ logger = logging.getLogger("trader_daemon")
 BE_THRESHOLD_GROSS_DEFAULT: float = 0.40
 SWING_4H_LAB_STRATEGIES = (
     "1_donchian_breakout_sol_4h",
+    "2_squeeze_dual_eth_4h",
+    "ttm_squeeze_sol_4h",
     "squeeze_dual_eth_fondeo_strict_4h",
     "squeeze_dual_eth_4h_slot1",
     "squeeze_dual_eth_4h",
@@ -33,14 +35,77 @@ BE_THRESHOLD_GROSS_BY_STRATEGY: Dict[str, float] = {
     "donchian_breakout_1h": 1.00,
     "kula_cava_sol_1h": 1.00,
     "kula_cava_eth_1h": 1.00,
+    "ttm_squeeze_eth_1h": 1.00,
     "mtf_presencial_15m": 1.00,
     "mtf_presencial_5m": 1.00,
     "1_donchian_breakout_sol_4h": 1.40,
+    "2_squeeze_dual_eth_4h": 1.40,
+    "ttm_squeeze_sol_4h": 1.40,
     "squeeze_dual_eth_fondeo_strict_4h": 1.40,
     "squeeze_dual_eth_4h_slot1": 1.40,
     "squeeze_dual_eth_4h": 1.40,
     "3_squeeze_dual_eth_oos_4h": 1.40,
 }
+
+
+def _resolve_strategy_exit_policy(pos_strategy: str) -> Dict[str, Any]:
+    """
+    Resuelve la política de salida (Breakeven, Trailing Stop, Peluqueo) declarada por la estrategia.
+    - Para estrategias promovidas del catálogo (`CatalogFormulaStrategy`): lee `BREAKEVEN_RR` y
+      `TRAILING_ATR_MULT` desde el módulo de la fórmula (por defecto 0.0 si no se declaran,
+      en paridad exacta con `backtest_lab/server.py`).
+    - Para `donchian_breakout_1h`: certificada en Lab con SL/TP ATR puros (`BREAKEVEN_RR=0.0`,
+      `TRAILING_ATR_MULT=0.0`), incluso cuando se ejecuta bajo el orquestador `"auto"`.
+    - Para estrategias nativas con runner explícito (ej. `kula_balam_cava_ruiz`,
+      `trailing_trend_runner`, `trailing_short_runner`, `alex_ruiz_triada_3velas`,
+      `triple_confluencia_4h`, etc.): conserva Breakeven + Peluqueo + Trailing Stop habilitados.
+    """
+    sid = str(pos_strategy or "").strip()
+    if sid == "donchian_breakout_1h":
+        return {
+            "is_catalog_policy": True,
+            "breakeven_rr": 0.0,
+            "trailing_atr_mult": 0.0,
+            "be_enabled": False,
+            "trailing_enabled": False,
+            "peluqueo_enabled": False,
+        }
+
+    try:
+        from backend.estrategias.registry import get_strategy
+        strat_obj = get_strategy(sid) if sid else None
+    except Exception:
+        strat_obj = None
+
+    if strat_obj is not None and hasattr(strat_obj, "_load_module"):
+        be_rr = 0.0
+        trail_mult = 0.0
+        try:
+            mod = strat_obj._load_module()
+            raw_be = getattr(mod, "BREAKEVEN_RR", 0.0)
+            raw_tr = getattr(mod, "TRAILING_ATR_MULT", 0.0)
+            be_rr = float(raw_be) if raw_be is not None else 0.0
+            trail_mult = float(raw_tr) if raw_tr is not None else 0.0
+        except Exception:
+            be_rr = 0.0
+            trail_mult = 0.0
+        return {
+            "is_catalog_policy": True,
+            "breakeven_rr": be_rr,
+            "trailing_atr_mult": trail_mult,
+            "be_enabled": be_rr > 0.0,
+            "trailing_enabled": trail_mult > 0.0,
+            "peluqueo_enabled": trail_mult > 0.0,
+        }
+
+    return {
+        "is_catalog_policy": False,
+        "breakeven_rr": None,
+        "trailing_atr_mult": None,
+        "be_enabled": True,
+        "trailing_enabled": True,
+        "peluqueo_enabled": True,
+    }
 
 # Lista Blanca Estricta Cuantitativa Donchian (4H / 1D):
 # 7 activos y temporalidades validados empíricamente
@@ -1389,13 +1454,24 @@ class TraderDaemon:
             trade_id = pos.get("id")
             pos_strategy = str(pos.get("strategy") or self.strategy)
             is_pos_short = str(pos.get("side") or "").upper() == "SHORT"
-            # Solo en ejecución aislada donchian_breakout_1h se mantiene TP fijo (compatibilidad unit test);
-            # en Cerebro Kula Autónomo ("auto"), Donchian y todas las estrategias tácticas/promovidas corren SIN TECHO con Stop Móvil.
-            is_donchian = (self.strategy == "donchian_breakout_1h" and pos_strategy == "donchian_breakout_1h")
+            exit_policy = _resolve_strategy_exit_policy(pos_strategy)
+            be_enabled = bool(exit_policy["be_enabled"])
+            trailing_enabled = bool(exit_policy["trailing_enabled"])
+            peluqueo_enabled = bool(exit_policy["peluqueo_enabled"])
+            policy_be_rr = exit_policy["breakeven_rr"]
+            # Paridad Lab vs Producción: donchian_breakout_1h y estrategias de catálogo con
+            # BREAKEVEN_RR == 0.0 / TRAILING_ATR_MULT == 0.0 operan con SL/TP puros sin BE ni Trailing,
+            # incluso bajo el orquestador "auto". Estrategias runner explícitas (kula_balam_cava_ruiz, etc.)
+            # conservan Peluqueo + Breakeven + Trailing sin techo.
+            is_donchian = (pos_strategy == "donchian_breakout_1h")
             FIXED_TP_ONLY_STRATEGIES = ("manual", "nasdaq_araujo_vwap", "mean_reversion_atr", "hyenuk_chu_multibagger")
             is_trailing_runner = (
-                self.strategy in ("trailing_trend_runner", "trailing_short_runner", "kula_balam_cava_ruiz", "alex_ruiz_triada_3velas", "triple_confluencia_4h")
-                or (self.strategy == "auto" and pos_strategy not in FIXED_TP_ONLY_STRATEGIES)
+                trailing_enabled
+                and not is_donchian
+                and (
+                    self.strategy in ("trailing_trend_runner", "trailing_short_runner", "kula_balam_cava_ruiz", "alex_ruiz_triada_3velas", "triple_confluencia_4h")
+                    or (self.strategy == "auto" and pos_strategy not in FIXED_TP_ONLY_STRATEGIES)
+                )
             )
 
             # 1. Calcular PnL bruto y neto actual (Simétrico: LONG vs SHORT) con fricción real por activo
@@ -1417,7 +1493,12 @@ class TraderDaemon:
             net_pnl_pct = net_return_after_costs(gross_pnl_pct, pos_fee, pos_spread)
 
             # 2. Rastreo continuo de Extremo Favorable (Pico Máximo para LONG / Valle Mínimo para SHORT)
-            cached_peak = float((self.counterfactual_cache.get(sym) or {}).get("peak_price") or entry_price)
+            cached_cf = self.counterfactual_cache.get(sym) or {}
+            cached_peak = (
+                float(cached_cf.get("peak_price") or entry_price)
+                if (trade_id is not None and cached_cf.get("trade_id") == trade_id)
+                else entry_price
+            )
             db_peak = float(pos.get("peak_price") or entry_price)
             if is_pos_short:
                 peak_price = min(db_peak, cached_peak, cur_price) if (db_peak > 0 and cached_peak > 0) else cur_price
@@ -1490,14 +1571,17 @@ class TraderDaemon:
             be_threshold_gross = 0.08 if is_micro_fut_sym else (0.16 if is_forex_sym else BE_THRESHOLD_GROSS_BY_STRATEGY.get(pos_strategy, BE_THRESHOLD_GROSS_DEFAULT))
             be_lock_net_pct = 0.05 if is_micro_fut_sym else (0.45 if is_swing_lab else 0.15)
             be_early_net_pct = 0.02 if is_micro_fut_sym else (0.20 if is_swing_lab else 0.05)
+            be_slippage_cushion_pct = 0.01 if is_micro_fut_sym else (0.02 if is_forex_sym else 0.03)
             be_lock_gross_pct = gross_target_for_net(be_lock_net_pct, pos_fee, pos_spread)
-            be_early_gross_pct = max(0.05 if (pos_fee == 0.0 or is_micro_fut_sym or is_forex_sym) else 0.25, round(2.0 * pos_fee + 0.05, 4) if not is_forex_sym else 0.05)
+            be_early_gross_pct = round(gross_target_for_net(be_early_net_pct + be_slippage_cushion_pct, pos_fee, pos_spread), 4)
             effective_be_trigger_gross = be_threshold_gross
+            if policy_be_rr is not None and policy_be_rr > 0.0 and sl_pct > 0.0:
+                effective_be_trigger_gross = max(be_threshold_gross, round(policy_be_rr * sl_pct, 4))
             updated_trailing = False
             max_reached_gross = max(gross_pnl_pct, peak_gross_pct)
             be_upgrade_threshold = 0.15 if is_micro_fut_sym else (0.25 if is_forex_sym else (1.80 if is_swing_lab else 0.65))
             be_floor_gross_pct = be_lock_gross_pct if max_reached_gross >= be_upgrade_threshold else be_early_gross_pct
-            target_be_net_pct = be_lock_net_pct if max_reached_gross >= be_upgrade_threshold else be_early_net_pct
+            target_be_net_pct = be_lock_net_pct if max_reached_gross >= be_upgrade_threshold else round(be_early_net_pct + be_slippage_cushion_pct, 4)
             if is_pos_short:
                 be_target_price = entry_price * (1.0 - be_floor_gross_pct / 100.0)
             else:
@@ -1511,15 +1595,15 @@ class TraderDaemon:
             is_be_pass = (cur_price < be_target_price) if is_pos_short else (cur_price > be_target_price)
 
             # Pre-Breakeven para Shorting (Escalón 0.30% favorable -> comprime SL inicial un 60% si aún no armó BE)
-            # Para donchian_breakout_1h y Swing 4H: DESACOPLADO (sin compresión asfixiante prematura)
-            if not is_donchian and not is_swing_lab and is_pos_short and be_armed == 0 and max_reached_gross >= 0.30:
+            # Para donchian_breakout_1h, Swing 4H y estrategias con BREAKEVEN_RR == 0.0: DESACTIVADO
+            if be_enabled and not is_donchian and not is_swing_lab and is_pos_short and be_armed == 0 and max_reached_gross >= 0.30:
                 compressed_short_sl_net = -round(abs(sl_pct) * 0.40, 4)
                 if current_stop_net_pct < compressed_short_sl_net:
                     current_stop_net_pct = compressed_short_sl_net
                     pos["current_stop_net_pct"] = current_stop_net_pct
                     updated_trailing = True
 
-            if not is_donchian and max_reached_gross >= effective_be_trigger_gross and be_armed == 0 and is_be_pass:
+            if be_enabled and not is_donchian and max_reached_gross >= effective_be_trigger_gross and be_armed == 0 and is_be_pass:
                 be_armed = 1
                 pos["be_armed"] = 1
                 if current_stop_net_pct < be_lock_net_pct:
@@ -1542,7 +1626,7 @@ class TraderDaemon:
             else:
                 scalp_target_price = entry_price * (1.0 + scalp_floor_gross / 100.0)
 
-            if not is_donchian and max_reached_gross >= scalp_trigger_gross:
+            if be_enabled and not is_donchian and max_reached_gross >= scalp_trigger_gross:
                 if be_armed == 0:
                     be_armed = 1
                     pos["be_armed"] = 1
@@ -1669,10 +1753,12 @@ class TraderDaemon:
             cost_pos = float(pos.get("cost_basis") or (entry_price * qty_pos) or 100.0)
             counterfactual_diff_usd = cost_pos * (counterfactual_diff_pct / 100.0)
 
-            # Actualizar Trailing Stop activo si el nuevo stop supera el anterior (requiere Breakeven previo para no asfixiar el avance temprano)
-            # Para donchian_breakout_1h: DESACOPLADO (salida gobernada exclusivamente por MID_EXIT)
+            # Actualizar Trailing Stop activo si la estrategia lo habilita (TRAILING_ATR_MULT > 0 o runner nativo).
+            # Si Breakeven está activo, requiere BE previo; si BREAKEVEN_RR == 0.0 con TRAILING_ATR_MULT > 0.0,
+            # activa trailing a partir de 1.0R (paridad con backtest_lab/server.py).
             is_favorable_now = (cur_price < entry_price) if is_pos_short else (cur_price > entry_price)
-            if not is_donchian and is_favorable_now and chosen_net_pct > current_stop_net_pct and (be_armed == 1 or trail_active == 1):
+            trailing_arm_ready = (be_armed == 1 or trail_active == 1) if be_enabled else (trail_active == 1 or (sl_pct > 0.0 and peak_gross_pct >= sl_pct))
+            if trailing_enabled and not is_donchian and is_favorable_now and chosen_net_pct > current_stop_net_pct and trailing_arm_ready:
                 trail_active = 1
                 pos["trail_active"] = 1
                 current_stop_net_pct = chosen_net_pct
@@ -1685,27 +1771,31 @@ class TraderDaemon:
 
             # Si el Breakeven Real o el Cerrojo de Scalping supera al trailing bruto,
             # reflejar el Stop Efectivo Real en la telemetría (respetando el piso innegociable)
-            if not is_donchian:
-                floor_stop_px = scalp_target_price if max_reached_gross >= scalp_trigger_gross else be_target_price
+            if not is_donchian and (be_enabled or trailing_enabled):
+                floor_stop_px = scalp_target_price if (be_enabled and max_reached_gross >= scalp_trigger_gross) else be_target_price
                 stop_gross_equiv = gross_target_for_net(current_stop_net_pct, pos_fee, pos_spread)
                 if is_pos_short:
                     if be_armed == 1:
-                        protected_stop_px = min(floor_stop_px, active_stop_price)
+                        protected_stop_px = min(floor_stop_px, active_stop_price) if trail_active == 1 else floor_stop_px
+                    elif trail_active == 1:
+                        protected_stop_px = active_stop_price
                     elif current_stop_net_pct > -sl_pct:
                         protected_stop_px = min(entry_price * (1.0 - stop_gross_equiv / 100.0), active_stop_price)
                     else:
-                        protected_stop_px = active_stop_price
-                    if protected_stop_px < active_stop_price:
+                        protected_stop_px = active_stop_price if trailing_enabled else (entry_price * (1.0 + sl_pct / 100.0))
+                    if protected_stop_px < active_stop_price or not trailing_enabled:
                         active_stop_price = round(protected_stop_px, 6)
                         chosen_net_pct = round(current_stop_net_pct, 4)
                 else:
                     if be_armed == 1:
-                        protected_stop_px = max(floor_stop_px, active_stop_price)
+                        protected_stop_px = max(floor_stop_px, active_stop_price) if trail_active == 1 else floor_stop_px
+                    elif trail_active == 1:
+                        protected_stop_px = active_stop_price
                     elif current_stop_net_pct > -sl_pct:
                         protected_stop_px = max(entry_price * (1.0 + stop_gross_equiv / 100.0), active_stop_price)
                     else:
-                        protected_stop_px = active_stop_price
-                    if protected_stop_px > active_stop_price:
+                        protected_stop_px = active_stop_price if trailing_enabled else (entry_price * (1.0 - sl_pct / 100.0))
+                    if protected_stop_px > active_stop_price or not trailing_enabled:
                         active_stop_price = round(protected_stop_px, 6)
                         chosen_net_pct = round(current_stop_net_pct, 4)
             else:
@@ -1715,6 +1805,7 @@ class TraderDaemon:
 
             # Almacenar telemetría contrafáctica para la auditoría forense
             cf_info = {
+                "trade_id": trade_id,
                 "symbol": sym,
                 "entry_price": entry_price,
                 "cur_price": cur_price,
@@ -1866,7 +1957,7 @@ class TraderDaemon:
                 continue
 
             # 6. Cálculo del precio de salida de Stop Loss (SL Inicial vs Breakeven Real / Cerrojo Scalping / Trailing / Time-Decay)
-            floor_stop_px = scalp_target_price if max_reached_gross >= scalp_trigger_gross else be_target_price
+            floor_stop_px = scalp_target_price if (be_enabled and max_reached_gross >= scalp_trigger_gross) else be_target_price
             stop_gross_equiv = gross_target_for_net(current_stop_net_pct, pos_fee, pos_spread)
             if is_pos_short:
                 if be_armed == 1:
@@ -1952,7 +2043,7 @@ class TraderDaemon:
                     exit_label = "Breakeven Real"
                 else:
                     exit_label = "Stop Loss"
-                scalp_tag = " [CERROJO SCALPING]" if max_reached_gross >= scalp_trigger_gross else ""
+                scalp_tag = " [CERROJO SCALPING]" if (be_enabled and max_reached_gross >= scalp_trigger_gross) else ""
                 logger.info(f"🛑 [DAEMON {exit_label.upper()}{scalp_tag}] Precio actual ${cur_price} tocó {exit_label} ${sl_price:.2f} en {sym} ({'SHORT' if is_pos_short else 'LONG'}). Liquidando...")
                 try:
                     res = self.broker.flatten(sym, current_price=cur_price, exit_reason=exit_label)
@@ -2000,7 +2091,7 @@ class TraderDaemon:
                 or (is_pos_short and rsi_val <= climax_rsi_dn and gross_pnl_pct >= climax_min_gross)
             )
 
-            if (tp_hit or rsi_climax_trim) and not is_manual and not is_donchian and not already_trimmed and sl_pct > 0.0:
+            if (tp_hit or rsi_climax_trim) and peluqueo_enabled and not is_manual and not is_donchian and not already_trimmed and sl_pct > 0.0:
                 total_qty = float(pos.get("qty", 0.0))
                 if is_micro_fut_sym:
                     # En Micro-Futuros CME: cerrar exactamente 1 contrato (de 2) en TP1 y dejar 1 corriendo con trailing/BE
